@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
-import { QrCode, Smartphone, Copy, Check, Download, ExternalLink, Sparkles, RefreshCw } from 'lucide-react';
+import { QrCode, Smartphone, Copy, Check, Download, ExternalLink, Sparkles, RefreshCw, Apple } from 'lucide-react';
 
 interface PwaQrCodeCardProps {
   defaultUrl?: string;
@@ -12,6 +12,7 @@ export const PwaQrCodeCard: React.FC<PwaQrCodeCardProps> = ({ defaultUrl }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [selectedOS, setSelectedOS] = useState<'android' | 'ios'>('android');
 
   useEffect(() => {
     generateQrCode(targetUrl);
@@ -68,13 +69,13 @@ export const PwaQrCodeCard: React.FC<PwaQrCodeCardProps> = ({ defaultUrl }) => {
           </div>
           <div>
             <h3 className="font-bold text-slate-100 text-base flex items-center space-x-2">
-              <span>QR Code para Instalação PWA Sem Cabos</span>
+              <span>QR Code para Instalação PWA (iOS & Android)</span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Instalação 100% Direta
+                100% Sem Cabos
               </span>
             </h3>
             <p className="text-xs text-slate-400">
-              Aponte a câmara do telemóvel Android para instalar instantaneamente como app nativa disfarçada.
+              Aponte a câmara do iPhone ou Android para instalar a aplicação disfarçada de Calculadora diretamente no ecrã principal.
             </p>
           </div>
         </div>
@@ -135,12 +136,12 @@ export const PwaQrCodeCard: React.FC<PwaQrCodeCardProps> = ({ defaultUrl }) => {
           </div>
         </div>
 
-        {/* URL Input & Quick PWA Instructions */}
+        {/* URL Input & OS Tabs Instructions */}
         <div className="md:col-span-7 space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
               <span>URL da Aplicação (APP_URL):</span>
-              <span className="text-[10px] text-slate-500 font-mono">Suporta Firebase, Render ou AI Studio</span>
+              <span className="text-[10px] text-slate-500 font-mono">Funciona em iOS e Android</span>
             </label>
             <div className="flex items-center space-x-2">
               <input
@@ -160,27 +161,79 @@ export const PwaQrCodeCard: React.FC<PwaQrCodeCardProps> = ({ defaultUrl }) => {
             </div>
           </div>
 
-          {/* Step by step guide */}
-          <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2.5">
-            <div className="flex items-center space-x-2 text-xs font-bold text-indigo-300">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>Passos Rápidos no Telemóvel Android:</span>
-            </div>
-            <ol className="text-xs text-slate-300 space-y-1.5 list-decimal list-inside leading-relaxed">
-              <li>
-                Abra a câmara do telemóvel e <strong>escaneie o QR Code</strong> (ou abra o link no Chrome).
-              </li>
-              <li>
-                Toque no menu de <strong>3 pontos (⋮)</strong> no canto superior direito do Chrome.
-              </li>
-              <li>
-                Selecione <strong>"Adicionar ao ecrã principal"</strong> (ou <em>"Instalar aplicação"</em>).
-              </li>
-              <li>
-                Pronto! A app é instalada no seu telefone com o ícone de <strong>Calculadora</strong>, disfarçada e pronta a usar sem precisar de cabo USB.
-              </li>
-            </ol>
+          {/* OS Selector Tabs */}
+          <div className="flex items-center space-x-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+              onClick={() => setSelectedOS('android')}
+              className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedOS === 'android'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Android (Chrome)</span>
+            </button>
+            <button
+              onClick={() => setSelectedOS('ios')}
+              className={`flex-1 flex items-center justify-center space-x-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedOS === 'ios'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Apple className="w-4 h-4" />
+              <span>iPhone / iOS (Safari)</span>
+            </button>
           </div>
+
+          {/* Step by step guide */}
+          {selectedOS === 'android' ? (
+            <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2.5 animate-in fade-in">
+              <div className="flex items-center space-x-2 text-xs font-bold text-indigo-300">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>Instalação no Android (Chrome):</span>
+              </div>
+              <ol className="text-xs text-slate-300 space-y-1.5 list-decimal list-inside leading-relaxed">
+                <li>
+                  Abra a câmara e <strong>escaneie o QR Code</strong> (ou acesse no Chrome).
+                </li>
+                <li>
+                  Toque no menu de <strong>3 pontos (⋮)</strong> no canto superior do Chrome.
+                </li>
+                <li>
+                  Selecione <strong>"Adicionar ao ecrã principal"</strong> (ou <em>"Instalar aplicação"</em>).
+                </li>
+                <li>
+                  A app surge no telefone com o nome e ícone de <strong>Calculadora</strong>.
+                </li>
+              </ol>
+            </div>
+          ) : (
+            <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2.5 animate-in fade-in">
+              <div className="flex items-center space-x-2 text-xs font-bold text-indigo-300">
+                <Apple className="w-4 h-4 text-slate-200" />
+                <span>Instalação no iPhone (Safari / iOS):</span>
+              </div>
+              <ol className="text-xs text-slate-300 space-y-1.5 list-decimal list-inside leading-relaxed">
+                <li>
+                  Abra a <strong>Câmara do iPhone</strong> e escaneie o QR Code para abrir o link no <strong>Safari</strong>.
+                </li>
+                <li>
+                  No Safari, toque no botão <strong>Partilhar</strong> (ícone do quadrado com a seta para cima ⎋ na barra inferior).
+                </li>
+                <li>
+                  Role a lista para baixo e toque em <strong>"Adicionar ao Ecrã Principal"</strong> (<em>Add to Home Screen</em>).
+                </li>
+                <li>
+                  Confirme o nome <strong>"Calculadora"</strong> e toque em <strong>Adicionar</strong> no canto superior direito.
+                </li>
+                <li>
+                  Pronto! O ícone da <strong>Calculadora</strong> ficará no ecrã do iPhone e abrirá sem barras do navegador.
+                </li>
+              </ol>
+            </div>
+          )}
         </div>
       </div>
     </div>
