@@ -4,7 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import { PortalEvent, Device, KeepAliveConfig, PingLog, FirestoreConfig } from './src/types';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json());
 
