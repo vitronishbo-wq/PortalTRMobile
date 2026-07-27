@@ -1,11 +1,9 @@
 import React from 'react';
-import { Activity, Radio, Smartphone, BarChart3, Database, Rocket, Plus, Lock, Zap } from 'lucide-react';
-import { KeepAliveConfig } from '../types';
+import { Activity, Cloud, Smartphone, BarChart3, Database, Rocket, Plus, Lock, Zap } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  keepAliveConfig: KeepAliveConfig | null;
   unreadCount: number;
   onSimulateEvent: () => void;
   onLockCamouflage?: () => void;
@@ -14,16 +12,13 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
-  keepAliveConfig,
   unreadCount,
   onSimulateEvent,
   onLockCamouflage
 }) => {
-  const isRenderAwake = keepAliveConfig?.lastPingStatus === 200;
-
   const navItems = [
     { id: 'timeline', label: 'Linha do Tempo', icon: Activity, badge: unreadCount > 0 ? unreadCount : undefined },
-    { id: 'keepalive', label: 'Render Keep-Alive', icon: Radio, highlight: true },
+    { id: 'cloudstatus', label: 'Cloud Status', icon: Cloud, highlight: true },
     { id: 'devices', label: 'Dispositivos', icon: Smartphone },
     { id: 'analytics', label: 'Métricas', icon: BarChart3 },
     { id: 'firestore', label: 'Firestore', icon: Database },
@@ -55,22 +50,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Render Keep-Alive Live Badge & Fast Action */}
-          <div className="hidden lg:flex items-center space-x-3 text-xs bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700/60">
-            <div className="flex items-center space-x-2">
-              <span className={`relative flex h-2.5 w-2.5`}>
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isRenderAwake ? 'bg-emerald-400' : 'bg-amber-400'} opacity-75`}></span>
-                <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isRenderAwake ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-              </span>
-              <span className="text-slate-300 font-medium">Render Engine:</span>
-              <span className={isRenderAwake ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
-                {isRenderAwake ? '100% Acordado' : 'Aguardando Ping'}
-              </span>
-            </div>
-            <span className="text-slate-600">|</span>
-            <span className="text-slate-400 font-mono">
-              {keepAliveConfig?.lastLatencyMs ? `${keepAliveConfig.lastLatencyMs}ms` : '32ms'}
+          {/* System Status Indicator */}
+          <div className="hidden lg:flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700/60">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
+            <span className="text-slate-300 font-medium">Servidor Online</span>
           </div>
 
           {/* Quick Action Buttons */}

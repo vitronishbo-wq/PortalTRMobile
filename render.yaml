@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: portaltrmobile-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: APP_NAME
+        value: PortalTRMobile
+      - key: APP_CODE
+        value: portaltrmobile
+      - key: APP_ENV
+        value: production
+      - key: WEB_URL
+        value: https://portaltrmobile.web.app
+      - key: API_URL
+        value: https://portaltrmobile-api.onrender.com
+      - key: HOSTING_URL
+        value: https://portaltrmobile.web.app
+      - key: FIREBASE_PROJECT_ID
+        value: portaltrmobile
+      - key: FIREBASE_STORAGE_BUCKET
+        value: portaltrmobile.firebasestorage.app
+      - key: FIRESTORE_DATABASE
+        value: "(default)"
+      - key: FIRESTORE_EVENTS
+        value: events
+      - key: FIRESTORE_USERS
+        value: users
+      - key: FIRESTORE_DEVICES
+        value: devices
+      - key: FIRESTORE_SETTINGS
+        value: settings
+      - key: FIRESTORE_FAVORITES
+        value: favorites
+      - key: FIRESTORE_LOGS
+        value: logs
+      - key: FIRESTORE_SESSIONS
+        value: sessions

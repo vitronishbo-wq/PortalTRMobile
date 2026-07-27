@@ -307,269 +307,55 @@ async function executeKeepAlivePing(reason: string = 'Scheduled Heartbeat'): Pro
   return newLog;
 }
 
-// Background Interval - Runs keep alive auto-pinger every 5 minutes
-setInterval(() => {
-  if (keepAliveConfig.enabled) {
-    executeKeepAlivePing('Autonomous 5-min Render Keep-Alive Cron');
-  }
-}, 5 * 60 * 1000);
-
-// API ROUTES
+// API ROUTES (Minimal Auxiliar Backend)
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     uptime: process.uptime(),
     timestamp: Date.now(),
-    service: 'Portal Mobile Backend',
-    renderKeepAlive: keepAliveConfig
+    service: 'Portal Mobile API'
   });
 });
 
-app.get('/api/ping', (req, res) => {
+app.get('/api/version', (req, res) => {
   res.json({
-    pong: true,
-    message: 'Render instance is awake and responsive',
-    timestamp: Date.now()
+    version: '1.2.0',
+    build: '2026.07.26',
+    runtime: 'NodeJS',
+    platform: 'Render / Cloud Run'
   });
 });
 
-// KEEP ALIVE ENDPOINTS
-app.get('/api/keep-alive', (req, res) => {
+app.get('/api/config', (req, res) => {
   res.json({
-    config: keepAliveConfig,
-    logs: pingLogs
+    config: firestoreConfig
   });
 });
 
-app.post('/api/keep-alive/config', (req, res) => {
-  const { targetUrl, enabled, intervalMinutes, latencyThresholdMs, adminEmail, adminWhatsapp } = req.body;
-  if (typeof targetUrl === 'string') keepAliveConfig.targetUrl = targetUrl;
-  if (typeof enabled === 'boolean') keepAliveConfig.enabled = enabled;
-  if (typeof intervalMinutes === 'number' && intervalMinutes > 0) {
-    keepAliveConfig.intervalMinutes = intervalMinutes;
-  }
-  if (typeof latencyThresholdMs === 'number' && latencyThresholdMs > 0) {
-    keepAliveConfig.latencyThresholdMs = latencyThresholdMs;
-  }
-  if (typeof adminEmail === 'string') keepAliveConfig.adminEmail = adminEmail;
-  if (typeof adminWhatsapp === 'string') keepAliveConfig.adminWhatsapp = adminWhatsapp;
-
-  res.json({ success: true, config: keepAliveConfig });
-});
-
-app.post('/api/keep-alive/trigger', async (req, res) => {
-  const log = await executeKeepAlivePing('Manual User Trigger');
-  res.json({ success: true, log, config: keepAliveConfig });
-});
-
-app.delete('/api/keep-alive/logs', (req, res) => {
-  pingLogs = [];
-  res.json({ success: true, message: 'Keep-alive logs cleared' });
-});
-
-// EVENTS ENDPOINTS
-app.get('/api/events', (req, res) => {
-  const { search, app: filterApp, priority, type, favorites, unread, deviceId } = req.query;
-
-  let filtered = [...events];
-
-  if (search && typeof search === 'string' && search.trim() !== '') {
-    const query = search.toLowerCase();
-    filtered = filtered.filter(
-      (e) =>
-        e.title.toLowerCase().includes(query) ||
-        e.text.toLowerCase().includes(query) ||
-        e.app.toLowerCase().includes(query) ||
-        (e.sender && e.sender.toLowerCase().includes(query))
-    );
-  }
-
-  if (filterApp && typeof filterApp === 'string' && filterApp !== 'all') {
-    filtered = filtered.filter((e) => e.app === filterApp);
-  }
-
-  if (priority && typeof priority === 'string' && priority !== 'all') {
-    filtered = filtered.filter((e) => e.priority === priority);
-  }
-
-  if (type && typeof type === 'string' && type !== 'all') {
-    filtered = filtered.filter((e) => e.type === type);
-  }
-
-  if (favorites === 'true') {
-    filtered = filtered.filter((e) => e.favorite);
-  }
-
-  if (unread === 'true') {
-    filtered = filtered.filter((e) => !e.read);
-  }
-
-  if (deviceId && typeof deviceId === 'string' && deviceId !== 'all') {
-    filtered = filtered.filter((e) => e.deviceId === deviceId);
-  }
-
-  filtered.sort((a, b) => b.timestamp - a.timestamp);
-
+app.post('/api/export', (req, res) => {
   res.json({
-    events: filtered,
-    total: filtered.length,
-    unreadCount: events.filter((e) => !e.read).length
-  });
-});
-
-app.post('/api/events', (req, res) => {
-  const body = req.body;
-  const newEvent: PortalEvent = {
-    id: body.id || `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    uid: body.uid || 'usr-default',
-    deviceId: body.deviceId || 'dev-pixel-8',
-    deviceName: body.deviceName || 'Google Pixel 8 Pro',
-    app: body.app || 'WhatsApp',
-    packageName: body.packageName || 'com.whatsapp',
-    title: body.title || 'Nova Notificação',
-    text: body.text || 'Conteúdo da notificação capturada.',
-    sender: body.sender,
-    timestamp: body.timestamp || Date.now(),
-    priority: body.priority || 'normal',
-    type: body.type || 'notification',
-    read: false,
-    favorite: false
-  };
-
-  events.unshift(newEvent);
-  res.status(201).json({ success: true, event: newEvent });
-});
-
-app.put('/api/events/:id', (req, res) => {
-  const { id } = req.params;
-  const index = events.findIndex((e) => e.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({ error: 'Event not found' });
-  }
-
-  events[index] = { ...events[index], ...req.body };
-  res.json({ success: true, event: events[index] });
-});
-
-app.delete('/api/events/:id', (req, res) => {
-  const { id } = req.params;
-  events = events.filter((e) => e.id !== id);
-  res.json({ success: true, id });
-});
-
-app.post('/api/events/read-all', (req, res) => {
-  events = events.map((e) => ({ ...e, read: true }));
-  res.json({ success: true, count: events.length });
-});
-
-app.delete('/api/events', (req, res) => {
-  events = [];
-  res.json({ success: true, message: 'All events deleted' });
-});
-
-// DEVICE ENDPOINTS
-app.get('/api/devices', (req, res) => {
-  res.json(devices);
-});
-
-app.post('/api/devices', (req, res) => {
-  const newDevice: Device = {
-    deviceId: req.body.deviceId || `dev-${Date.now()}`,
-    uid: req.body.uid || 'usr-default',
-    name: req.body.name || 'Novo Dispositivo Android',
-    model: req.body.model || 'Android Device',
-    osVersion: req.body.osVersion || 'Android 14',
-    lastSync: Date.now(),
-    online: true,
-    batteryLevel: req.body.batteryLevel || 100,
-    pairedAt: Date.now()
-  };
-
-  devices.push(newDevice);
-  res.status(201).json({ success: true, device: newDevice });
-});
-
-app.delete('/api/devices/:id', (req, res) => {
-  const { id } = req.params;
-  devices = devices.filter((d) => d.deviceId !== id);
-  res.json({ success: true, id });
-});
-
-// STATS ENDPOINT
-app.get('/api/stats', (req, res) => {
-  const appMap: Record<string, number> = {};
-  const priorityMap: Record<string, number> = {};
-
-  events.forEach((e) => {
-    appMap[e.app] = (appMap[e.app] || 0) + 1;
-    priorityMap[e.priority] = (priorityMap[e.priority] || 0) + 1;
-  });
-
-  const appDistribution = Object.keys(appMap).map((k) => ({ name: k, count: appMap[k] }));
-  const priorityDistribution = Object.keys(priorityMap).map((k) => ({ name: k, count: priorityMap[k] }));
-
-  // Generate timeline for last 7 hours
-  const timelineData = Array.from({ length: 6 }).map((_, i) => {
-    const hourLabel = `${(new Date().getHours() - (5 - i) + 24) % 24}:00`;
-    return {
-      time: hourLabel,
-      count: Math.floor(Math.random() * 8) + 1
-    };
-  });
-
-  res.json({
-    totalEvents: events.length,
-    unreadCount: events.filter((e) => !e.read).length,
-    favoriteCount: events.filter((e) => e.favorite).length,
-    deviceCount: devices.length,
-    appDistribution,
-    priorityDistribution,
-    timelineData
-  });
-});
-
-// EVENT SIMULATOR
-app.post('/api/simulator/generate', (req, res) => {
-  const sample = mockApps[Math.floor(Math.random() * mockApps.length)];
-  const randomDevice = devices[Math.floor(Math.random() * devices.length)] || devices[0];
-
-  const sampleMessages: Record<string, { title: string; text: string; sender: string }> = {
-    'WhatsApp': { title: 'Ana Beatriz', text: 'Cheguei no local do evento! Pode me mandar o comprovante?', sender: 'Ana Beatriz' },
-    'Banco do Brasil': { title: 'Notificação de Saldo', text: 'Seu extrato mensal já está disponível para consulta no App BB.', sender: 'Banco do Brasil' },
-    'SMS': { title: 'SMS Recebido', text: 'Seu código de segurança Mercado Pago é: 918204. Não compartilhe.', sender: '+55 11 98820-1122' },
-    'Chamada Telefônica': { title: 'Chamada do Sistema', text: 'Chamada recebida e encerrada (Duração: 02 min 14 seg).', sender: '+55 11 3003-0000' },
-    'Nubank': { title: 'Transferência Recebida', text: 'Você recebeu R$ 120,00 de Marcos Oliveira via Pix.', sender: 'Nubank' },
-    'Telegram': { title: 'Alerta Render Cron', text: 'Serviço Render mantido ativo com sucesso via Keep-Alive Heartbeat.', sender: 'Bot Render' },
-    'Instagram': { title: 'Novo Curtiu', text: 'lucas_dev curtiu a sua publicação na linha do tempo.', sender: 'Instagram' },
-    'Gmail': { title: 'Confirmacao de Deploy', text: 'Deploy no Cloud Run / Render finalizado sem erros.', sender: 'deploy@render.com' },
-    'Sistema': { title: 'Sincronização Concluída', text: 'Eventos offline sincronizados com o Firestore.', sender: 'Sistema' }
-  };
-
-  const msg = sampleMessages[sample.app] || { title: 'Nova Mensagem', text: 'Conteúdo do evento recebido no celular.', sender: 'Remetente' };
-
-  const newEvent: PortalEvent = {
-    id: `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    uid: 'usr-default',
-    deviceId: randomDevice.deviceId,
-    deviceName: randomDevice.name,
-    app: sample.app,
-    packageName: sample.packageName,
-    title: msg.title,
-    text: msg.text,
-    sender: msg.sender,
+    success: true,
     timestamp: Date.now(),
-    priority: sample.priority as any,
-    type: sample.type as any,
-    read: false,
-    favorite: false
-  };
-
-  events.unshift(newEvent);
-  res.json({ success: true, event: newEvent });
+    message: 'Exportação de metadados realizada com sucesso.',
+    exportFiles: {
+      renderYaml: `services:\n  - type: web\n    name: portal-mobile-backend\n    runtime: node\n    buildCommand: npm run build\n    startCommand: npm run start`,
+      dockerfile: `FROM node:20-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nEXPOSE 3000\nCMD ["node", "dist/server.cjs"]`,
+      githubWorkflow: `name: Deploy Portal Mobile\non:\n  push:\n    branches: [ main ]`
+    }
+  });
 });
 
-// EXPORT DEPLOYMENT FILES GENERATOR
+app.post('/api/backup', (req, res) => {
+  const backupId = `bkp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  res.json({
+    success: true,
+    backupId,
+    timestamp: Date.now(),
+    message: 'Backup das configurações e estado efetuado com sucesso.'
+  });
+});
+
+// Alias for deployment guide export
 app.get('/api/export-files', (req, res) => {
   res.json({
     renderYaml: `services:
@@ -585,7 +371,7 @@ app.get('/api/export-files', (req, res) => {
         value: 3000
       - key: FIREBASE_PROJECT_ID
         value: portal-mobile-prod
-    healthCheckPath: /api/ping
+    healthCheckPath: /api/health
     autoDeploy: true`,
 
     dockerfile: `FROM node:20-alpine AS builder

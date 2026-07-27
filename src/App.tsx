@@ -1,15 +1,25 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { TimelineView } from './components/TimelineView';
-import { KeepAliveView } from './components/KeepAliveView';
+import { CloudStatusView } from './components/CloudStatusView';
 import { DevicesView } from './components/DevicesView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { FirestoreConfigView } from './components/FirestoreConfigView';
 import { DeploymentGuideView } from './components/DeploymentGuideView';
 import { EventSimulatorModal } from './components/EventSimulatorModal';
 import { DisguisedCalculator } from './components/DisguisedCalculator';
-import { PortalEvent, Device, KeepAliveConfig, PingLog, FirestoreConfig, EventStats } from './types';
-import { Bell, X, ShieldAlert, Sparkles, Smartphone, CheckCircle, AlertTriangle } from 'lucide-react';
+import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
+import { Bell, X } from 'lucide-react';
+import {
+  subscribeToEvents,
+  subscribeToDevices,
+  saveEventToFirestore,
+  updateEventInFirestore,
+  deleteEventFromFirestore,
+  saveDeviceToFirestore,
+  deleteDeviceFromFirestore,
+  defaultFirestoreConfig
+} from './lib/firebase';
 
 interface ToastItem {
   id: string;
@@ -17,33 +27,116 @@ interface ToastItem {
   createdAt: number;
 }
 
+const mockApps = [
+  { app: 'WhatsApp', packageName: 'com.whatsapp', priority: 'critical', type: 'notification' },
+  { app: 'Banco do Brasil', packageName: 'br.com.bb.app', priority: 'critical', type: 'notification' },
+  { app: 'SMS', packageName: 'com.google.android.apps.messaging', priority: 'high', type: 'sms' },
+  { app: 'Chamada Telefônica', packageName: 'com.google.android.dialer', priority: 'high', type: 'call' },
+  { app: 'Nubank', packageName: 'com.nu.production', priority: 'critical', type: 'notification' },
+  { app: 'Telegram', packageName: 'org.telegram.messenger', priority: 'normal', type: 'notification' },
+  { app: 'Instagram', packageName: 'com.instagram.android', priority: 'low', type: 'notification' },
+  { app: 'Gmail', packageName: 'com.google.android.gm', priority: 'normal', type: 'notification' },
+  { app: 'Sistema', packageName: 'android', priority: 'low', type: 'system' }
+];
+
+const initialDevices: Device[] = [
+  {
+    deviceId: 'dev-pixel-8',
+    uid: 'usr-default',
+    name: 'Google Pixel 8 Pro',
+    model: 'Pixel 8 Pro (Android 14)',
+    osVersion: 'Android 14 (API 34)',
+    lastSync: Date.now() - 2 * 60 * 1000,
+    online: true,
+    batteryLevel: 88,
+    pairedAt: Date.now() - 7 * 24 * 3600 * 1000
+  },
+  {
+    deviceId: 'dev-samsung-s23',
+    uid: 'usr-default',
+    name: 'Samsung Galaxy S23',
+    model: 'SM-S911B (One UI 6)',
+    osVersion: 'Android 14 (API 34)',
+    lastSync: Date.now() - 45 * 60 * 1000,
+    online: true,
+    batteryLevel: 62,
+    pairedAt: Date.now() - 14 * 24 * 3600 * 1000
+  }
+];
+
+const initialEvents: PortalEvent[] = [
+  {
+    id: 'evt-101',
+    uid: 'usr-default',
+    deviceId: 'dev-pixel-8',
+    deviceName: 'Google Pixel 8 Pro',
+    app: 'WhatsApp',
+    packageName: 'com.whatsapp',
+    title: 'Maria Silva',
+    text: 'Enviei os relatórios financeiros do projeto para revisão. Consegue dar uma olhada?',
+    sender: 'Maria Silva',
+    timestamp: Date.now() - 5 * 60 * 1000,
+    priority: 'critical',
+    type: 'notification',
+    read: false,
+    favorite: true
+  },
+  {
+    id: 'evt-102',
+    uid: 'usr-default',
+    deviceId: 'dev-pixel-8',
+    deviceName: 'Google Pixel 8 Pro',
+    app: 'Banco do Brasil',
+    packageName: 'br.com.bb.app',
+    title: 'Pix Recebido',
+    text: 'Você recebeu um Pix de R$ 450,00 de Carlos Santos.',
+    sender: 'Banco do Brasil',
+    timestamp: Date.now() - 18 * 60 * 1000,
+    priority: 'critical',
+    type: 'notification',
+    read: false,
+    favorite: false
+  },
+  {
+    id: 'evt-103',
+    uid: 'usr-default',
+    deviceId: 'dev-samsung-s23',
+    deviceName: 'Samsung Galaxy S23',
+    app: 'SMS',
+    packageName: 'com.google.android.apps.messaging',
+    title: 'Código de Autenticação 2FA',
+    text: 'Seu código de acesso temporário é 849-204. Válido por 5 minutos.',
+    sender: '+55 11 99887-1234',
+    timestamp: Date.now() - 32 * 60 * 1000,
+    priority: 'high',
+    type: 'sms',
+    read: true,
+    favorite: true
+  }
+];
+
 export default function App() {
   const [isCamouflaged, setIsCamouflaged] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('timeline');
-  const [events, setEvents] = useState<PortalEvent[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [keepAliveConfig, setKeepAliveConfig] = useState<KeepAliveConfig | null>(null);
-  const [pingLogs, setPingLogs] = useState<PingLog[]>([]);
-  const [stats, setStats] = useState<EventStats | null>(null);
-  const [firestoreConfig, setFirestoreConfig] = useState<FirestoreConfig>({
-    apiKey: 'AIzaSyA_SampleKeyPortalMobile2026',
-    authDomain: 'portal-mobile-demo.firebaseapp.com',
-    projectId: 'portal-mobile-demo',
-    storageBucket: 'portal-mobile-demo.appspot.com',
-    messagingSenderId: '1029384756',
-    appId: '1:1029384756:web:abcd1234efgh5678',
-    connected: true,
-    mode: 'local'
+  const [events, setEvents] = useState<PortalEvent[]>(initialEvents);
+  const [devices, setDevices] = useState<Device[]>(initialDevices);
+  const [lastSyncTime, setLastSyncTime] = useState<number | null>(Date.now());
+  const [firestoreConfig, setFirestoreConfig] = useState<FirestoreConfig>(defaultFirestoreConfig);
+  const [githubRepo, setGithubRepo] = useState<string>(() => {
+    return localStorage.getItem('portal_github_repo') || 'https://github.com/vitronishbo-wq/PortalTRMobile';
   });
+
+  useEffect(() => {
+    localStorage.setItem('portal_github_repo', githubRepo);
+  }, [githubRepo]);
 
   const [loading, setLoading] = useState(false);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   // Track event IDs to trigger real-time toasts on new items
-  const knownEventIdsRef = useRef<Set<string>>(new Set());
+  const knownEventIdsRef = useRef<Set<string>>(new Set(initialEvents.map((e) => e.id)));
   const initialLoadDoneRef = useRef(false);
-  const lastAlertedPingTimeRef = useRef<number | null>(null);
 
   // Audio tone synthesizer for notification sound
   const playNotificationSound = useCallback(() => {
@@ -55,8 +148,8 @@ export default function App() {
       const gain = ctx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
 
       gain.gain.setValueAtTime(0.15, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
@@ -71,60 +164,17 @@ export default function App() {
     }
   }, []);
 
-  // Check latency against configured threshold and trigger critical toast alert
-  const checkLatencyAndAlert = useCallback((cfg: KeepAliveConfig) => {
-    if (!cfg || cfg.lastLatencyMs === null || !cfg.lastPingTime) return;
-    const threshold = cfg.latencyThresholdMs || 1500;
-
-    if (cfg.lastLatencyMs > threshold && lastAlertedPingTimeRef.current !== cfg.lastPingTime) {
-      lastAlertedPingTimeRef.current = cfg.lastPingTime;
-      
-      playNotificationSound();
-      
-      const alertEvent: PortalEvent = {
-        id: `coldstart-${cfg.lastPingTime}`,
-        uid: 'usr-default',
-        deviceId: 'render-server',
-        deviceName: 'Servidor Render',
-        app: 'Alerta Keep-Alive',
-        packageName: 'com.render.coldstart',
-        title: '⚠️ Latência Elevada Detectada',
-        text: `Tempo de resposta do Render foi de ${cfg.lastLatencyMs}ms (Limiar: ${threshold}ms). Possível cold-start do servidor em andamento!`,
-        sender: 'Sistema de Infraestrutura',
-        timestamp: cfg.lastPingTime,
-        priority: 'critical',
-        type: 'system',
-        read: false,
-        favorite: false
-      };
-
-      const newToast: ToastItem = {
-        id: `toast-coldstart-${cfg.lastPingTime}-${Date.now()}`,
-        event: alertEvent,
-        createdAt: Date.now()
-      };
-
-      setToasts((prev) => [newToast, ...prev].slice(0, 5));
-    }
-  }, [playNotificationSound]);
-
-  // Fetch Events & Devices
-  const fetchEvents = useCallback(async () => {
+  // Real-Time Firestore Subscription using onSnapshot (No HTTP polling)
+  useEffect(() => {
     setLoading(true);
-    try {
-      const [resEvts, resDevs, resStats, resKeep] = await Promise.all([
-        fetch('/api/events'),
-        fetch('/api/devices'),
-        fetch('/api/stats'),
-        fetch('/api/keep-alive')
-      ]);
 
-      if (resEvts.ok) {
-        const dataEvts = await resEvts.json();
-        const fetchedEvents: PortalEvent[] = dataEvts.events || [];
+    const unsubEvents = subscribeToEvents(firestoreConfig, (fetchedEvents, syncTimestamp) => {
+      setLastSyncTime(syncTimestamp);
+
+      if (fetchedEvents.length > 0) {
         setEvents(fetchedEvents);
 
-        // Detect new events for real-time toast notifications
+        // Real-time toast detection for newly added events via onSnapshot
         if (initialLoadDoneRef.current) {
           const newEvents = fetchedEvents.filter((e) => !knownEventIdsRef.current.has(e.id));
           if (newEvents.length > 0) {
@@ -140,46 +190,24 @@ export default function App() {
           }
         }
 
-        // Update known IDs
         fetchedEvents.forEach((e) => knownEventIdsRef.current.add(e.id));
-        initialLoadDoneRef.current = true;
       }
 
-      if (resDevs.ok) {
-        const dataDevs = await resDevs.json();
-        setDevices(dataDevs || []);
-      }
-
-      if (resStats.ok) {
-        const dataStats = await resStats.json();
-        setStats(dataStats);
-      }
-
-      if (resKeep.ok) {
-        const dataKeep = await resKeep.json();
-        setKeepAliveConfig(dataKeep.config);
-        setPingLogs(dataKeep.logs || []);
-        if (dataKeep.config) {
-          checkLatencyAndAlert(dataKeep.config);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching portal data:', err);
-    } finally {
+      initialLoadDoneRef.current = true;
       setLoading(false);
-    }
-  }, [playNotificationSound, checkLatencyAndAlert]);
+    });
 
-  // Polling every 4s for instant real-time updates
-  useEffect(() => {
-    fetchEvents();
+    const unsubDevices = subscribeToDevices(firestoreConfig, (fetchedDevices) => {
+      if (fetchedDevices.length > 0) {
+        setDevices(fetchedDevices);
+      }
+    });
 
-    const interval = setInterval(() => {
-      fetchEvents();
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [fetchEvents]);
+    return () => {
+      unsubEvents();
+      unsubDevices();
+    };
+  }, [firestoreConfig, playNotificationSound]);
 
   // Toast Auto-dismiss
   useEffect(() => {
@@ -199,159 +227,167 @@ export default function App() {
   // Handlers
   const handleToggleFavorite = async (id: string, current: boolean) => {
     setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, favorite: !current } : e)));
-    try {
-      await fetch(`/api/events/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ favorite: !current })
-      });
-    } catch (e) {
-      console.error('Error updating favorite:', e);
-    }
+    updateEventInFirestore(firestoreConfig, id, { favorite: !current });
   };
 
   const handleMarkRead = async (id: string, current: boolean) => {
     setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, read: !current } : e)));
-    try {
-      await fetch(`/api/events/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ read: !current })
-      });
-    } catch (e) {
-      console.error('Error updating read status:', e);
-    }
+    updateEventInFirestore(firestoreConfig, id, { read: !current });
   };
 
   const handleMarkAllRead = async () => {
     setEvents((prev) => prev.map((e) => ({ ...e, read: true })));
-    try {
-      await fetch('/api/events/read-all', { method: 'POST' });
-    } catch (e) {
-      console.error('Error marking all read:', e);
-    }
+    events.forEach((e) => {
+      updateEventInFirestore(firestoreConfig, e.id, { read: true });
+    });
   };
 
   const handleDeleteEvent = async (id: string) => {
     setEvents((prev) => prev.filter((e) => e.id !== id));
-    try {
-      await fetch(`/api/events/${id}`, { method: 'DELETE' });
-    } catch (e) {
-      console.error('Error deleting event:', e);
-    }
+    deleteEventFromFirestore(firestoreConfig, id);
   };
+
+  const handleClearLocalCache = useCallback(() => {
+    setEvents([]);
+    setDevices([]);
+    setToasts([]);
+    knownEventIdsRef.current.clear();
+    initialLoadDoneRef.current = false;
+  }, []);
 
   const handleClearAllEvents = async () => {
     if (!window.confirm('Tem certeza que deseja apagar todos os eventos capturados?')) return;
-    setEvents([]);
-    try {
-      await fetch('/api/events', { method: 'DELETE' });
-    } catch (e) {
-      console.error('Error clearing events:', e);
-    }
-  };
-
-  const handleTriggerPing = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/keep-alive/trigger', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setKeepAliveConfig(data.config);
-        setPingLogs((prev) => [data.log, ...prev].slice(0, 50));
-        if (data.config) {
-          checkLatencyAndAlert(data.config);
-        }
-      }
-    } catch (e) {
-      console.error('Error triggering ping:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateKeepAliveConfig = async (newCfg: Partial<KeepAliveConfig>) => {
-    try {
-      const res = await fetch('/api/keep-alive/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCfg)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setKeepAliveConfig(data.config);
-        if (data.config) {
-          checkLatencyAndAlert(data.config);
-        }
-      }
-    } catch (e) {
-      console.error('Error updating config:', e);
-    }
-  };
-
-  const handleClearLogs = async () => {
-    setPingLogs([]);
-    try {
-      await fetch('/api/keep-alive/logs', { method: 'DELETE' });
-    } catch (e) {
-      console.error('Error clearing logs:', e);
-    }
+    events.forEach((e) => deleteEventFromFirestore(firestoreConfig, e.id));
+    handleClearLocalCache();
   };
 
   const handleAddDevice = async (deviceData: Partial<Device>) => {
-    try {
-      const res = await fetch('/api/devices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(deviceData)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setDevices((prev) => [...prev, data.device]);
-      }
-    } catch (e) {
-      console.error('Error adding device:', e);
-    }
+    const newDevice: Device = {
+      deviceId: deviceData.deviceId || `dev-${Date.now()}`,
+      uid: deviceData.uid || 'usr-default',
+      name: deviceData.name || 'Novo Dispositivo Android',
+      model: deviceData.model || 'Android Device',
+      osVersion: deviceData.osVersion || 'Android 14',
+      lastSync: Date.now(),
+      online: true,
+      batteryLevel: deviceData.batteryLevel || 100,
+      pairedAt: Date.now()
+    };
+
+    setDevices((prev) => [...prev, newDevice]);
+    saveDeviceToFirestore(firestoreConfig, newDevice);
   };
 
   const handleRemoveDevice = async (id: string) => {
     setDevices((prev) => prev.filter((d) => d.deviceId !== id));
-    try {
-      await fetch(`/api/devices/${id}`, { method: 'DELETE' });
-    } catch (e) {
-      console.error('Error removing device:', e);
-    }
+    deleteDeviceFromFirestore(firestoreConfig, id);
   };
 
   const handleSimulateCustomEvent = async (data: any) => {
-    try {
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (res.ok) {
-        const resData = await res.json();
-        setEvents((prev) => [resData.event, ...prev]);
-      }
-    } catch (e) {
-      console.error('Error simulating event:', e);
-    }
+    const newEvent: PortalEvent = {
+      id: data.id || `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      uid: data.uid || 'usr-default',
+      deviceId: data.deviceId || 'dev-pixel-8',
+      deviceName: data.deviceName || 'Google Pixel 8 Pro',
+      app: data.app || 'WhatsApp',
+      packageName: data.packageName || 'com.whatsapp',
+      title: data.title || 'Nova Notificação',
+      text: data.text || 'Conteúdo da notificação capturada.',
+      sender: data.sender,
+      timestamp: data.timestamp || Date.now(),
+      priority: data.priority || 'normal',
+      type: data.type || 'notification',
+      read: false,
+      favorite: false
+    };
+
+    setEvents((prev) => [newEvent, ...prev]);
+    knownEventIdsRef.current.add(newEvent.id);
+    saveEventToFirestore(firestoreConfig, newEvent);
   };
 
   const handleSimulateRandomEvent = async () => {
-    try {
-      const res = await fetch('/api/simulator/generate', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setEvents((prev) => [data.event, ...prev]);
-      }
-    } catch (e) {
-      console.error('Error generating random event:', e);
-    }
+    const sample = mockApps[Math.floor(Math.random() * mockApps.length)];
+    const randomDevice = devices[Math.floor(Math.random() * devices.length)] || initialDevices[0];
+
+    const sampleMessages: Record<string, { title: string; text: string; sender: string }> = {
+      'WhatsApp': { title: 'Ana Beatriz', text: 'Cheguei no local do evento! Pode me mandar o comprovante?', sender: 'Ana Beatriz' },
+      'Banco do Brasil': { title: 'Notificação de Saldo', text: 'Seu extrato mensal já está disponível para consulta no App BB.', sender: 'Banco do Brasil' },
+      'SMS': { title: 'SMS Recebido', text: 'Seu código de segurança Mercado Pago é: 918204. Não compartilhe.', sender: '+55 11 98820-1122' },
+      'Chamada Telefônica': { title: 'Chamada do Sistema', text: 'Chamada recebida e encerrada (Duração: 02 min 14 seg).', sender: '+55 11 3003-0000' },
+      'Nubank': { title: 'Transferência Recebida', text: 'Você recebeu R$ 120,00 de Marcos Oliveira via Pix.', sender: 'Nubank' },
+      'Telegram': { title: 'Alerta Firestore', text: 'Evento recebido instantaneamente via onSnapshot sem backend intermediário.', sender: 'Firestore Realtime' },
+      'Instagram': { title: 'Novo Curtiu', text: 'lucas_dev curtiu a sua publicação na linha do tempo.', sender: 'Instagram' },
+      'Gmail': { title: 'Confirmação de Sync', text: 'Sincronização em tempo real do Android com Firestore concluída com sucesso.', sender: 'notifications@firebase.com' },
+      'Sistema': { title: 'Sincronização Concluída', text: 'Eventos sincronizados diretamente com o Firestore DB.', sender: 'Sistema' }
+    };
+
+    const msg = sampleMessages[sample.app] || { title: 'Nova Mensagem', text: 'Conteúdo do evento recebido no celular.', sender: 'Remetente' };
+
+    const newEvent: PortalEvent = {
+      id: `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      uid: 'usr-default',
+      deviceId: randomDevice.deviceId,
+      deviceName: randomDevice.name,
+      app: sample.app,
+      packageName: sample.packageName,
+      title: msg.title,
+      text: msg.text,
+      sender: msg.sender,
+      timestamp: Date.now(),
+      priority: sample.priority as any,
+      type: sample.type as any,
+      read: false,
+      favorite: false
+    };
+
+    setEvents((prev) => [newEvent, ...prev]);
+    knownEventIdsRef.current.add(newEvent.id);
+    saveEventToFirestore(firestoreConfig, newEvent);
+
+    // Trigger toast & sound
+    playNotificationSound();
+    const newToast: ToastItem = {
+      id: newEvent.id + '-' + Date.now(),
+      event: newEvent,
+      createdAt: Date.now()
+    };
+    setToasts((prev) => [newToast, ...prev].slice(0, 5));
   };
 
-  const unreadCount = events.filter((e) => !e.read).length;
+  // Compute Event Stats dynamically in memory
+  const computedStats: EventStats = React.useMemo(() => {
+    const appMap: Record<string, number> = {};
+    const priorityMap: Record<string, number> = {};
+
+    events.forEach((e) => {
+      appMap[e.app] = (appMap[e.app] || 0) + 1;
+      priorityMap[e.priority] = (priorityMap[e.priority] || 0) + 1;
+    });
+
+    const appDistribution = Object.keys(appMap).map((k) => ({ name: k, count: appMap[k] }));
+    const priorityDistribution = Object.keys(priorityMap).map((k) => ({ name: k, count: priorityMap[k] }));
+
+    const timelineData = Array.from({ length: 6 }).map((_, i) => {
+      const hourLabel = `${(new Date().getHours() - (5 - i) + 24) % 24}:00`;
+      return {
+        time: hourLabel,
+        count: Math.floor(Math.random() * 8) + 1
+      };
+    });
+
+    return {
+      totalEvents: events.length,
+      unreadCount: events.filter((e) => !e.read).length,
+      favoriteCount: events.filter((e) => e.favorite).length,
+      deviceCount: devices.length,
+      appDistribution,
+      priorityDistribution,
+      timelineData
+    };
+  }, [events, devices]);
+
+  const unreadCount = computedStats.unreadCount;
 
   if (isCamouflaged) {
     return <DisguisedCalculator onUnlock={() => setIsCamouflaged(false)} secretPin="12345" />;
@@ -364,7 +400,7 @@ export default function App() {
       <div className="fixed top-5 right-5 z-50 space-y-2.5 max-w-sm w-full px-4 sm:px-0 pointer-events-none">
         {toasts.map((toast) => {
           const evt = toast.event;
-          const isHigh = evt.priority === 'HIGH' || evt.priority === 'CRITICAL';
+          const isHigh = evt.priority === 'high' || evt.priority === 'critical';
 
           return (
             <div
@@ -385,7 +421,7 @@ export default function App() {
                 </div>
                 <div className="min-w-0 space-y-0.5">
                   <div className="flex items-center space-x-2">
-                    <span className="font-bold text-xs truncate">{evt.appName || 'Notificação'}</span>
+                    <span className="font-bold text-xs truncate">{evt.app || 'Notificação'}</span>
                     <span
                       className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase ${
                         isHigh ? 'bg-rose-500/30 text-rose-300' : 'bg-indigo-500/30 text-indigo-300'
@@ -396,7 +432,7 @@ export default function App() {
                   </div>
                   <p className="text-xs font-semibold text-white truncate">{evt.title}</p>
                   <p className="text-[11px] text-slate-300 line-clamp-2 leading-tight">
-                    {evt.content}
+                    {evt.text}
                   </p>
                   <div className="text-[10px] text-slate-400 font-mono pt-1">
                     {new Date(evt.timestamp).toLocaleTimeString()} • {evt.deviceName}
@@ -419,7 +455,6 @@ export default function App() {
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        keepAliveConfig={keepAliveConfig}
         unreadCount={unreadCount}
         onSimulateEvent={handleSimulateRandomEvent}
         onLockCamouflage={() => setIsCamouflaged(true)}
@@ -432,7 +467,7 @@ export default function App() {
             events={events}
             devices={devices}
             loading={loading}
-            onRefresh={fetchEvents}
+            onRefresh={() => {}}
             onToggleFavorite={handleToggleFavorite}
             onMarkRead={handleMarkRead}
             onMarkAllRead={handleMarkAllRead}
@@ -441,14 +476,13 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'keepalive' && (
-          <KeepAliveView
-            config={keepAliveConfig}
-            logs={pingLogs}
-            onTriggerPing={handleTriggerPing}
-            onUpdateConfig={handleUpdateKeepAliveConfig}
-            onClearLogs={handleClearLogs}
-            loading={loading}
+        {activeTab === 'cloudstatus' && (
+          <CloudStatusView
+            firestoreConfig={firestoreConfig}
+            lastSyncTime={lastSyncTime}
+            onClearLocalCache={handleClearLocalCache}
+            githubRepo={githubRepo}
+            onUpdateGithubRepo={setGithubRepo}
           />
         )}
 
@@ -462,13 +496,14 @@ export default function App() {
         )}
 
         {activeTab === 'analytics' && (
-          <AnalyticsView stats={stats} />
+          <AnalyticsView stats={computedStats} />
         )}
 
         {activeTab === 'firestore' && (
           <FirestoreConfigView
             config={firestoreConfig}
             onSaveConfig={(cfg) => setFirestoreConfig(cfg)}
+            onClearLocalCache={handleClearLocalCache}
           />
         )}
 
@@ -487,11 +522,11 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-slate-900/80 border-t border-slate-800 py-4 text-center text-xs text-slate-500 mt-auto">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Portal Mobile • Sistema de Monitoramento & Sincronização 24/7</span>
+          <span>Portal Mobile • Sincronização Direta Android ↔ Firestore 24/7</span>
           <div className="flex items-center space-x-3 text-[11px]">
-            <span className="text-emerald-400 font-semibold">● Render Keep-Alive Ativo</span>
+            <span className="text-emerald-400 font-semibold">● Firestore Realtime (onSnapshot)</span>
             <span>•</span>
-            <span className="text-indigo-400 font-semibold">● Firestore Sincronizado</span>
+            <span className="text-indigo-400 font-semibold">● Firebase Auth & Hosting</span>
           </div>
         </div>
       </footer>

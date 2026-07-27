@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
-import { Database, Shield, CheckCircle2, Cloud, HardDrive, Key, Copy, Check, ExternalLink } from 'lucide-react';
+import { Database, Shield, CheckCircle2, Cloud, HardDrive, Key, Copy, Check, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 import { FirestoreConfig } from '../types';
 
 interface FirestoreConfigViewProps {
   config: FirestoreConfig;
   onSaveConfig: (cfg: FirestoreConfig) => void;
+  onClearLocalCache?: () => void;
 }
 
 export const FirestoreConfigView: React.FC<FirestoreConfigViewProps> = ({
   config,
-  onSaveConfig
+  onSaveConfig,
+  onClearLocalCache
 }) => {
   const [form, setForm] = useState<FirestoreConfig>(config);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [cacheCleared, setCacheCleared] = useState(false);
 
   const rulesSnippet = `rules_version = '2';
 service cloud.firestore {
@@ -56,7 +59,23 @@ service cloud.firestore {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {onClearLocalCache && (
+            <button
+              type="button"
+              onClick={() => {
+                onClearLocalCache();
+                setCacheCleared(true);
+                setTimeout(() => setCacheCleared(false), 3000);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
+              title="Limpar o cache local de eventos e dispositivos"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Limpar Cache Local</span>
+            </button>
+          )}
+
           <span className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 ${
             form.mode === 'cloud' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30'
           }`}>
@@ -64,6 +83,54 @@ service cloud.firestore {
             <span>{form.mode === 'cloud' ? 'Sincronização em Nuvem' : 'Cache Local + Firestore'}</span>
           </span>
         </div>
+      </div>
+
+      {/* Decoupled Real-Time Architecture Flow */}
+      <div className="bg-slate-900/90 rounded-2xl p-5 border border-indigo-500/30 shadow-xl space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+          <div className="flex items-center space-x-2">
+            <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <RefreshCw className="w-4 h-4" />
+            </span>
+            <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wider">
+              Arquitetura Sem Backend Central (Desconectada do Render)
+            </h3>
+          </div>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            Render Pode Dormir Livremente
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-center text-xs font-semibold">
+          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+            <span className="text-indigo-400 block font-mono text-[10px] uppercase">1. Origem</span>
+            <span className="text-white">App Android</span>
+          </div>
+
+          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col justify-center">
+            <span className="text-amber-400 block font-mono text-[10px] uppercase">2. Autenticação</span>
+            <span className="text-white">Firebase Auth</span>
+          </div>
+
+          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col justify-center">
+            <span className="text-emerald-400 block font-mono text-[10px] uppercase">3. Banco de Dados</span>
+            <span className="text-white">Firestore DB</span>
+          </div>
+
+          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col justify-center">
+            <span className="text-cyan-400 block font-mono text-[10px] uppercase">4. Escuta Tempo Real</span>
+            <span className="text-white">Portal (onSnapshot)</span>
+          </div>
+
+          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col justify-center">
+            <span className="text-violet-400 block font-mono text-[10px] uppercase">5. Renderização</span>
+            <span className="text-white">UI do Portal</span>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-slate-400 pt-1">
+          💡 <strong className="text-slate-200">Papel do Render:</strong> Restrito a utilitários secundários (API, Admin, Logs, Backup, Export, Webhook, Health, Version). O Portal permanece online no Hosting e recebe eventos em tempo real do Android diretamente pelo Firestore, sem passar pelo servidor Render.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -151,6 +218,13 @@ service cloud.firestore {
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400 flex items-center space-x-2">
               <CheckCircle2 className="w-4 h-4" />
               <span>Configurações do Firestore salvas com sucesso!</span>
+            </div>
+          )}
+
+          {cacheCleared && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center space-x-2">
+              <CheckCircle2 className="w-4 h-4 text-rose-400" />
+              <span>Cache local de eventos e dispositivos limpo com sucesso.</span>
             </div>
           )}
         </form>
