@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Cloud, Smartphone, BarChart3, Database, Rocket, Plus, Lock, Zap } from 'lucide-react';
+import { Activity, Cloud, Smartphone, BarChart3, Database, Rocket, Plus, Lock, Zap, Shield } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;
@@ -7,6 +7,7 @@ interface NavbarProps {
   unreadCount: number;
   onSimulateEvent: () => void;
   onLockCamouflage?: () => void;
+  onOpenCamouflageSettings?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -14,7 +15,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   unreadCount,
   onSimulateEvent,
-  onLockCamouflage
+  onLockCamouflage,
+  onOpenCamouflageSettings
 }) => {
   const navItems = [
     { id: 'timeline', label: 'Linha do Tempo', icon: Activity, badge: unreadCount > 0 ? unreadCount : undefined },
@@ -61,6 +63,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Quick Action Buttons */}
           <div className="flex items-center space-x-2">
+            {onOpenCamouflageSettings && (
+              <button
+                onClick={onOpenCamouflageSettings}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-indigo-300 border border-slate-700/80 transition-colors cursor-pointer"
+                title="Configurar Perfil de Camuflagem (Calculadora/PIN)"
+              >
+                <Shield className="w-4 h-4" />
+              </button>
+            )}
+
             {onLockCamouflage && (
               <button
                 onClick={onLockCamouflage}
@@ -81,6 +93,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
         </div>
+
 
         {/* Navigation Tabs */}
         <div className="flex space-x-1 overflow-x-auto pb-2 pt-1 no-scrollbar border-t border-slate-800/60 mt-1">

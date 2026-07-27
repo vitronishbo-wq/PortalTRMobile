@@ -360,17 +360,17 @@ app.get('/api/export-files', (req, res) => {
   res.json({
     renderYaml: `services:
   - type: web
-    name: portal-mobile-backend
+    name: portaltrmobile-api
     runtime: node
-    buildCommand: npm run build
-    startCommand: npm run start
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 3000
       - key: FIREBASE_PROJECT_ID
-        value: portal-mobile-prod
+        value: portaltrmobile
     healthCheckPath: /api/health
     autoDeploy: true`,
 

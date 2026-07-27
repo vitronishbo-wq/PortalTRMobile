@@ -8,6 +8,7 @@ import { FirestoreConfigView } from './components/FirestoreConfigView';
 import { DeploymentGuideView } from './components/DeploymentGuideView';
 import { EventSimulatorModal } from './components/EventSimulatorModal';
 import { DisguisedCalculator } from './components/DisguisedCalculator';
+import { CamouflageSettingsModal } from './components/CamouflageSettingsModal';
 import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
 import { Bell, X } from 'lucide-react';
 import {
@@ -116,8 +117,46 @@ const initialEvents: PortalEvent[] = [
 ];
 
 export default function App() {
-  const [isCamouflaged, setIsCamouflaged] = useState<boolean>(false);
+  const [secretPin, setSecretPin] = useState<string>(() => {
+    return localStorage.getItem('portal_camouflage_pin') || '12345';
+  });
+  const [calcTitle, setCalcTitle] = useState<string>(() => {
+    return localStorage.getItem('portal_camouflage_title') || 'Calculadora Padrão';
+  });
+  const [startCamouflaged, setStartCamouflaged] = useState<boolean>(() => {
+    return localStorage.getItem('portal_camouflage_start') === 'true';
+  });
+  const [hideUnlockBtn, setHideUnlockBtn] = useState<boolean>(() => {
+    return localStorage.getItem('portal_camouflage_hide_btn') === 'true';
+  });
+
+  const [isCamouflaged, setIsCamouflaged] = useState<boolean>(() => {
+    return localStorage.getItem('portal_camouflage_start') === 'true';
+  });
+  const [isCamouflageModalOpen, setIsCamouflageModalOpen] = useState(false);
+
+  const handleSavePin = (pin: string) => {
+    setSecretPin(pin);
+    localStorage.setItem('portal_camouflage_pin', pin);
+  };
+
+  const handleSaveCalcTitle = (title: string) => {
+    setCalcTitle(title);
+    localStorage.setItem('portal_camouflage_title', title);
+  };
+
+  const handleSaveStartCamouflaged = (val: boolean) => {
+    setStartCamouflaged(val);
+    localStorage.setItem('portal_camouflage_start', String(val));
+  };
+
+  const handleSaveHideUnlockBtn = (val: boolean) => {
+    setHideUnlockBtn(val);
+    localStorage.setItem('portal_camouflage_hide_btn', String(val));
+  };
+
   const [activeTab, setActiveTab] = useState<string>('timeline');
+
   const [events, setEvents] = useState<PortalEvent[]>(initialEvents);
   const [devices, setDevices] = useState<Device[]>(initialDevices);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(Date.now());
@@ -390,7 +429,14 @@ export default function App() {
   const unreadCount = computedStats.unreadCount;
 
   if (isCamouflaged) {
-    return <DisguisedCalculator onUnlock={() => setIsCamouflaged(false)} secretPin="12345" />;
+    return (
+      <DisguisedCalculator
+        onUnlock={() => setIsCamouflaged(false)}
+        secretPin={secretPin}
+        calcTitle={calcTitle}
+        hideUnlockBtn={hideUnlockBtn}
+      />
+    );
   }
 
   return (
@@ -458,6 +504,7 @@ export default function App() {
         unreadCount={unreadCount}
         onSimulateEvent={handleSimulateRandomEvent}
         onLockCamouflage={() => setIsCamouflaged(true)}
+        onOpenCamouflageSettings={() => setIsCamouflageModalOpen(true)}
       />
 
       {/* Main Content Body */}
@@ -518,6 +565,21 @@ export default function App() {
         onClose={() => setIsSimulatorOpen(false)}
         onSimulate={handleSimulateCustomEvent}
       />
+
+      {/* Camouflage Settings Modal */}
+      <CamouflageSettingsModal
+        isOpen={isCamouflageModalOpen}
+        onClose={() => setIsCamouflageModalOpen(false)}
+        secretPin={secretPin}
+        onSavePin={handleSavePin}
+        startCamouflaged={startCamouflaged}
+        onSaveStartCamouflaged={handleSaveStartCamouflaged}
+        hideUnlockBtn={hideUnlockBtn}
+        onSaveHideUnlockBtn={handleSaveHideUnlockBtn}
+        calcTitle={calcTitle}
+        onSaveCalcTitle={handleSaveCalcTitle}
+      />
+
 
       {/* Footer */}
       <footer className="bg-slate-900/80 border-t border-slate-800 py-4 text-center text-xs text-slate-500 mt-auto">

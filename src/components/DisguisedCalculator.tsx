@@ -4,11 +4,15 @@ import { Lock, Unlock, Calculator as CalcIcon, Shield, Eye, EyeOff, AlertCircle 
 interface DisguisedCalculatorProps {
   onUnlock: () => void;
   secretPin?: string;
+  calcTitle?: string;
+  hideUnlockBtn?: boolean;
 }
 
 export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
   onUnlock,
-  secretPin = '12345'
+  secretPin = '12345',
+  calcTitle = 'Calculadora Padrão',
+  hideUnlockBtn = false
 }) => {
   const [display, setDisplay] = useState('0');
   const [expression, setExpression] = useState('');
@@ -19,7 +23,7 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
   const handleInput = (val: string) => {
     setErrorMessage('');
 
-    // Detect secret PIN sequence
+    // Detect secret PIN sequence typed in numeric order
     if (/\d/.test(val)) {
       const nextSeq = (inputSequence + val).slice(-secretPin.length);
       setInputSequence(nextSeq);
@@ -42,7 +46,6 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
         if (!expression) return;
         // Safe evaluation for basic math expressions
         const sanitized = expression.replace(/×/g, '*').replace(/÷/g, '/');
-        // Validate expression contains only safe chars
         if (!/^[0-9+\-*/.() ]+$/.test(sanitized)) {
           setDisplay('Erro');
           return;
@@ -67,7 +70,7 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
     if (pin === secretPin || pin === '12345') {
       onUnlock();
     } else if (pin !== null) {
-      setErrorMessage('PIN incorreto. Tente novamente ou use o teclado da calculadora (PIN padrão: 12345).');
+      setErrorMessage(`PIN incorreto. Tente novamente ou digite a sequência secreta no teclado.`);
     }
   };
 
@@ -76,7 +79,7 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
     ['7', '8', '9', '×'],
     ['4', '5', '6', '-'],
     ['1', '2', '3', '+'],
-    ['0', '.', '=', '🔓']
+    ['0', '.', '=', hideUnlockBtn ? '%' : '🔓']
   ];
 
   return (
@@ -87,11 +90,11 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center space-x-2">
             <CalcIcon className="w-5 h-5 text-indigo-400" />
-            <span className="font-bold text-sm text-slate-200">Calculadora Padrão</span>
+            <span className="font-bold text-sm text-slate-200">{calcTitle}</span>
           </div>
           <button
             onClick={() => setShowPinHint(!showPinHint)}
-            className="text-slate-500 hover:text-slate-300 transition-colors p-1"
+            className="text-slate-500 hover:text-slate-300 transition-colors p-1 cursor-pointer"
             title="Dica de Camuflagem"
           >
             {showPinHint ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -106,7 +109,7 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
               <span>Modo Disfarçado Ativo</span>
             </div>
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              Para desbloquear o painel real do <strong>Portal Mobile</strong>, digite a sequência PIN no teclado (PIN Padrão: <strong className="text-white font-mono">12345</strong>).
+              Para desbloquear o painel do <strong>Portal Mobile</strong>, digite a sequência PIN no teclado (PIN Ativo: <strong className="text-white font-mono">{secretPin}</strong>).
             </p>
           </div>
         )}
@@ -163,17 +166,18 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
           )}
         </div>
 
-        {/* Bottom Disguised Uninstall Button */}
+        {/* Bottom Disguised System Status */}
         <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
-          <span>v2.4.0 (Sistema)</span>
+          <span>v2.4.0 (Serviço de Calculadora)</span>
           <button
-            onClick={() => alert('Acesso negado: Aplicativo protegido como serviço essencial do sistema.')}
-            className="text-rose-400/80 hover:text-rose-400 hover:underline cursor-pointer"
+            onClick={() => alert('Acesso negado: Aplicativo essencial do sistema.')}
+            className="text-slate-500 hover:text-slate-400 hover:underline cursor-pointer"
           >
-            Desinstalar
+            Info
           </button>
         </div>
       </div>
     </div>
   );
 };
+
