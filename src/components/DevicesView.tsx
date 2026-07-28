@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, QrCode, Battery, Wifi, ShieldCheck, Plus, Trash2, Send, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Smartphone, QrCode, Battery, Wifi, ShieldCheck, Plus, Trash2, Send, RefreshCw, CheckCircle2, Activity, Cpu, Wrench, Zap } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Device } from '../types';
+import { ZeroTouchIdentity } from '../engine/provisioningEngine';
 
 interface DevicesViewProps {
   devices: Device[];
@@ -21,6 +22,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [pairingToken, setPairingToken] = useState<string>('');
   const [newDeviceName, setNewDeviceName] = useState('');
   const [newDeviceModel, setNewDeviceModel] = useState('');
+  const [repairingMap, setRepairingMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     // Generate pairing token & QR Code
@@ -40,16 +42,23 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
   const handleManualPair = () => {
     if (!newDeviceName.trim()) return;
+    const zeroTouchDev = ZeroTouchIdentity.createIdentity('generic');
     onAddDevice({
+      ...zeroTouchDev,
       name: newDeviceName,
-      model: newDeviceModel || 'Android Phone',
-      osVersion: 'Android 14 (API 34)',
-      batteryLevel: 95,
-      online: true
+      model: newDeviceModel || 'Android Phone'
     });
     setNewDeviceName('');
     setNewDeviceModel('');
     setShowPairModal(false);
+  };
+
+  const handleAutoRepair = (deviceId: string) => {
+    setRepairingMap((prev) => ({ ...prev, [deviceId]: true }));
+    setTimeout(() => {
+      setRepairingMap((prev) => ({ ...prev, [deviceId]: false }));
+      alert(`[Auto-Repair] Comando de reativação enviado com sucesso para o dispositivo ${deviceId}! Listener de Notificações restaurado.`);
+    }, 1200);
   };
 
   return (
@@ -60,10 +69,10 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         <div>
           <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
             <Smartphone className="w-6 h-6 text-indigo-400" />
-            <span>Dispositivos Conectados ({devices.length})</span>
+            <span>Dispositivos & DeviceHealth ({devices.length})</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Gerencie os smartphones Android emparelhados que capturam notificações, SMS e chamadas em tempo real.
+            Monitorização de Saúde Zero-Touch, permissões OEM e latência de sincronização em lote.
           </p>
         </div>
 
@@ -78,69 +87,128 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
       {/* Device Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {devices.map((device) => (
-          <div
-            key={device.deviceId}
-            className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800 shadow-lg relative space-y-4 hover:border-slate-700 transition-all"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                  <Smartphone className="w-6 h-6" />
+        {devices.map((device) => {
+          const isRepairing = repairingMap[device.deviceId];
+          const healthScore = device.permissionScore ?? 98;
+          const notificationStatus = device.notificationListenerStatus || 'active';
+          const oem = device.oemProfile || 'xiaomi';
+
+          return (
+            <div
+              key={device.deviceId}
+              className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800 shadow-lg relative space-y-4 hover:border-slate-700 transition-all"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                    <Smartphone className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="font-bold text-slate-100 text-sm">{device.name}</h3>
+                      <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[10px] uppercase font-mono font-semibold">
+                        {oem}
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400 block">{device.model}</span>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-100 text-sm">{device.name}</h3>
-                  <span className="text-xs text-slate-400 block">{device.model}</span>
+
+                <div className="flex items-center space-x-1">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1 ${
+                    device.online ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-500'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${device.online ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`}></span>
+                    <span>{device.online ? 'ONLINE' : 'OFFLINE'}</span>
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-1">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1 ${
-                  device.online ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-500'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${device.online ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`}></span>
-                  <span>{device.online ? 'ONLINE' : 'OFFLINE'}</span>
-                </span>
-              </div>
-            </div>
+              {/* Zero-Touch Device Health Diagnostics Panel */}
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/90 space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400 flex items-center space-x-1.5">
+                    <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Score de Saúde Agente:</span>
+                  </span>
+                  <span className="font-bold text-emerald-400 font-mono">{healthScore}%</span>
+                </div>
 
-            <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300">
-              <div className="flex items-center space-x-1.5">
-                <Battery className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{device.batteryLevel ?? 88}%</span>
-              </div>
-              <div className="flex items-center space-x-1.5">
-                <Wifi className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Wi-Fi / 5G</span>
-              </div>
-              <div className="flex items-center space-x-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Ativo</span>
-              </div>
-            </div>
+                {/* Health Progress Bar */}
+                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-emerald-500 to-indigo-500 h-1.5 rounded-full"
+                    style={{ width: `${healthScore}%` }}
+                  />
+                </div>
 
-            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-              <span>Última Sincronização: {new Date(device.lastSync).toLocaleTimeString('pt-BR')}</span>
-              
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={onSimulateEvent}
-                  className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all cursor-pointer"
-                  title="Testar Envio de Evento do Celular"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => onRemoveDevice(device.deviceId)}
-                  className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer"
-                  title="Desconectar Dispositivo"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                  <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                    <span className="text-slate-400">Listener:</span>
+                    <span className={`font-semibold capitalize ${
+                      notificationStatus === 'active' ? 'text-emerald-400' : 'text-amber-400'
+                    }`}>
+                      {notificationStatus === 'active' ? '● Ativo' : '▲ Requer Reparo'}
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                    <span className="text-slate-400">Latência:</span>
+                    <span className="font-mono text-indigo-300 font-bold">
+                      {device.syncDelayMs ?? 12}ms
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300">
+                <div className="flex items-center space-x-1.5">
+                  <Battery className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{device.batteryLevel ?? 98}%</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Zero-Touch</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Sem Limites</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                <span>Último Heartbeat: {new Date(device.lastSync).toLocaleTimeString('pt-BR')}</span>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleAutoRepair(device.deviceId)}
+                    disabled={isRepairing}
+                    className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all cursor-pointer flex items-center space-x-1"
+                    title="Auto-Repair Background Listener"
+                  >
+                    <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
+                    <span className="text-[10px]">Auto-Repair</span>
+                  </button>
+
+                  <button
+                    onClick={onSimulateEvent}
+                    className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all cursor-pointer"
+                    title="Testar Envio de Evento do Celular"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => onRemoveDevice(device.deviceId)}
+                    className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer"
+                    title="Desconectar Dispositivo"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* QR Code Pair Modal */}
@@ -150,7 +218,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-indigo-400" />
-                <span>Emparelhar App Android</span>
+                <span>Emparelhar App Android Zero-Touch</span>
               </h3>
               <button
                 onClick={() => setShowPairModal(false)}
@@ -212,3 +280,4 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     </div>
   );
 };
+

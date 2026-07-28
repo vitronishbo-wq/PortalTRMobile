@@ -20,7 +20,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const navItems = [
     { id: 'timeline', label: 'Linha do Tempo', icon: Activity, badge: unreadCount > 0 ? unreadCount : undefined },
-    { id: 'onboarding', label: 'Engine Adaptativo', icon: Cpu, highlight: true },
+    { id: 'runtime', label: 'Runtime V2', icon: Cpu, highlight: true },
+    { id: 'onboarding', label: 'Engine Zero-Touch', icon: Zap },
     { id: 'installer', label: 'Instalação PWA', icon: Smartphone },
     { id: 'cloudstatus', label: 'Cloud Status', icon: Cloud },
     { id: 'devices', label: 'Dispositivos', icon: Smartphone },

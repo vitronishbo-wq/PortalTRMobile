@@ -11,6 +11,7 @@ import { DisguisedCalculator } from './components/DisguisedCalculator';
 import { CamouflageSettingsModal } from './components/CamouflageSettingsModal';
 import { SmartInstaller } from './components/SmartInstaller';
 import { AdaptiveOnboardingView } from './components/AdaptiveOnboardingView';
+import { RuntimeControlView } from './components/RuntimeControlView';
 import { useAppStateMachine } from './engine/appStateMachine';
 import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
 import { Bell, X } from 'lucide-react';
@@ -585,6 +586,8 @@ export default function App() {
             onClearAll={handleClearAllEvents}
           />
         )}
+
+        {activeTab === 'runtime' && <RuntimeControlView />}
 
         {activeTab === 'onboarding' && (
           <AdaptiveOnboardingView
