@@ -19,13 +19,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCamouflageSettings
 }) => {
   const navItems = [
-    { id: 'timeline', label: 'Linha do Tempo', icon: Activity, badge: unreadCount > 0 ? unreadCount : undefined },
-    { id: 'runtime', label: 'Runtime V2', icon: Cpu, highlight: true },
-    { id: 'console', label: 'Console Founder', icon: Crown, highlight: true },
+    { id: 'public', label: 'Public Workspace (PWA)', icon: Activity },
+    { id: 'founder_ide', label: 'Founder IDE Workspace', icon: Crown, highlight: true },
+    { id: 'runtime', label: 'Runtime Kernel V2', icon: Cpu, highlight: true },
     { id: 'onboarding', label: 'Engine Zero-Touch', icon: Zap },
     { id: 'installer', label: 'Instalação PWA', icon: Smartphone },
     { id: 'cloudstatus', label: 'Cloud Status', icon: Cloud },
-    { id: 'devices', label: 'Dispositivos', icon: Smartphone },
     { id: 'analytics', label: 'Métricas', icon: BarChart3 },
     { id: 'firestore', label: 'Firestore', icon: Database },
     { id: 'ritual', label: 'Ritual Deploy', icon: Rocket }
@@ -102,7 +101,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Navigation Tabs */}
         <div className="flex space-x-1 overflow-x-auto pb-2 pt-1 no-scrollbar border-t border-slate-800/60 mt-1">
-          {navItems.map((item) => {
+          {navItems.map((item: { id: string; label: string; icon: React.ForwardRefExoticComponent<any>; highlight?: boolean; badge?: number | string }) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (

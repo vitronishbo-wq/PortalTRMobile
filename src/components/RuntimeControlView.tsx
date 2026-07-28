@@ -181,14 +181,22 @@ export const RuntimeControlView: React.FC = () => {
             <span>Matriz de Plugins Modulares (Interface Uniforme: initialize, start, stop, health, events)</span>
           </h3>
           <span className="text-xs text-slate-400 font-mono">
-            {Array.from(globalRuntime.plugins.values()).filter((p) => p.health().status === 'ok').length}/
+            {Array.from(globalRuntime.plugins.values()).filter((p) => p.health() >= 50).length}/
             {globalRuntime.plugins.size} Operacionais
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {Array.from(globalRuntime.plugins.values()).map((plugin) => {
-            const h = plugin.health();
+            const score = plugin.health();
+            const h = plugin.healthDetails
+              ? plugin.healthDetails()
+              : {
+                  score,
+                  status: score >= 80 ? 'ok' : score >= 50 ? 'degraded' : 'down',
+                  message: score >= 50 ? 'Plugin operacional' : 'Plugin desativado'
+                };
+
             return (
               <div
                 key={plugin.id}
@@ -214,7 +222,7 @@ export const RuntimeControlView: React.FC = () => {
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Score de Saúde:</span>
+                    <span>Score de Saúde (health):</span>
                     <span className="font-mono font-bold text-emerald-400">{h.score}%</span>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-snug">{h.message}</p>
@@ -241,8 +249,9 @@ export const RuntimeControlView: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
-                      const evts = plugin.events();
-                      globalRuntime.log(`[Plugin ${plugin.id}] Total de eventos em buffer: ${evts.length}`);
+                      const evStream = plugin.events();
+                      const count = typeof evStream?.getHistory === 'function' ? evStream.getHistory().length : 0;
+                      globalRuntime.log(`[Plugin ${plugin.id}] Observable de Eventos. Eventos em buffer: ${count}`);
                       syncUI();
                     }}
                     className="flex-1 py-1 bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 text-[10px] font-bold rounded-lg border border-indigo-800/50 transition-all cursor-pointer"

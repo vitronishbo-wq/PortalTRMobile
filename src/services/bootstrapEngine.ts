@@ -20,6 +20,24 @@ export interface SecretStatusItem {
   lastChecked: number;
 }
 
+export interface SuperUserCredentials {
+  username: string;
+  email: string;
+  role: 'founder';
+  pinCode: string;
+  systemKey: string;
+  immutable: boolean;
+}
+
+export const DEUS_FUNDADOR_CREDENTIALS: SuperUserCredentials = {
+  username: 'deusfundador',
+  email: 'deusfundador@portal.internal',
+  role: 'founder',
+  pinCode: '0000',
+  systemKey: 'SYS-FOUNDER-DEUS-MASTER-2026-X99',
+  immutable: true
+};
+
 export class BootstrapEngine {
   private static founderProfile: UserProfile | null = null;
   private static bootstrapCompleted = false;
@@ -41,9 +59,9 @@ export class BootstrapEngine {
     }
 
     const defaultFounder: UserProfile = {
-      userId: 'founder-master-001',
-      email: 'silajaneiro9@gmail.com',
-      displayName: 'Portal Founder (System Master)',
+      userId: 'deusfundador-master-001',
+      email: DEUS_FUNDADOR_CREDENTIALS.email,
+      displayName: 'Deus Fundador (Super Utilizador Master)',
       role: 'founder',
       system: true,
       immutable: true,

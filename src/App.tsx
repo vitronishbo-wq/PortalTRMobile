@@ -13,6 +13,8 @@ import { SmartInstaller } from './components/SmartInstaller';
 import { AdaptiveOnboardingView } from './components/AdaptiveOnboardingView';
 import { RuntimeControlView } from './components/RuntimeControlView';
 import { FounderConsoleView } from './components/FounderConsoleView';
+import { FounderIDEWorkspace } from './components/workspaces/FounderIDEWorkspace';
+import { PublicWorkspace } from './components/workspaces/PublicWorkspace';
 import { useAppStateMachine } from './engine/appStateMachine';
 import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
 import { Bell, X } from 'lucide-react';
@@ -574,6 +576,12 @@ export default function App() {
 
       {/* Main Content Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {activeTab === 'public' && (
+          <PublicWorkspace onOpenFounderWorkspace={() => setActiveTab('founder_ide')} />
+        )}
+
+        {activeTab === 'founder_ide' && <FounderIDEWorkspace />}
+
         {activeTab === 'timeline' && (
           <TimelineView
             events={events}

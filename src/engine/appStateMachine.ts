@@ -11,7 +11,7 @@ export interface AppStateMachineState {
 export function useAppStateMachine(initialStartCamouflaged: boolean) {
   const [state, setState] = useState<AppStateMachineState>(() => ({
     lifecycle: initialStartCamouflaged ? 'LOCKED' : 'READY',
-    activeTab: 'timeline',
+    activeTab: 'public',
     isSimulatorOpen: false,
     isCamouflageModalOpen: false
   }));

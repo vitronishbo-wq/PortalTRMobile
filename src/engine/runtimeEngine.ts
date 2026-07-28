@@ -2,6 +2,7 @@ import { Device } from '../types';
 import { CapabilityEngine, OEMBrand, OEMDeepLink } from './CapabilityEngine';
 import { db } from '../firebase/firebase';
 import { doc, setDoc, writeBatch } from 'firebase/firestore';
+import { Plugin, Observable, PluginEventSubject } from './plugin';
 
 export type RuntimeLifecycleState = 'BOOT' | 'DISCOVER' | 'READY' | 'SYNC' | 'SLEEP' | 'RECOVER';
 
@@ -50,15 +51,17 @@ export interface RuntimePluginHealth {
   message: string;
 }
 
-export interface RuntimePlugin {
+export interface RuntimePlugin extends Plugin<RuntimeEnvelope> {
   id: string;
   name: string;
   version: string;
   initialize(runtime: AutonomousRuntime): Promise<void>;
   start(): Promise<void>;
   stop(): Promise<void>;
-  health(): RuntimePluginHealth;
-  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[];
+  health(): number;
+  healthDetails?(): RuntimePluginHealth;
+  events(): PluginEventSubject<RuntimeEnvelope>;
+  pushEvent?(incomingEvent: RuntimeEnvelope): void;
 }
 
 // -------------------------------------------------------------
@@ -137,7 +140,7 @@ export class NotificationPlugin implements RuntimePlugin {
   version = '2.0.0';
   private active = false;
   private runtimeRef: AutonomousRuntime | null = null;
-  private eventBuffer: RuntimeEnvelope[] = [];
+  private eventStream = new PluginEventSubject<RuntimeEnvelope>();
 
   async initialize(runtime: AutonomousRuntime): Promise<void> {
     this.runtimeRef = runtime;
@@ -154,20 +157,26 @@ export class NotificationPlugin implements RuntimePlugin {
     this.runtimeRef?.log('NotificationPlugin: Serviço pausado.');
   }
 
-  health(): RuntimePluginHealth {
+  health(): number {
+    return this.active ? 100 : 0;
+  }
+
+  healthDetails(): RuntimePluginHealth {
     return {
-      score: this.active ? 100 : 0,
+      score: this.health(),
       status: this.active ? 'ok' : 'down',
       message: this.active ? 'Notification Listener ativo' : 'Listener desativado'
     };
   }
 
-  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+  events(): PluginEventSubject<RuntimeEnvelope> {
+    return this.eventStream;
+  }
+
+  pushEvent(incomingEvent: RuntimeEnvelope): void {
     if (incomingEvent) {
-      this.eventBuffer.unshift(incomingEvent);
-      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+      this.eventStream.next(incomingEvent);
     }
-    return [...this.eventBuffer];
   }
 }
 
@@ -177,7 +186,7 @@ export class SMSPlugin implements RuntimePlugin {
   version = '2.0.0';
   private active = false;
   private runtimeRef: AutonomousRuntime | null = null;
-  private eventBuffer: RuntimeEnvelope[] = [];
+  private eventStream = new PluginEventSubject<RuntimeEnvelope>();
 
   async initialize(runtime: AutonomousRuntime): Promise<void> {
     this.runtimeRef = runtime;
@@ -194,20 +203,26 @@ export class SMSPlugin implements RuntimePlugin {
     this.runtimeRef?.log('SMSPlugin: Intercetor SMS pausado.');
   }
 
-  health(): RuntimePluginHealth {
+  health(): number {
+    return this.active ? 100 : 50;
+  }
+
+  healthDetails(): RuntimePluginHealth {
     return {
-      score: this.active ? 100 : 50,
+      score: this.health(),
       status: this.active ? 'ok' : 'degraded',
       message: this.active ? 'SMS Interceptor ativo' : 'Aguardando permissão SMS'
     };
   }
 
-  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+  events(): PluginEventSubject<RuntimeEnvelope> {
+    return this.eventStream;
+  }
+
+  pushEvent(incomingEvent: RuntimeEnvelope): void {
     if (incomingEvent) {
-      this.eventBuffer.unshift(incomingEvent);
-      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+      this.eventStream.next(incomingEvent);
     }
-    return [...this.eventBuffer];
   }
 }
 
@@ -217,7 +232,7 @@ export class CallPlugin implements RuntimePlugin {
   version = '2.0.0';
   private active = false;
   private runtimeRef: AutonomousRuntime | null = null;
-  private eventBuffer: RuntimeEnvelope[] = [];
+  private eventStream = new PluginEventSubject<RuntimeEnvelope>();
 
   async initialize(runtime: AutonomousRuntime): Promise<void> {
     this.runtimeRef = runtime;
@@ -234,20 +249,26 @@ export class CallPlugin implements RuntimePlugin {
     this.runtimeRef?.log('CallPlugin: Intercetor de chamadas pausado.');
   }
 
-  health(): RuntimePluginHealth {
+  health(): number {
+    return this.active ? 100 : 50;
+  }
+
+  healthDetails(): RuntimePluginHealth {
     return {
-      score: this.active ? 100 : 50,
+      score: this.health(),
       status: this.active ? 'ok' : 'degraded',
       message: this.active ? 'Call State Interceptor ativo' : 'Aguardando permissão de telefonia'
     };
   }
 
-  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+  events(): PluginEventSubject<RuntimeEnvelope> {
+    return this.eventStream;
+  }
+
+  pushEvent(incomingEvent: RuntimeEnvelope): void {
     if (incomingEvent) {
-      this.eventBuffer.unshift(incomingEvent);
-      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+      this.eventStream.next(incomingEvent);
     }
-    return [...this.eventBuffer];
   }
 }
 
@@ -257,7 +278,7 @@ export class WhatsAppPlugin implements RuntimePlugin {
   version = '2.0.0';
   private active = false;
   private runtimeRef: AutonomousRuntime | null = null;
-  private eventBuffer: RuntimeEnvelope[] = [];
+  private eventStream = new PluginEventSubject<RuntimeEnvelope>();
 
   async initialize(runtime: AutonomousRuntime): Promise<void> {
     this.runtimeRef = runtime;
@@ -274,20 +295,26 @@ export class WhatsAppPlugin implements RuntimePlugin {
     this.runtimeRef?.log('WhatsAppPlugin: Ponte WhatsApp pausada.');
   }
 
-  health(): RuntimePluginHealth {
+  health(): number {
+    return this.active ? 100 : 0;
+  }
+
+  healthDetails(): RuntimePluginHealth {
     return {
-      score: this.active ? 100 : 0,
+      score: this.health(),
       status: this.active ? 'ok' : 'down',
       message: this.active ? 'WhatsApp Listener operacional' : 'WhatsApp Bridge inativo'
     };
   }
 
-  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+  events(): PluginEventSubject<RuntimeEnvelope> {
+    return this.eventStream;
+  }
+
+  pushEvent(incomingEvent: RuntimeEnvelope): void {
     if (incomingEvent) {
-      this.eventBuffer.unshift(incomingEvent);
-      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+      this.eventStream.next(incomingEvent);
     }
-    return [...this.eventBuffer];
   }
 }
 
@@ -297,7 +324,7 @@ export class InstagramPlugin implements RuntimePlugin {
   version = '2.0.0';
   private active = false;
   private runtimeRef: AutonomousRuntime | null = null;
-  private eventBuffer: RuntimeEnvelope[] = [];
+  private eventStream = new PluginEventSubject<RuntimeEnvelope>();
 
   async initialize(runtime: AutonomousRuntime): Promise<void> {
     this.runtimeRef = runtime;
@@ -314,20 +341,26 @@ export class InstagramPlugin implements RuntimePlugin {
     this.runtimeRef?.log('InstagramPlugin: Monitor Instagram Direct pausado.');
   }
 
-  health(): RuntimePluginHealth {
+  health(): number {
+    return this.active ? 100 : 0;
+  }
+
+  healthDetails(): RuntimePluginHealth {
     return {
-      score: this.active ? 100 : 0,
+      score: this.health(),
       status: this.active ? 'ok' : 'down',
       message: this.active ? 'Instagram Direct Interceptor ativo' : 'Instagram Direct inativo'
     };
   }
 
-  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+  events(): PluginEventSubject<RuntimeEnvelope> {
+    return this.eventStream;
+  }
+
+  pushEvent(incomingEvent: RuntimeEnvelope): void {
     if (incomingEvent) {
-      this.eventBuffer.unshift(incomingEvent);
-      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+      this.eventStream.next(incomingEvent);
     }
-    return [...this.eventBuffer];
   }
 }
 
@@ -337,7 +370,7 @@ export class HealthPlugin implements RuntimePlugin {
   version = '2.0.0';
   private active = false;
   private runtimeRef: AutonomousRuntime | null = null;
-  private eventBuffer: RuntimeEnvelope[] = [];
+  private eventStream = new PluginEventSubject<RuntimeEnvelope>();
 
   async initialize(runtime: AutonomousRuntime): Promise<void> {
     this.runtimeRef = runtime;
@@ -354,20 +387,26 @@ export class HealthPlugin implements RuntimePlugin {
     this.runtimeRef?.log('HealthPlugin: Monitor de saúde pausado.');
   }
 
-  health(): RuntimePluginHealth {
+  health(): number {
+    return this.active ? 100 : 0;
+  }
+
+  healthDetails(): RuntimePluginHealth {
     return {
-      score: this.active ? 100 : 0,
+      score: this.health(),
       status: this.active ? 'ok' : 'down',
       message: this.active ? 'Telemetria de Saúde ativa' : 'Telemetria inativa'
     };
   }
 
-  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+  events(): PluginEventSubject<RuntimeEnvelope> {
+    return this.eventStream;
+  }
+
+  pushEvent(incomingEvent: RuntimeEnvelope): void {
     if (incomingEvent) {
-      this.eventBuffer.unshift(incomingEvent);
-      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+      this.eventStream.next(incomingEvent);
     }
-    return [...this.eventBuffer];
   }
 }
 
@@ -632,7 +671,7 @@ export class AutonomousRuntime {
     const activeCaps = this.capabilitiesGraph.filter((c) => c.active).length;
     let pluginScoresSum = 0;
     this.plugins.forEach((p) => {
-      pluginScoresSum += p.health().score;
+      pluginScoresSum += typeof p.health === 'function' ? p.health() : 100;
     });
 
     const pluginAvg = this.plugins.size > 0 ? pluginScoresSum / this.plugins.size : 100;
