@@ -1,34 +1,16 @@
+export * from './types/index';
+import { AppEvent } from './types/Event';
+
 export type EventPriority = 'critical' | 'high' | 'normal' | 'low';
 export type EventType = 'notification' | 'sms' | 'call' | 'system';
 
-export interface PortalEvent {
-  id: string;
-  uid: string;
-  deviceId: string;
+// Backward compatibility alias for UI components
+export type PortalEvent = AppEvent & {
+  uid?: string;
   deviceName?: string;
-  app: string;
-  packageName: string;
-  title: string;
-  text: string;
-  sender?: string;
-  timestamp: number;
-  priority: EventPriority;
-  type: EventType;
-  read: boolean;
-  favorite: boolean;
-}
-
-export interface Device {
-  deviceId: string;
-  uid: string;
-  name: string;
-  model: string;
-  osVersion: string;
-  lastSync: number;
-  online: boolean;
-  batteryLevel?: number;
-  pairedAt: number;
-}
+  app?: string;
+  text?: string;
+};
 
 export interface KeepAliveConfig {
   targetUrl: string;
@@ -132,4 +114,3 @@ export interface SystemEnvConfig {
   ENABLE_EMAIL: string;
   ENABLE_ANALYTICS: string;
 }
-

@@ -9,6 +9,9 @@ import { DeploymentGuideView } from './components/DeploymentGuideView';
 import { EventSimulatorModal } from './components/EventSimulatorModal';
 import { DisguisedCalculator } from './components/DisguisedCalculator';
 import { CamouflageSettingsModal } from './components/CamouflageSettingsModal';
+import { SmartInstaller } from './components/SmartInstaller';
+import { AdaptiveOnboardingView } from './components/AdaptiveOnboardingView';
+import { useAppStateMachine } from './engine/appStateMachine';
 import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
 import { Bell, X } from 'lucide-react';
 import {
@@ -21,6 +24,7 @@ import {
   deleteDeviceFromFirestore,
   defaultFirestoreConfig
 } from './lib/firebase';
+import { registerServiceWorker, sendNativeNotification } from './lib/pushNotifications';
 
 interface ToastItem {
   id: string;
@@ -43,6 +47,7 @@ const mockApps = [
 const initialDevices: Device[] = [
   {
     deviceId: 'dev-pixel-8',
+    userId: 'usr-default',
     uid: 'usr-default',
     name: 'Google Pixel 8 Pro',
     model: 'Pixel 8 Pro (Android 14)',
@@ -54,6 +59,7 @@ const initialDevices: Device[] = [
   },
   {
     deviceId: 'dev-samsung-s23',
+    userId: 'usr-default',
     uid: 'usr-default',
     name: 'Samsung Galaxy S23',
     model: 'SM-S911B (One UI 6)',
@@ -68,50 +74,62 @@ const initialDevices: Device[] = [
 const initialEvents: PortalEvent[] = [
   {
     id: 'evt-101',
+    userId: 'usr-default',
     uid: 'usr-default',
     deviceId: 'dev-pixel-8',
     deviceName: 'Google Pixel 8 Pro',
     app: 'WhatsApp',
+    source: 'WhatsApp',
     packageName: 'com.whatsapp',
     title: 'Maria Silva',
+    body: 'Enviei os relatórios financeiros do projeto para revisão. Consegue dar uma olhada?',
     text: 'Enviei os relatórios financeiros do projeto para revisão. Consegue dar uma olhada?',
     sender: 'Maria Silva',
     timestamp: Date.now() - 5 * 60 * 1000,
     priority: 'critical',
     type: 'notification',
     read: false,
+    archived: false,
     favorite: true
   },
   {
     id: 'evt-102',
+    userId: 'usr-default',
     uid: 'usr-default',
     deviceId: 'dev-pixel-8',
     deviceName: 'Google Pixel 8 Pro',
     app: 'Banco do Brasil',
+    source: 'Banco do Brasil',
     packageName: 'br.com.bb.app',
     title: 'Pix Recebido',
+    body: 'Você recebeu um Pix de R$ 450,00 de Carlos Santos.',
     text: 'Você recebeu um Pix de R$ 450,00 de Carlos Santos.',
     sender: 'Banco do Brasil',
     timestamp: Date.now() - 18 * 60 * 1000,
     priority: 'critical',
     type: 'notification',
     read: false,
+    archived: false,
     favorite: false
   },
   {
     id: 'evt-103',
+    userId: 'usr-default',
     uid: 'usr-default',
     deviceId: 'dev-samsung-s23',
     deviceName: 'Samsung Galaxy S23',
     app: 'SMS',
+    source: 'SMS',
     packageName: 'com.google.android.apps.messaging',
     title: 'Código de Autenticação 2FA',
+    body: 'Seu código de acesso temporário é 849-204. Válido por 5 minutos.',
     text: 'Seu código de acesso temporário é 849-204. Válido por 5 minutos.',
     sender: '+55 11 99887-1234',
     timestamp: Date.now() - 32 * 60 * 1000,
     priority: 'high',
     type: 'sms',
     read: true,
+    archived: false,
     favorite: true
   }
 ];
@@ -130,10 +148,10 @@ export default function App() {
     return localStorage.getItem('portal_camouflage_hide_btn') === 'true';
   });
 
-  const [isCamouflaged, setIsCamouflaged] = useState<boolean>(() => {
-    return localStorage.getItem('portal_camouflage_start') === 'true';
-  });
-  const [isCamouflageModalOpen, setIsCamouflageModalOpen] = useState(false);
+  // Formal State Machine replacing scattered boolean flags
+  const appStateMachine = useAppStateMachine(startCamouflaged);
+  const activeTab = appStateMachine.state.activeTab;
+  const setActiveTab = appStateMachine.setActiveTab;
 
   const handleSavePin = (pin: string) => {
     setSecretPin(pin);
@@ -155,8 +173,6 @@ export default function App() {
     localStorage.setItem('portal_camouflage_hide_btn', String(val));
   };
 
-  const [activeTab, setActiveTab] = useState<string>('timeline');
-
   const [events, setEvents] = useState<PortalEvent[]>(initialEvents);
   const [devices, setDevices] = useState<Device[]>(initialDevices);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(Date.now());
@@ -169,8 +185,6 @@ export default function App() {
     localStorage.setItem('portal_github_repo', githubRepo);
   }, [githubRepo]);
 
-  const [loading, setLoading] = useState(false);
-  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   // Track event IDs to trigger real-time toasts on new items
@@ -203,9 +217,31 @@ export default function App() {
     }
   }, []);
 
+  // Register Service Worker on mount for Web Push and Offline capabilities
+  useEffect(() => {
+    registerServiceWorker();
+
+    // Listen for notification clicks from Service Worker
+    const handleSwMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'NOTIFICATION_CLICKED') {
+        setActiveTab('timeline');
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
+    };
+  }, []);
+
   // Real-Time Firestore Subscription using onSnapshot (No HTTP polling)
   useEffect(() => {
-    setLoading(true);
+    appStateMachine.setLoading(true);
 
     const unsubEvents = subscribeToEvents(firestoreConfig, (fetchedEvents, syncTimestamp) => {
       setLastSyncTime(syncTimestamp);
@@ -213,11 +249,13 @@ export default function App() {
       if (fetchedEvents.length > 0) {
         setEvents(fetchedEvents);
 
-        // Real-time toast detection for newly added events via onSnapshot
+        // Real-time toast & native Web Push notification detection for newly added events via onSnapshot
         if (initialLoadDoneRef.current) {
           const newEvents = fetchedEvents.filter((e) => !knownEventIdsRef.current.has(e.id));
           if (newEvents.length > 0) {
             playNotificationSound();
+            const autoNotifySetting = localStorage.getItem('portal_auto_push_notify') !== 'false';
+
             newEvents.forEach((evt) => {
               const newToast: ToastItem = {
                 id: evt.id + '-' + Date.now(),
@@ -225,6 +263,11 @@ export default function App() {
                 createdAt: Date.now()
               };
               setToasts((prev) => [newToast, ...prev].slice(0, 5));
+
+              // Trigger native browser notification via Service Worker / Web Push API
+              if (autoNotifySetting) {
+                sendNativeNotification(evt);
+              }
             });
           }
         }
@@ -233,7 +276,7 @@ export default function App() {
       }
 
       initialLoadDoneRef.current = true;
-      setLoading(false);
+      appStateMachine.setLoading(false);
     });
 
     const unsubDevices = subscribeToDevices(firestoreConfig, (fetchedDevices) => {
@@ -303,6 +346,7 @@ export default function App() {
   const handleAddDevice = async (deviceData: Partial<Device>) => {
     const newDevice: Device = {
       deviceId: deviceData.deviceId || `dev-${Date.now()}`,
+      userId: deviceData.userId || deviceData.uid || 'usr-default',
       uid: deviceData.uid || 'usr-default',
       name: deviceData.name || 'Novo Dispositivo Android',
       model: deviceData.model || 'Android Device',
@@ -325,18 +369,22 @@ export default function App() {
   const handleSimulateCustomEvent = async (data: any) => {
     const newEvent: PortalEvent = {
       id: data.id || `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      userId: data.userId || data.uid || 'usr-default',
       uid: data.uid || 'usr-default',
       deviceId: data.deviceId || 'dev-pixel-8',
       deviceName: data.deviceName || 'Google Pixel 8 Pro',
       app: data.app || 'WhatsApp',
+      source: data.source || data.app || 'WhatsApp',
       packageName: data.packageName || 'com.whatsapp',
       title: data.title || 'Nova Notificação',
-      text: data.text || 'Conteúdo da notificação capturada.',
+      body: data.body || data.text || 'Conteúdo da notificação capturada.',
+      text: data.text || data.body || 'Conteúdo da notificação capturada.',
       sender: data.sender,
       timestamp: data.timestamp || Date.now(),
       priority: data.priority || 'normal',
       type: data.type || 'notification',
       read: false,
+      archived: false,
       favorite: false
     };
 
@@ -365,18 +413,22 @@ export default function App() {
 
     const newEvent: PortalEvent = {
       id: `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      userId: 'usr-default',
       uid: 'usr-default',
       deviceId: randomDevice.deviceId,
       deviceName: randomDevice.name,
       app: sample.app,
+      source: sample.app,
       packageName: sample.packageName,
       title: msg.title,
+      body: msg.text,
       text: msg.text,
       sender: msg.sender,
       timestamp: Date.now(),
       priority: sample.priority as any,
       type: sample.type as any,
       read: false,
+      archived: false,
       favorite: false
     };
 
@@ -428,14 +480,25 @@ export default function App() {
 
   const unreadCount = computedStats.unreadCount;
 
-  if (isCamouflaged) {
+  if (appStateMachine.isLocked) {
     return (
       <DisguisedCalculator
-        onUnlock={() => setIsCamouflaged(false)}
+        onUnlock={appStateMachine.unlockApp}
         secretPin={secretPin}
         calcTitle={calcTitle}
         hideUnlockBtn={hideUnlockBtn}
       />
+    );
+  }
+
+  if (appStateMachine.isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-slate-400 font-mono">A carregar Portal TR Mobile...</p>
+        </div>
+      </div>
     );
   }
 
@@ -503,8 +566,8 @@ export default function App() {
         setActiveTab={setActiveTab}
         unreadCount={unreadCount}
         onSimulateEvent={handleSimulateRandomEvent}
-        onLockCamouflage={() => setIsCamouflaged(true)}
-        onOpenCamouflageSettings={() => setIsCamouflageModalOpen(true)}
+        onLockCamouflage={appStateMachine.lockApp}
+        onOpenCamouflageSettings={() => appStateMachine.setCamouflageModalOpen(true)}
       />
 
       {/* Main Content Body */}
@@ -513,13 +576,34 @@ export default function App() {
           <TimelineView
             events={events}
             devices={devices}
-            loading={loading}
+            loading={false}
             onRefresh={() => {}}
             onToggleFavorite={handleToggleFavorite}
             onMarkRead={handleMarkRead}
             onMarkAllRead={handleMarkAllRead}
             onDeleteEvent={handleDeleteEvent}
             onClearAll={handleClearAllEvents}
+          />
+        )}
+
+        {activeTab === 'onboarding' && (
+          <AdaptiveOnboardingView
+            appName={calcTitle}
+            hasPairedDevices={devices.length > 0}
+            isPinUnlocked={!appStateMachine.isLocked}
+            onPinSuccess={() => {
+              appStateMachine.unlockApp();
+              setActiveTab('timeline');
+            }}
+            onDevicePaired={handleAddDevice}
+            onEnterPortal={() => setActiveTab('timeline')}
+          />
+        )}
+
+        {activeTab === 'installer' && (
+          <SmartInstaller
+            appName={calcTitle}
+            onContinueToApp={() => setActiveTab('timeline')}
           />
         )}
 
@@ -561,15 +645,15 @@ export default function App() {
 
       {/* Custom Simulator Modal */}
       <EventSimulatorModal
-        isOpen={isSimulatorOpen}
-        onClose={() => setIsSimulatorOpen(false)}
+        isOpen={appStateMachine.state.isSimulatorOpen}
+        onClose={() => appStateMachine.setSimulatorOpen(false)}
         onSimulate={handleSimulateCustomEvent}
       />
 
       {/* Camouflage Settings Modal */}
       <CamouflageSettingsModal
-        isOpen={isCamouflageModalOpen}
-        onClose={() => setIsCamouflageModalOpen(false)}
+        isOpen={appStateMachine.state.isCamouflageModalOpen}
+        onClose={() => appStateMachine.setCamouflageModalOpen(false)}
         secretPin={secretPin}
         onSavePin={handleSavePin}
         startCamouflaged={startCamouflaged}

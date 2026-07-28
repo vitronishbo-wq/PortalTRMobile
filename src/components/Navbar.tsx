@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Cloud, Smartphone, BarChart3, Database, Rocket, Plus, Lock, Zap, Shield } from 'lucide-react';
+import { Activity, Cloud, Smartphone, BarChart3, Database, Rocket, Plus, Lock, Zap, Shield, Cpu } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;
@@ -20,7 +20,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const navItems = [
     { id: 'timeline', label: 'Linha do Tempo', icon: Activity, badge: unreadCount > 0 ? unreadCount : undefined },
-    { id: 'cloudstatus', label: 'Cloud Status', icon: Cloud, highlight: true },
+    { id: 'onboarding', label: 'Engine Adaptativo', icon: Cpu, highlight: true },
+    { id: 'installer', label: 'Instalação PWA', icon: Smartphone },
+    { id: 'cloudstatus', label: 'Cloud Status', icon: Cloud },
     { id: 'devices', label: 'Dispositivos', icon: Smartphone },
     { id: 'analytics', label: 'Métricas', icon: BarChart3 },
     { id: 'firestore', label: 'Firestore', icon: Database },

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Cloud, Database, ShieldCheck, HardDrive, Server, RefreshCw, CheckCircle2, Mail, Phone, Download, Save, Zap, Github, ExternalLink, Settings, ArrowRight, Layers, Sliders, Copy, Check, Terminal } from 'lucide-react';
 import { FirestoreConfig, SystemEnvConfig } from '../types';
 import { PwaQrCodeCard } from './PwaQrCodeCard';
+import { ServiceWorkerNotificationCard } from './ServiceWorkerNotificationCard';
 
 interface CloudStatusViewProps {
   firestoreConfig: FirestoreConfig;
@@ -346,6 +347,9 @@ export const CloudStatusView: React.FC<CloudStatusViewProps> = ({
 
       {/* PWA QR Code Generator Card */}
       <PwaQrCodeCard defaultUrl={envConfig.WEB_URL} />
+
+      {/* Service Worker & Web Push Notifications Card */}
+      <ServiceWorkerNotificationCard />
 
       {/* Grid of 5 Services */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

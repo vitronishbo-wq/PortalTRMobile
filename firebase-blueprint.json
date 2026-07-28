@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "AppEvent": {
+      "title": "App Event",
+      "description": "Unified capture model for notifications, SMS, calls, and system events",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "type": { "type": "string", "enum": ["notification", "sms", "call", "system"] },
+        "source": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "normal", "high", "critical"] },
+        "timestamp": { "type": "number" },
+        "read": { "type": "boolean" },
+        "archived": { "type": "boolean" }
+      },
+      "required": ["id", "userId", "deviceId", "type", "title", "body", "timestamp"]
+    },
+    "Device": {
+      "title": "Device",
+      "description": "Paired Android hardware device information",
+      "type": "object",
+      "properties": {
+        "deviceId": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "model": { "type": "string" },
+        "osVersion": { "type": "string" },
+        "lastSync": { "type": "number" },
+        "online": { "type": "boolean" },
+        "pairedAt": { "type": "number" }
+      },
+      "required": ["deviceId", "userId", "name", "model", "osVersion"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile representation",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] }
+      },
+      "required": ["userId", "email"]
+    },
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "User application settings",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "notificationsEnabled": { "type": "boolean" },
+        "soundEnabled": { "type": "boolean" },
+        "theme": { "type": "string" }
+      },
+      "required": ["userId"]
+    },
+    "AppSession": {
+      "title": "App Session",
+      "description": "Portal session tracking",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["sessionId", "userId"]
+    }
+  },
+  "firestore": {
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/AppEvent" },
+      "description": "Real-time notification events collection"
+    },
+    "/devices/{deviceId}": {
+      "schema": { "$ref": "#/entities/Device" },
+      "description": "Paired Android hardware devices"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles"
+    },
+    "/settings/{userId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "User preferences"
+    },
+    "/sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/AppSession" },
+      "description": "Active Portal sessions"
+    }
+  }
+}

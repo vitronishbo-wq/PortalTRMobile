@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Unlock, Calculator as CalcIcon, Shield, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Calculator as CalcIcon, AlertCircle } from 'lucide-react';
 
 interface DisguisedCalculatorProps {
   onUnlock: () => void;
@@ -17,7 +17,6 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
   const [display, setDisplay] = useState('0');
   const [expression, setExpression] = useState('');
   const [inputSequence, setInputSequence] = useState('');
-  const [showPinHint, setShowPinHint] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleInput = (val: string) => {
@@ -92,27 +91,8 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
             <CalcIcon className="w-5 h-5 text-indigo-400" />
             <span className="font-bold text-sm text-slate-200">{calcTitle}</span>
           </div>
-          <button
-            onClick={() => setShowPinHint(!showPinHint)}
-            className="text-slate-500 hover:text-slate-300 transition-colors p-1 cursor-pointer"
-            title="Dica de Camuflagem"
-          >
-            {showPinHint ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
+          <span className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">pwa v2.4</span>
         </div>
-
-        {/* Secret Pin Instruction Tooltip */}
-        {showPinHint && (
-          <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-xs text-indigo-300 space-y-1">
-            <div className="flex items-center space-x-1.5 font-bold">
-              <Shield className="w-4 h-4" />
-              <span>Modo Disfarçado Ativo</span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
-              Para desbloquear o painel do <strong>Portal Mobile</strong>, digite a sequência PIN no teclado (PIN Ativo: <strong className="text-white font-mono">{secretPin}</strong>).
-            </p>
-          </div>
-        )}
 
         {errorMessage && (
           <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-400 flex items-center space-x-2">

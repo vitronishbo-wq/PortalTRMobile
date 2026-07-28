@@ -17,12 +17,12 @@ let firebaseApp: FirebaseApp | null = null;
 let db: Firestore | null = null;
 
 export const defaultFirestoreConfig: FirestoreConfig = {
-  apiKey: 'AIzaSyA_SampleKeyPortalMobile2026',
+  apiKey: 'AIzaSyDV7vPMAIDLp5ooUvnYYBbbhnLpJ_s40jw',
   authDomain: 'portaltrmobile.firebaseapp.com',
   projectId: 'portaltrmobile',
-  storageBucket: 'portaltrmobile.appspot.com',
-  messagingSenderId: '113504478729039495873',
-  appId: '1:113504478729039495873:web:abcd1234efgh5678',
+  storageBucket: 'portaltrmobile.firebasestorage.app',
+  messagingSenderId: '703051403619',
+  appId: '1:703051403619:web:26f152ba7d9468e60bc356',
   connected: true,
   mode: 'local'
 };
@@ -71,18 +71,22 @@ export function subscribeToEvents(
           const data = docSnap.data();
           return {
             id: docSnap.id,
+            userId: data.userId || data.uid || 'usr-default',
             uid: data.uid || 'usr-default',
             deviceId: data.deviceId || 'dev-pixel-8',
             deviceName: data.deviceName || 'Google Pixel 8 Pro',
             app: data.app || 'WhatsApp',
+            source: data.source || data.app || 'WhatsApp',
             packageName: data.packageName || 'com.whatsapp',
             title: data.title || 'Nova Notificação',
-            text: data.text || data.content || '',
+            body: data.body || data.text || data.content || '',
+            text: data.text || data.body || data.content || '',
             sender: data.sender,
             timestamp: data.timestamp || Date.now(),
             priority: data.priority || 'normal',
             type: data.type || 'notification',
             read: data.read ?? false,
+            archived: data.archived ?? false,
             favorite: data.favorite ?? false
           };
         });
@@ -122,6 +126,7 @@ export function subscribeToDevices(
           const data = docSnap.data();
           return {
             deviceId: docSnap.id,
+            userId: data.userId || data.uid || 'usr-default',
             uid: data.uid || 'usr-default',
             name: data.name || 'Dispositivo Android',
             model: data.model || 'Android',
