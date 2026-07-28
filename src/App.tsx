@@ -152,6 +152,9 @@ export default function App() {
     return localStorage.getItem('portal_camouflage_hide_btn') === 'true';
   });
 
+  // Workspace Mode State: 'public' (User PWA Portal) vs 'founder' (Founder IDE)
+  const [workspaceMode, setWorkspaceMode] = useState<'public' | 'founder'>('public');
+
   // Formal State Machine replacing scattered boolean flags
   const appStateMachine = useAppStateMachine(startCamouflaged);
   const activeTab = appStateMachine.state.activeTab;
@@ -566,6 +569,8 @@ export default function App() {
 
       {/* Top Navbar */}
       <Navbar
+        workspaceMode={workspaceMode}
+        setWorkspaceMode={setWorkspaceMode}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         unreadCount={unreadCount}
@@ -575,85 +580,11 @@ export default function App() {
       />
 
       {/* Main Content Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'public' && (
-          <PublicWorkspace onOpenFounderWorkspace={() => setActiveTab('founder_ide')} />
-        )}
-
-        {activeTab === 'founder_ide' && <FounderIDEWorkspace />}
-
-        {activeTab === 'timeline' && (
-          <TimelineView
-            events={events}
-            devices={devices}
-            loading={false}
-            onRefresh={() => {}}
-            onToggleFavorite={handleToggleFavorite}
-            onMarkRead={handleMarkRead}
-            onMarkAllRead={handleMarkAllRead}
-            onDeleteEvent={handleDeleteEvent}
-            onClearAll={handleClearAllEvents}
-          />
-        )}
-
-        {activeTab === 'runtime' && <RuntimeControlView />}
-
-        {activeTab === 'console' && <FounderConsoleView />}
-
-        {activeTab === 'onboarding' && (
-          <AdaptiveOnboardingView
-            appName={calcTitle}
-            hasPairedDevices={devices.length > 0}
-            isPinUnlocked={!appStateMachine.isLocked}
-            onPinSuccess={() => {
-              appStateMachine.unlockApp();
-              setActiveTab('timeline');
-            }}
-            onDevicePaired={handleAddDevice}
-            onEnterPortal={() => setActiveTab('timeline')}
-          />
-        )}
-
-        {activeTab === 'installer' && (
-          <SmartInstaller
-            appName={calcTitle}
-            onContinueToApp={() => setActiveTab('timeline')}
-          />
-        )}
-
-        {activeTab === 'cloudstatus' && (
-          <CloudStatusView
-            firestoreConfig={firestoreConfig}
-            lastSyncTime={lastSyncTime}
-            onClearLocalCache={handleClearLocalCache}
-            githubRepo={githubRepo}
-            onUpdateGithubRepo={setGithubRepo}
-          />
-        )}
-
-        {activeTab === 'devices' && (
-          <DevicesView
-            devices={devices}
-            onAddDevice={handleAddDevice}
-            onRemoveDevice={handleRemoveDevice}
-            onSimulateEvent={handleSimulateRandomEvent}
-          />
-        )}
-
-        {activeTab === 'analytics' && (
-          <AnalyticsView stats={computedStats} />
-        )}
-
-        {activeTab === 'firestore' && (
-          <FirestoreConfigView
-            config={firestoreConfig}
-            onSaveConfig={(cfg) => setFirestoreConfig(cfg)}
-            onClearLocalCache={handleClearLocalCache}
-          />
-        )}
-
-        {activeTab === 'ritual' && (
-          <DeploymentGuideView />
+      <main className="flex-1 w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
+        {workspaceMode === 'public' ? (
+          <PublicWorkspace onOpenFounderWorkspace={() => setWorkspaceMode('founder')} />
+        ) : (
+          <FounderIDEWorkspace />
         )}
       </main>
 
