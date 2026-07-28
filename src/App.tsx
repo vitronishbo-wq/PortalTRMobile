@@ -12,6 +12,7 @@ import { CamouflageSettingsModal } from './components/CamouflageSettingsModal';
 import { SmartInstaller } from './components/SmartInstaller';
 import { AdaptiveOnboardingView } from './components/AdaptiveOnboardingView';
 import { RuntimeControlView } from './components/RuntimeControlView';
+import { FounderConsoleView } from './components/FounderConsoleView';
 import { useAppStateMachine } from './engine/appStateMachine';
 import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
 import { Bell, X } from 'lucide-react';
@@ -588,6 +589,8 @@ export default function App() {
         )}
 
         {activeTab === 'runtime' && <RuntimeControlView />}
+
+        {activeTab === 'console' && <FounderConsoleView />}
 
         {activeTab === 'onboarding' && (
           <AdaptiveOnboardingView

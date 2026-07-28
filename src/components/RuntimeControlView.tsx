@@ -169,7 +169,90 @@ export const RuntimeControlView: React.FC = () => {
             <Layers className="w-5 h-5 text-cyan-400" />
             <span className="text-lg font-black text-cyan-300 font-mono">{globalRuntime.plugins.size} Plugins</span>
           </div>
-          <span className="text-[10px] text-slate-500 block">Arquitetura Modular</span>
+          <span className="text-[10px] text-slate-500 block">Interface Única Registada</span>
+        </div>
+      </div>
+
+      {/* Uniform Plugins Matrix Section */}
+      <div className="bg-slate-900/90 p-5 rounded-2xl border border-slate-800 shadow-lg space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="font-bold text-slate-100 text-sm flex items-center space-x-2">
+            <Layers className="w-4 h-4 text-cyan-400" />
+            <span>Matriz de Plugins Modulares (Interface Uniforme: initialize, start, stop, health, events)</span>
+          </h3>
+          <span className="text-xs text-slate-400 font-mono">
+            {Array.from(globalRuntime.plugins.values()).filter((p) => p.health().status === 'ok').length}/
+            {globalRuntime.plugins.size} Operacionais
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {Array.from(globalRuntime.plugins.values()).map((plugin) => {
+            const h = plugin.health();
+            return (
+              <div
+                key={plugin.id}
+                className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 hover:border-slate-700 transition-all space-y-2.5"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200">{plugin.name}</h4>
+                    <span className="text-[10px] text-slate-500 font-mono block">
+                      {plugin.id} • v{plugin.version}
+                    </span>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                      h.status === 'ok'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    }`}
+                  >
+                    {h.status}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Score de Saúde:</span>
+                    <span className="font-mono font-bold text-emerald-400">{h.score}%</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-snug">{h.message}</p>
+                </div>
+
+                <div className="pt-1 flex items-center space-x-2">
+                  <button
+                    onClick={async () => {
+                      await plugin.start();
+                      syncUI();
+                    }}
+                    className="flex-1 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold rounded-lg border border-slate-700 transition-all cursor-pointer"
+                  >
+                    start()
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await plugin.stop();
+                      syncUI();
+                    }}
+                    className="flex-1 py-1 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[10px] font-bold rounded-lg border border-slate-800 transition-all cursor-pointer"
+                  >
+                    stop()
+                  </button>
+                  <button
+                    onClick={() => {
+                      const evts = plugin.events();
+                      globalRuntime.log(`[Plugin ${plugin.id}] Total de eventos em buffer: ${evts.length}`);
+                      syncUI();
+                    }}
+                    className="flex-1 py-1 bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 text-[10px] font-bold rounded-lg border border-indigo-800/50 transition-all cursor-pointer"
+                  >
+                    events()
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

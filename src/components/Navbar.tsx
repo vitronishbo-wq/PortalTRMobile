@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Cloud, Smartphone, BarChart3, Database, Rocket, Plus, Lock, Zap, Shield, Cpu } from 'lucide-react';
+import { Activity, Cloud, Smartphone, BarChart3, Database, Rocket, Plus, Lock, Zap, Shield, Cpu, Crown } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;
@@ -21,6 +21,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const navItems = [
     { id: 'timeline', label: 'Linha do Tempo', icon: Activity, badge: unreadCount > 0 ? unreadCount : undefined },
     { id: 'runtime', label: 'Runtime V2', icon: Cpu, highlight: true },
+    { id: 'console', label: 'Console Founder', icon: Crown, highlight: true },
     { id: 'onboarding', label: 'Engine Zero-Touch', icon: Zap },
     { id: 'installer', label: 'Instalação PWA', icon: Smartphone },
     { id: 'cloudstatus', label: 'Cloud Status', icon: Cloud },
@@ -29,6 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'firestore', label: 'Firestore', icon: Database },
     { id: 'ritual', label: 'Ritual Deploy', icon: Rocket }
   ];
+
 
   return (
     <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-slate-100">

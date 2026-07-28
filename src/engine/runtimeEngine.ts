@@ -58,7 +58,7 @@ export interface RuntimePlugin {
   start(): Promise<void>;
   stop(): Promise<void>;
   health(): RuntimePluginHealth;
-  onEvent?(event: RuntimeEnvelope): void;
+  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[];
 }
 
 // -------------------------------------------------------------
@@ -129,32 +129,45 @@ export class ActionPipeline {
 }
 
 // -------------------------------------------------------------
-// Built-In Runtime Plugins
+// Built-In Uniform Runtime Plugins
 // -------------------------------------------------------------
 export class NotificationPlugin implements RuntimePlugin {
   id = 'plugin-notification';
   name = 'Notification Listener Plugin';
   version = '2.0.0';
   private active = false;
+  private runtimeRef: AutonomousRuntime | null = null;
+  private eventBuffer: RuntimeEnvelope[] = [];
 
   async initialize(runtime: AutonomousRuntime): Promise<void> {
-    runtime.log('NotificationPlugin initialized');
+    this.runtimeRef = runtime;
+    this.runtimeRef.log('NotificationPlugin: Inicializado.');
   }
 
   async start(): Promise<void> {
     this.active = true;
+    this.runtimeRef?.log('NotificationPlugin: Serviço ativado e escutando notificações do sistema.');
   }
 
   async stop(): Promise<void> {
     this.active = false;
+    this.runtimeRef?.log('NotificationPlugin: Serviço pausado.');
   }
 
   health(): RuntimePluginHealth {
     return {
       score: this.active ? 100 : 0,
       status: this.active ? 'ok' : 'down',
-      message: this.active ? 'Notification Listener active' : 'Listener disabled'
+      message: this.active ? 'Notification Listener ativo' : 'Listener desativado'
     };
+  }
+
+  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+    if (incomingEvent) {
+      this.eventBuffer.unshift(incomingEvent);
+      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+    }
+    return [...this.eventBuffer];
   }
 }
 
@@ -163,25 +176,38 @@ export class SMSPlugin implements RuntimePlugin {
   name = 'SMS Capture Plugin';
   version = '2.0.0';
   private active = false;
+  private runtimeRef: AutonomousRuntime | null = null;
+  private eventBuffer: RuntimeEnvelope[] = [];
 
   async initialize(runtime: AutonomousRuntime): Promise<void> {
-    runtime.log('SMSPlugin initialized');
+    this.runtimeRef = runtime;
+    this.runtimeRef.log('SMSPlugin: Inicializado.');
   }
 
   async start(): Promise<void> {
     this.active = true;
+    this.runtimeRef?.log('SMSPlugin: Intercetor SMS ativado.');
   }
 
   async stop(): Promise<void> {
     this.active = false;
+    this.runtimeRef?.log('SMSPlugin: Intercetor SMS pausado.');
   }
 
   health(): RuntimePluginHealth {
     return {
       score: this.active ? 100 : 50,
       status: this.active ? 'ok' : 'degraded',
-      message: this.active ? 'SMS Interceptor active' : 'Awaiting SMS permission'
+      message: this.active ? 'SMS Interceptor ativo' : 'Aguardando permissão SMS'
     };
+  }
+
+  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+    if (incomingEvent) {
+      this.eventBuffer.unshift(incomingEvent);
+      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+    }
+    return [...this.eventBuffer];
   }
 }
 
@@ -190,25 +216,158 @@ export class CallPlugin implements RuntimePlugin {
   name = 'Call Interceptor Plugin';
   version = '2.0.0';
   private active = false;
+  private runtimeRef: AutonomousRuntime | null = null;
+  private eventBuffer: RuntimeEnvelope[] = [];
 
   async initialize(runtime: AutonomousRuntime): Promise<void> {
-    runtime.log('CallPlugin initialized');
+    this.runtimeRef = runtime;
+    this.runtimeRef.log('CallPlugin: Inicializado.');
   }
 
   async start(): Promise<void> {
     this.active = true;
+    this.runtimeRef?.log('CallPlugin: Intercetor de chamadas ativado.');
   }
 
   async stop(): Promise<void> {
     this.active = false;
+    this.runtimeRef?.log('CallPlugin: Intercetor de chamadas pausado.');
   }
 
   health(): RuntimePluginHealth {
     return {
       score: this.active ? 100 : 50,
       status: this.active ? 'ok' : 'degraded',
-      message: this.active ? 'Call State Interceptor active' : 'Awaiting Telephony permission'
+      message: this.active ? 'Call State Interceptor ativo' : 'Aguardando permissão de telefonia'
     };
+  }
+
+  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+    if (incomingEvent) {
+      this.eventBuffer.unshift(incomingEvent);
+      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+    }
+    return [...this.eventBuffer];
+  }
+}
+
+export class WhatsAppPlugin implements RuntimePlugin {
+  id = 'plugin-whatsapp';
+  name = 'WhatsApp Bridge Plugin';
+  version = '2.0.0';
+  private active = false;
+  private runtimeRef: AutonomousRuntime | null = null;
+  private eventBuffer: RuntimeEnvelope[] = [];
+
+  async initialize(runtime: AutonomousRuntime): Promise<void> {
+    this.runtimeRef = runtime;
+    this.runtimeRef.log('WhatsAppPlugin: Inicializado.');
+  }
+
+  async start(): Promise<void> {
+    this.active = true;
+    this.runtimeRef?.log('WhatsAppPlugin: Ponte WhatsApp ativada.');
+  }
+
+  async stop(): Promise<void> {
+    this.active = false;
+    this.runtimeRef?.log('WhatsAppPlugin: Ponte WhatsApp pausada.');
+  }
+
+  health(): RuntimePluginHealth {
+    return {
+      score: this.active ? 100 : 0,
+      status: this.active ? 'ok' : 'down',
+      message: this.active ? 'WhatsApp Listener operacional' : 'WhatsApp Bridge inativo'
+    };
+  }
+
+  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+    if (incomingEvent) {
+      this.eventBuffer.unshift(incomingEvent);
+      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+    }
+    return [...this.eventBuffer];
+  }
+}
+
+export class InstagramPlugin implements RuntimePlugin {
+  id = 'plugin-instagram';
+  name = 'Instagram Direct Plugin';
+  version = '2.0.0';
+  private active = false;
+  private runtimeRef: AutonomousRuntime | null = null;
+  private eventBuffer: RuntimeEnvelope[] = [];
+
+  async initialize(runtime: AutonomousRuntime): Promise<void> {
+    this.runtimeRef = runtime;
+    this.runtimeRef.log('InstagramPlugin: Inicializado.');
+  }
+
+  async start(): Promise<void> {
+    this.active = true;
+    this.runtimeRef?.log('InstagramPlugin: Monitor Instagram Direct ativado.');
+  }
+
+  async stop(): Promise<void> {
+    this.active = false;
+    this.runtimeRef?.log('InstagramPlugin: Monitor Instagram Direct pausado.');
+  }
+
+  health(): RuntimePluginHealth {
+    return {
+      score: this.active ? 100 : 0,
+      status: this.active ? 'ok' : 'down',
+      message: this.active ? 'Instagram Direct Interceptor ativo' : 'Instagram Direct inativo'
+    };
+  }
+
+  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+    if (incomingEvent) {
+      this.eventBuffer.unshift(incomingEvent);
+      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+    }
+    return [...this.eventBuffer];
+  }
+}
+
+export class HealthPlugin implements RuntimePlugin {
+  id = 'plugin-health';
+  name = 'Battery & Health Monitor Plugin';
+  version = '2.0.0';
+  private active = false;
+  private runtimeRef: AutonomousRuntime | null = null;
+  private eventBuffer: RuntimeEnvelope[] = [];
+
+  async initialize(runtime: AutonomousRuntime): Promise<void> {
+    this.runtimeRef = runtime;
+    this.runtimeRef.log('HealthPlugin: Inicializado.');
+  }
+
+  async start(): Promise<void> {
+    this.active = true;
+    this.runtimeRef?.log('HealthPlugin: Monitor de saúde da bateria e sistema ativo.');
+  }
+
+  async stop(): Promise<void> {
+    this.active = false;
+    this.runtimeRef?.log('HealthPlugin: Monitor de saúde pausado.');
+  }
+
+  health(): RuntimePluginHealth {
+    return {
+      score: this.active ? 100 : 0,
+      status: this.active ? 'ok' : 'down',
+      message: this.active ? 'Telemetria de Saúde ativa' : 'Telemetria inativa'
+    };
+  }
+
+  events(incomingEvent?: RuntimeEnvelope): RuntimeEnvelope[] {
+    if (incomingEvent) {
+      this.eventBuffer.unshift(incomingEvent);
+      if (this.eventBuffer.length > 50) this.eventBuffer.pop();
+    }
+    return [...this.eventBuffer];
   }
 }
 
@@ -324,6 +483,9 @@ export class AutonomousRuntime {
     this.registerPlugin(new NotificationPlugin());
     this.registerPlugin(new SMSPlugin());
     this.registerPlugin(new CallPlugin());
+    this.registerPlugin(new WhatsAppPlugin());
+    this.registerPlugin(new InstagramPlugin());
+    this.registerPlugin(new HealthPlugin());
   }
 
   log(msg: string): void {
