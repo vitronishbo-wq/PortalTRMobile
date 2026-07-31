@@ -21,17 +21,22 @@ import {
   Zap,
   ArrowRight
 } from 'lucide-react';
-import { BootstrapEngine, FeatureFlagsState, SecretStatusItem } from '../services/bootstrapEngine';
+import {
+  AuthorityEngine,
+  computeFounderIdentityHash,
+  FeatureFlagsState,
+  SecretStatusItem
+} from '../engine/authorityEngine';
 import { PaymentRegistry, ChargeResponse, ChargeRequest } from '../services/paymentEngine';
-import { UserProfile, UserRole } from '../types/User';
+import { IdentityEngine, useIdentity } from '../engine/identityEngine';
+import { UserProfile, UserRole, resolveRootLevel, getDefaultPermissionsForRole } from '../types/User';
 import { FirestoreService } from '../services/firestore';
-import { RootAuthorityEngine, computeFounderIdentityHash } from '../services/rootAuthorityEngine';
-import { auth } from '../firebase/firebase';
 
 export const FounderConsoleView: React.FC = () => {
-  const [founder, setFounder] = useState<UserProfile | null>(null);
-  const [flags, setFlags] = useState<FeatureFlagsState>(BootstrapEngine.getFeatureFlags());
-  const [secrets, setSecrets] = useState<SecretStatusItem[]>(BootstrapEngine.getSecretsStatus());
+  const { user: authUser, profile: identityFounder } = useIdentity();
+  const [founder, setFounder] = useState<UserProfile | null>(identityFounder);
+  const [flags, setFlags] = useState<FeatureFlagsState>(AuthorityEngine.getFeatureFlags());
+  const [secrets, setSecrets] = useState<SecretStatusItem[]>(AuthorityEngine.getSecretsStatus());
   const [activeTab, setActiveTab] = useState<'overview' | 'secrets' | 'appypay' | 'flags' | 'rbac'>('overview');
   const [mfaSuccessMsg, setMfaSuccessMsg] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState<boolean>(false);
@@ -53,41 +58,39 @@ export const FounderConsoleView: React.FC = () => {
   const [lastCharge, setLastCharge] = useState<ChargeResponse | null>(null);
   const [isCharging, setIsCharging] = useState<boolean>(false);
 
-  // System Users List initialized with default fallback and synced to Firestore
+  // System Users List synchronized directly with IdentityEngine / Firestore
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     // 1. Inicializar bootstrap do Founder
-    BootstrapEngine.initFounderBootstrap().then((profile) => {
+    AuthorityEngine.initFounderBootstrap().then((profile) => {
       setFounder(profile);
     });
 
-    // 2. Subscrever à coleção 'users' do Firestore em tempo real
-    const unsubscribeUsers = FirestoreService.listenToAllUsers((firestoreUsers) => {
+    // 2. Subscrever a todos os utilizadores via IdentityEngine
+    const unsubscribeUsers = IdentityEngine.listenToAllUsers((firestoreUsers) => {
       if (firestoreUsers && firestoreUsers.length > 0) {
         setUsersList(firestoreUsers);
-
-        // Se encontrar o founder ativo no Firestore, atualizar o estado
-        const activeUserUid = auth?.currentUser?.uid;
+        const activeUserUid = authUser?.uid;
         const founderInDb = firestoreUsers.find((u) => u.role === 'founder' || (activeUserUid && u.userId === activeUserUid));
         if (founderInDb) {
           setFounder(founderInDb);
         }
       } else {
-        // Se a coleção 'users' estiver vazia, popular com utilizadores base do sistema
         const defaultUsers: UserProfile[] = [
           {
-            userId: auth?.currentUser?.uid || 'founder-master-001',
-            email: auth?.currentUser?.email || 'silajaneiro9@gmail.com',
-            displayName: auth?.currentUser?.displayName || 'Founder Master (System)',
+            userId: authUser?.uid || 'founder-master-001',
+            email: authUser?.email || 'silajaneiro9@gmail.com',
+            displayName: authUser?.displayName || 'Founder Master (System)',
             role: 'founder',
             system: true,
             immutable: true,
             authority: 'ROOT',
+            rootLevel: 'ROOT',
             createdAt: Date.now() - 86400000 * 30,
             lastLogin: Date.now(),
             permissions: ['*'],
-            claims: ['canManageUsers', 'canDeploy', 'canManagePayments', 'canManageLicenses', 'canReadAudit', 'canCreateAdmins', 'canDeleteUsers', 'canAccessSecrets']
+            ...getDefaultPermissionsForRole('founder', 'ROOT')
           },
           {
             userId: 'admin-002',
@@ -113,8 +116,6 @@ export const FounderConsoleView: React.FC = () => {
           }
         ];
         setUsersList(defaultUsers);
-
-        // Garantir salvamento no Firestore
         defaultUsers.forEach((u) => FirestoreService.saveUserProfile(u));
       }
     });
@@ -122,11 +123,11 @@ export const FounderConsoleView: React.FC = () => {
     return () => {
       unsubscribeUsers();
     };
-  }, []);
+  }, [authUser]);
 
   const handleManualFounderPromotion = async () => {
-    const currentUid = auth?.currentUser?.uid;
-    const currentEmail = auth?.currentUser?.email || 'founder@portal.internal';
+    const currentUid = authUser?.uid;
+    const currentEmail = authUser?.email || 'founder@portal.internal';
     if (!currentUid) {
       alert('Nenhum utilizador do Firebase Auth autenticado no momento.');
       return;
@@ -137,10 +138,10 @@ export const FounderConsoleView: React.FC = () => {
       const updatedProfile = await FirestoreService.promoteUserToFounder(
         currentUid,
         currentEmail,
-        auth?.currentUser?.displayName || 'Founder Master'
+        authUser?.displayName || 'Founder Master'
       );
       setFounder(updatedProfile);
-      setMfaSuccessMsg(`Autoridade 'founder', status immutable=true e claims gravados com sucesso no Firestore (doc: users/${currentUid})!`);
+      setMfaSuccessMsg(`Autoridade 'founder', status immutable=true e permissões atómicas (canDeploy, canAudit, etc.) gravadas com sucesso no Firestore (doc: users/${currentUid})!`);
     } catch (e) {
       console.error('Erro ao promover utilizador:', e);
     } finally {
@@ -163,10 +164,10 @@ export const FounderConsoleView: React.FC = () => {
         municipality: idMunicipality
       });
 
-      const currentUid = auth?.currentUser?.uid || founder?.userId || 'founder-master-001';
+      const currentUid = authUser?.uid || founder?.userId || 'founder-master-001';
       const updated = await FirestoreService.promoteUserToFounder(
         currentUid,
-        auth?.currentUser?.email || idEmail,
+        authUser?.email || idEmail,
         founder?.displayName || 'Founder Master',
         hash
       );
@@ -184,7 +185,7 @@ export const FounderConsoleView: React.FC = () => {
 
 
   const handleToggleFlag = (key: keyof FeatureFlagsState) => {
-    const updated = BootstrapEngine.toggleFeatureFlag(key, !flags[key]);
+    const updated = AuthorityEngine.toggleFeatureFlag(key, !flags[key]);
     setFlags(updated);
   };
 
@@ -254,11 +255,11 @@ export const FounderConsoleView: React.FC = () => {
         <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 text-xs space-y-2">
           <div className="flex items-center space-x-2">
             <Crown className="w-4 h-4 text-amber-400" />
-            <span className="font-bold text-slate-200">{founder?.email || auth?.currentUser?.email || 'silajaneiro9@gmail.com'}</span>
+            <span className="font-bold text-slate-200">{founder?.email || authUser?.email || 'silajaneiro9@gmail.com'}</span>
           </div>
           <div className="flex items-center justify-between text-[10px] text-slate-400 gap-3">
             <span>
-              Doc: <strong className="text-amber-300 font-mono">users/{founder?.userId || auth?.currentUser?.uid || 'founder-master-001'}</strong>
+              Doc: <strong className="text-amber-300 font-mono">users/{founder?.userId || authUser?.uid || 'founder-master-001'}</strong>
             </span>
             <span className="text-emerald-400 font-mono font-bold flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> Firestore Persisted
@@ -606,15 +607,15 @@ export const FounderConsoleView: React.FC = () => {
                   <div>
                     <span className="font-bold text-xs text-slate-200 font-mono block">{flagKey}</span>
                     <span className="text-[11px] text-slate-400">
-                      {flagKey === 'appypay.enabled'
+                      {flagKey.includes('appyPay')
                         ? 'Ativa o módulo de integração de pagamentos AppyPay'
-                        : flagKey === 'payments.enabled'
-                        ? 'Habilita subscrições e cobranças no portal'
-                        : flagKey === 'admin.enabled'
+                        : flagKey.includes('realtimeSync')
+                        ? 'Habilita sincronização em tempo real de dispositivos Android'
+                        : flagKey.includes('admin')
                         ? 'Permite acesso ao painel administrativo'
-                        : flagKey === 'developer.enabled'
-                        ? 'Mostra ferramentas de diagnóstico e logs'
-                        : 'Ativa proxy de rede para bypass de CORS'}
+                        : flagKey.includes('extendedLogging')
+                        ? 'Mostra registos estendidos de auditoria'
+                        : 'Ativa controlo de funcionalidade do sistema'}
                     </span>
                   </div>
 
@@ -649,35 +650,54 @@ export const FounderConsoleView: React.FC = () => {
                 <tr>
                   <th className="p-3">Utilizador / Entidade</th>
                   <th className="p-3">Papel (Role)</th>
+                  <th className="p-3">Nível Root</th>
                   <th className="p-3">E-mail</th>
                   <th className="p-3">Permissões</th>
                   <th className="p-3">Imutável</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono">
-                {usersList.map((usr) => (
-                  <tr key={usr.userId} className="hover:bg-slate-950/50">
-                    <td className="p-3 font-bold text-slate-200">{usr.displayName}</td>
-                    <td className="p-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${getRoleBadgeStyle(
-                          usr.role
-                        )}`}
-                      >
-                        {usr.role}
-                      </span>
-                    </td>
-                    <td className="p-3 text-slate-400">{usr.email}</td>
-                    <td className="p-3 text-slate-400">{usr.permissions?.join(', ')}</td>
-                    <td className="p-3">
-                      {usr.immutable ? (
-                        <span className="text-amber-400 font-bold">✓ Imutável</span>
-                      ) : (
-                        <span className="text-slate-500">Normal</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {usersList.map((usr) => {
+                  const effectiveRootLevel = usr.rootLevel || resolveRootLevel(usr.role, usr.authority);
+                  return (
+                    <tr key={usr.userId} className="hover:bg-slate-950/50">
+                      <td className="p-3 font-bold text-slate-200">{usr.displayName}</td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${getRoleBadgeStyle(
+                            usr.role
+                          )}`}
+                        >
+                          {usr.role}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono border ${
+                            effectiveRootLevel === 'ROOT'
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                              : effectiveRootLevel === 'LEVEL_1'
+                              ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                              : effectiveRootLevel === 'LEVEL_2'
+                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                              : 'bg-slate-800 text-slate-400 border-slate-700'
+                          }`}
+                        >
+                          {effectiveRootLevel}
+                        </span>
+                      </td>
+                      <td className="p-3 text-slate-400">{usr.email}</td>
+                      <td className="p-3 text-slate-400">{usr.permissions?.join(', ')}</td>
+                      <td className="p-3">
+                        {usr.immutable ? (
+                          <span className="text-amber-400 font-bold">✓ Imutável</span>
+                        ) : (
+                          <span className="text-slate-500">Normal</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldAlert,
   Crown,
@@ -23,6 +23,7 @@ import {
   Server
 } from 'lucide-react';
 import {
+  AuthorityEngine,
   RootAuthorityEngine,
   RootSession,
   AdminRole,
@@ -31,7 +32,7 @@ import {
   AdminAccount,
   AuditLogRecord,
   SystemBackupRecord
-} from '../../services/rootAuthorityEngine';
+} from '../../engine/authorityEngine';
 
 export const RootConsoleView: React.FC = () => {
   // Session State
@@ -59,10 +60,21 @@ export const RootConsoleView: React.FC = () => {
 
   // Lists
   const [auditLogs, setAuditLogs] = useState<AuditLogRecord[]>(RootAuthorityEngine.getAuditLogs());
-  const [invitations, setInvitations] = useState<AdminInvitation[]>(RootAuthorityEngine.getActiveInvitations());
-  const [admins, setAdmins] = useState<AdminAccount[]>(RootAuthorityEngine.getAdminAccounts());
+  const [invitations, setInvitations] = useState<AdminInvitation[]>([]);
+  const [admins, setAdmins] = useState<AdminAccount[]>([]);
   const [backups, setBackups] = useState<SystemBackupRecord[]>(RootAuthorityEngine.getBackups());
   const [isLockdown, setIsLockdown] = useState<boolean>(RootAuthorityEngine.isLockdownActive());
+
+  const refreshFirestoreData = async () => {
+    const activeInvs = await AuthorityEngine.getActiveInvitationsAsync();
+    setInvitations(activeInvs);
+    const adminAccs = await AuthorityEngine.listAdminAccountsAsync();
+    setAdmins(adminAccs);
+  };
+
+  useEffect(() => {
+    refreshFirestoreData();
+  }, []);
 
   // Elevation Handler
   const handleElevateToRoot = (e: React.FormEvent) => {
@@ -79,6 +91,7 @@ export const RootConsoleView: React.FC = () => {
     if (result.success && result.session) {
       setSession(result.session);
       setAuditLogs(RootAuthorityEngine.getAuditLogs());
+      refreshFirestoreData();
     } else {
       setChallengeError(result.message);
     }
@@ -103,23 +116,22 @@ export const RootConsoleView: React.FC = () => {
     }
   };
 
-  const handleGenerateInvitation = () => {
-    const res = RootAuthorityEngine.createAdminInvitation(selectedRole, customPermissions);
+  const handleGenerateInvitation = async () => {
+    const res = await RootAuthorityEngine.createAdminInvitationAsync(selectedRole, customPermissions);
     if (res.success && res.invitation) {
       setGeneratedInvite(res.invitation);
-      setInvitations(RootAuthorityEngine.getActiveInvitations());
+      await refreshFirestoreData();
       setAuditLogs(RootAuthorityEngine.getAuditLogs());
     }
   };
 
-  const handleAcceptInvite = (e: React.FormEvent) => {
+  const handleAcceptInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setAcceptFeedback(null);
-    const res = RootAuthorityEngine.acceptAdminInvitation(acceptToken, acceptEmail, acceptName);
+    const res = await RootAuthorityEngine.acceptAdminInvitation(acceptToken, acceptEmail, acceptName);
     setAcceptFeedback(res.message);
     if (res.success) {
-      setAdmins(RootAuthorityEngine.getAdminAccounts());
-      setInvitations(RootAuthorityEngine.getActiveInvitations());
+      await refreshFirestoreData();
       setAuditLogs(RootAuthorityEngine.getAuditLogs());
       setAcceptToken('');
       setAcceptEmail('');
@@ -128,20 +140,20 @@ export const RootConsoleView: React.FC = () => {
   };
 
   const handleCreateBackup = () => {
-    RootAuthorityEngine.createBackup('Snapshot de Segurança do Root Authority Engine');
-    setBackups(RootAuthorityEngine.getBackups());
-    setAuditLogs(RootAuthorityEngine.getAuditLogs());
+    AuthorityEngine.createBackup();
+    setBackups(AuthorityEngine.getBackups());
+    setAuditLogs(AuthorityEngine.getAuditLogs());
   };
 
   const handleToggleLockdown = () => {
     if (isLockdown) {
-      const res = RootAuthorityEngine.liftEmergencyLockdown();
-      setIsLockdown(res.active);
+      AuthorityEngine.liftEmergencyLockdown();
+      setIsLockdown(false);
     } else {
-      const res = RootAuthorityEngine.triggerEmergencyLockdown('Bloqueio preventivo ativado via Root Console');
-      setIsLockdown(res.active);
+      AuthorityEngine.triggerEmergencyLockdown();
+      setIsLockdown(true);
     }
-    setAuditLogs(RootAuthorityEngine.getAuditLogs());
+    setAuditLogs(AuthorityEngine.getAuditLogs());
   };
 
   return (

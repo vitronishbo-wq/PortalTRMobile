@@ -11,7 +11,7 @@ import {
   limit,
   Unsubscribe
 } from 'firebase/firestore';
-import { AppEvent, Device, UserSettings, UserProfile, AppSession } from '../types/index';
+import { AppEvent, Device, UserSettings, UserProfile, AppSession, License, resolveRootLevel, getDefaultPermissionsForRole } from '../types/index';
 
 export class FirestoreService {
   /**
@@ -205,16 +205,73 @@ export class FirestoreService {
     if (!db) return;
     try {
       const userRef = doc(db, 'users', user.userId);
+      const rootLevel = user.rootLevel || resolveRootLevel(user.role, user.authority);
       await setDoc(
         userRef,
         {
           ...user,
+          rootLevel,
           lastLogin: Date.now()
         },
         { merge: true }
       );
     } catch (error) {
       console.error('[FirestoreService] Erro ao salvar perfil do utilizador:', error);
+    }
+  }
+
+  /**
+   * Salva licença na coleção 'licenses'
+   */
+  static async saveLicense(license: License): Promise<void> {
+    if (!db) return;
+    try {
+      const docId = license.id || license.user;
+      const licenseRef = doc(db, 'licenses', docId);
+      const now = Date.now();
+      const expires = license.expires || now + 7 * 86400000;
+      const daysLeft = Math.max(0, Math.ceil((expires - now) / 86400000));
+      await setDoc(
+        licenseRef,
+        {
+          user: license.user,
+          userEmail: license.userEmail || '',
+          plan: license.plan || 'trial',
+          expires: expires,
+          trial: license.trial ?? (expires > now),
+          daysLeft: license.daysLeft ?? daysLeft,
+          activatedBy: license.activatedBy || 'system_onboarding',
+          updatedAt: now
+        },
+        { merge: true }
+      );
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao salvar licença:', error);
+    }
+  }
+
+  /**
+   * Obtém licença pelo ID do utilizador na coleção 'licenses'
+   */
+  static async getLicense(userId: string): Promise<License | null> {
+    if (!db || !userId) return null;
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const licenseRef = doc(db, 'licenses', userId);
+      const snap = await getDoc(licenseRef);
+      if (snap.exists()) {
+        const data = snap.data() as License;
+        const now = Date.now();
+        const daysLeft = Math.max(0, Math.ceil((data.expires - now) / 86400000));
+        return {
+          ...data,
+          daysLeft: data.plan === 'founder' || data.expires > now + 30000 * 86400000 ? 9999 : daysLeft
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao obter licença:', error);
+      return null;
     }
   }
 
@@ -318,18 +375,10 @@ export class FirestoreService {
       system: true,
       immutable: true,
       authority: 'ROOT',
+      rootLevel: 'ROOT',
       permissions: ['*'],
       ...(identityHash ? { identityHash } : {}),
-      claims: [
-        'canManageUsers',
-        'canDeploy',
-        'canManagePayments',
-        'canManageLicenses',
-        'canReadAudit',
-        'canCreateAdmins',
-        'canDeleteUsers',
-        'canAccessSecrets'
-      ],
+      ...getDefaultPermissionsForRole('founder', 'ROOT'),
       createdAt: Date.now(),
       lastLogin: Date.now()
     };
@@ -352,6 +401,72 @@ export class FirestoreService {
     }
 
     return founderProfile;
+  }
+
+  /**
+   * Salva um convite de administrador na coleção 'invitations' do Firestore
+   */
+  static async saveInvitation(invitation: any): Promise<void> {
+    if (!db) return;
+    try {
+      const invRef = doc(db, 'invitations', invitation.token);
+      await setDoc(invRef, invitation, { merge: true });
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao salvar convite no Firestore:', error);
+    }
+  }
+
+  /**
+   * Obtém um convite pelo token no Firestore
+   */
+  static async getInvitation(token: string): Promise<any | null> {
+    if (!db || !token) return null;
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const invRef = doc(db, 'invitations', token);
+      const snap = await getDoc(invRef);
+      if (snap.exists()) {
+        return snap.data();
+      }
+      return null;
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao obter convite do Firestore:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Promove ou cria um utilizador como Admin no Firestore
+   */
+  static async createOrUpdateAdminUser(
+    uid: string,
+    email: string,
+    displayName: string,
+    adminRole: string,
+    permissions: string[]
+  ): Promise<UserProfile> {
+    const defaultAdminPerms = getDefaultPermissionsForRole('admin', 'ADMIN');
+    const adminProfile: UserProfile = {
+      userId: uid,
+      email: email,
+      displayName: displayName,
+      role: 'admin',
+      system: false,
+      immutable: false,
+      authority: 'ADMIN',
+      rootLevel: 'LEVEL_1',
+      permissions: permissions || ['events.read'],
+      ...defaultAdminPerms,
+      createdAt: Date.now(),
+      lastLogin: Date.now()
+    };
+
+    if (db) {
+      const userRef = doc(db, 'users', uid);
+      await setDoc(userRef, adminProfile, { merge: true });
+    }
+
+    return adminProfile;
   }
 
   /**

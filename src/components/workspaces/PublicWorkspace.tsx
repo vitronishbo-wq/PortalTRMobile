@@ -16,52 +16,44 @@ import {
   LogOut
 } from 'lucide-react';
 import { TrialEngine, LicenseRecord } from '../../services/trialEngine';
+import { useIdentity, IdentityEngine } from '../../engine/identityEngine';
 
 interface PublicWorkspaceProps {
   onOpenFounderWorkspace?: () => void;
 }
 
 export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({ onOpenFounderWorkspace }) => {
-  // Authentication & Guest State
-  const [user, setUser] = useState<{ name: string; email: string; photo?: string; isGuest: boolean } | null>({
-    name: 'Utilizador Google',
-    email: 'utilizador.exemplo@gmail.com',
-    isGuest: false
-  });
+  const { user: authUser, profile: userProfile, loginWithGoogle, logout } = useIdentity();
 
   const [guestDismissed, setGuestDismissed] = useState<boolean>(false);
   const [pinEnabled, setPinEnabled] = useState<boolean>(false);
   const [activePublicTab, setActivePublicTab] = useState<'timeline' | 'search' | 'favorites' | 'devices' | 'settings'>('timeline');
 
+  const displayName = userProfile?.displayName || authUser?.displayName || 'Utilizador Google';
+  const displayEmail = userProfile?.email || authUser?.email || 'utilizador.exemplo@gmail.com';
+  const isGuest = !authUser;
+
   // License State
   const [license, setLicense] = useState<LicenseRecord>(
-    TrialEngine.getLicense('usr-public-001', user?.email || 'utilizador@gmail.com')
+    TrialEngine.getLicense(authUser?.uid || 'usr-public-001', displayEmail)
   );
 
   const evalState = TrialEngine.evaluateState(license);
 
-  // Google Smart Onboarding Handler
-  const handleGoogleAuth = () => {
-    setUser({
-      name: 'Mário Silva',
-      email: 'mario.silva@gmail.com',
-      isGuest: false
-    });
+  // Google Smart Onboarding Handler via IdentityEngine
+  const handleGoogleAuth = async () => {
+    await loginWithGoogle();
     setGuestDismissed(true);
   };
 
-  const handleContinueAsGuest = () => {
-    setUser({
-      name: 'Visitante (Modo Temporário)',
-      email: 'convidado@portal.local',
-      isGuest: true
-    });
+  const handleLogout = async () => {
+    await logout();
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 select-none font-sans">
       {/* 1. Discrete Guest Reminder Banner (If in guest mode) */}
-      {user?.isGuest && !guestDismissed && (
+      {isGuest && !guestDismissed && (
         <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-950 p-4 rounded-2xl border border-indigo-500/30 shadow-lg flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <span className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
@@ -96,12 +88,12 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({ onOpenFounderW
       <div className="bg-slate-900/90 p-6 rounded-2xl border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-amber-500 flex items-center justify-center text-white font-black text-lg shadow-md">
-            {user?.name ? user.name[0] : 'U'}
+            {displayName ? displayName[0].toUpperCase() : 'U'}
           </div>
 
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="text-lg font-extrabold text-slate-100">{user?.name || 'Portal do Utilizador'}</h1>
+              <h1 className="text-lg font-extrabold text-slate-100">{displayName}</h1>
               <span
                 className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono ${
                   evalState.active
@@ -112,13 +104,13 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({ onOpenFounderW
                 {evalState.label}
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-mono mt-0.5">{user?.email}</p>
+            <p className="text-xs text-slate-400 font-mono mt-0.5">{displayEmail}</p>
           </div>
         </div>
 
         {/* Quick Actions */}
         <div className="flex items-center space-x-2">
-          {user?.isGuest ? (
+          {isGuest ? (
             <button
               onClick={handleGoogleAuth}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-indigo-600/30 cursor-pointer flex items-center space-x-1.5"
@@ -128,7 +120,7 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({ onOpenFounderW
             </button>
           ) : (
             <button
-              onClick={handleContinueAsGuest}
+              onClick={handleLogout}
               className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer flex items-center space-x-1.5"
             >
               <LogOut className="w-3.5 h-3.5" />

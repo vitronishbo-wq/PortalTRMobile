@@ -18,6 +18,8 @@ import { FounderIDEWorkspace } from './components/workspaces/FounderIDEWorkspace
 import { PublicWorkspace } from './components/workspaces/PublicWorkspace';
 import { useAppStateMachine } from './engine/appStateMachine';
 import { CapabilityEngine } from './engine/CapabilityEngine';
+import { useIdentity, IdentityEngine } from './engine/identityEngine';
+import { AuthorityEngine } from './engine/authorityEngine';
 import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
 import { Bell, X } from 'lucide-react';
 import {
@@ -141,6 +143,12 @@ const initialEvents: PortalEvent[] = [
 ];
 
 export default function App() {
+  // IdentityEngine central auth hook subscribing directly to Firebase Auth & Firestore user profile document
+  const { user: authUser, profile: userProfile, loading: authLoading } = useIdentity();
+
+  // Reactive role & claim verification directly from authenticated Firestore document users/{uid}
+  const isFounderUser = userProfile?.role === 'founder' || userProfile?.authority === 'ROOT' || AuthorityEngine.hasClaim(userProfile, 'canDeploy');
+
   const [secretPin, setSecretPin] = useState<string>(() => {
     return localStorage.getItem('portal_camouflage_pin') || '12345';
   });

@@ -36,10 +36,11 @@ import {
   Clock,
   Sparkles
 } from 'lucide-react';
-import { BootstrapEngine, FeatureFlagsState, DEUS_FUNDADOR_CREDENTIALS } from '../../services/bootstrapEngine';
+import { AuthorityEngine, FeatureFlagsState, DEUS_FUNDADOR_CREDENTIALS } from '../../engine/authorityEngine';
 import { PaymentRegistry, ChargeResponse, ChargeRequest } from '../../services/paymentEngine';
 import { TrialEngine, LicenseRecord } from '../../services/trialEngine';
 import { UserProfile, UserRole } from '../../types/User';
+import { IdentityEngine } from '../../engine/identityEngine';
 import { RootConsoleView } from './RootConsoleView';
 import { CommandPalette } from './CommandPalette';
 import { AutomationEngine, AutomationRule, AutomationExecutionLog } from '../../services/automationEngine';
@@ -85,56 +86,68 @@ export const FounderIDEWorkspace: React.FC = () => {
   const [commandInput, setCommandInput] = useState<string>('');
 
   // Domain Data States
-  const [flags, setFlags] = useState<FeatureFlagsState>(BootstrapEngine.getFeatureFlags());
+  const [flags, setFlags] = useState<FeatureFlagsState>(AuthorityEngine.getFeatureFlags());
   const [selectedUserFilter, setSelectedUserFilter] = useState<'all' | 'trial' | 'lifetime' | 'founder' | 'admin'>('all');
 
-  // Mock Users List with Trial Licenses
-  const [users, setUsers] = useState<UserProfile[]>([
-    {
-      userId: 'deusfundador-master-001',
-      email: DEUS_FUNDADOR_CREDENTIALS.email,
-      displayName: 'Deus Fundador (Super Master)',
-      role: 'founder',
-      system: true,
-      immutable: true,
-      createdAt: Date.now() - 86400000 * 60,
-      lastLogin: Date.now(),
-      permissions: ['*']
-    },
-    {
-      userId: 'usr-248',
-      email: 'mario.silva@empresa.ao',
-      displayName: 'Mário Silva (Operador de Caixa)',
-      role: 'user',
-      system: false,
-      immutable: false,
-      createdAt: Date.now() - 86400000 * 3,
-      lastLogin: Date.now() - 1800000,
-      permissions: ['events.read']
-    },
-    {
-      userId: 'usr-501',
-      email: 'ana.costa@tech.co.ao',
-      displayName: 'Ana Costa (Gestora Financeira)',
-      role: 'admin',
-      system: false,
-      immutable: false,
-      createdAt: Date.now() - 86400000 * 12,
-      lastLogin: Date.now() - 3600000,
-      permissions: ['devices.manage', 'events.read', 'payments.write']
-    },
-    {
-      userId: 'agent-samsung-s22',
-      email: 'android.samsung@internal.device',
-      displayName: 'Agente Android Samsung S22',
-      role: 'android_agent',
-      system: true,
-      immutable: true,
-      createdAt: Date.now() - 86400000 * 20,
-      lastLogin: Date.now() - 30000,
-      permissions: ['sync.write', 'events.push']
-    }
-  ]);
+  // Real-time Users List from IdentityEngine / Firestore
+  const [users, setUsers] = useState<UserProfile[]>([]);
+
+  useEffect(() => {
+    const unsub = IdentityEngine.listenToAllUsers((fetchedUsers) => {
+      if (fetchedUsers && fetchedUsers.length > 0) {
+        setUsers(fetchedUsers);
+      } else {
+        setUsers([
+          {
+            userId: 'deusfundador-master-001',
+            email: DEUS_FUNDADOR_CREDENTIALS.email,
+            displayName: 'Deus Fundador (Super Master)',
+            role: 'founder',
+            system: true,
+            immutable: true,
+            createdAt: Date.now() - 86400000 * 60,
+            lastLogin: Date.now(),
+            permissions: ['*']
+          },
+          {
+            userId: 'usr-248',
+            email: 'mario.silva@empresa.ao',
+            displayName: 'Mário Silva (Operador de Caixa)',
+            role: 'user',
+            system: false,
+            immutable: false,
+            createdAt: Date.now() - 86400000 * 3,
+            lastLogin: Date.now() - 1800000,
+            permissions: ['events.read']
+          },
+          {
+            userId: 'usr-501',
+            email: 'ana.costa@tech.co.ao',
+            displayName: 'Ana Costa (Gestora Financeira)',
+            role: 'admin',
+            system: false,
+            immutable: false,
+            createdAt: Date.now() - 86400000 * 12,
+            lastLogin: Date.now() - 3600000,
+            permissions: ['devices.manage', 'events.read', 'payments.write']
+          },
+          {
+            userId: 'agent-samsung-s22',
+            email: 'android.samsung@internal.device',
+            displayName: 'Agente Android Samsung S22',
+            role: 'android_agent',
+            system: true,
+            immutable: true,
+            createdAt: Date.now() - 86400000 * 20,
+            lastLogin: Date.now() - 30000,
+            permissions: ['sync.write', 'events.push']
+          }
+        ]);
+      }
+    });
+
+    return () => unsub();
+  }, []);
 
   // Activity Bar Navigation Definition
   const activityItems = [
@@ -872,7 +885,7 @@ export const FounderIDEWorkspace: React.FC = () => {
                           </div>
                           <button
                             onClick={() => {
-                              const updated = BootstrapEngine.toggleFeatureFlag(key, !flags[key]);
+                              const updated = AuthorityEngine.toggleFeatureFlag(key, !flags[key]);
                               setFlags(updated);
                             }}
                             className={`px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer ${

@@ -1,23 +1,20 @@
 import { useState, useEffect } from 'react';
 import { AppEvent, Device } from '../types/index';
 import { FirestoreService } from '../services/firestore';
-import { AuthService } from '../services/auth';
+import { IdentityEngine } from '../engine/identityEngine';
 import { User } from 'firebase/auth';
 
 export function useRealtime() {
-  const [user, setUser] = useState<User | null>(AuthService.getCurrentUser());
+  const [user, setUser] = useState<User | null>(IdentityEngine.getCurrentUser());
   const [events, setEvents] = useState<AppEvent[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Iniciar autenticação anónima se nenhum utilizador estiver ativo
-    const unsubscribeAuth = AuthService.observeAuthState((currentUser) => {
+    // 1. Iniciar observação de autenticação do utilizador
+    const unsubscribeAuth = IdentityEngine.observeAuthState((currentUser) => {
       setUser(currentUser);
-      if (!currentUser) {
-        AuthService.loginAnonymously();
-      }
     });
 
     // 2. Registar listener em tempo real para Eventos/Notificações
