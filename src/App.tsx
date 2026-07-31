@@ -10,12 +10,14 @@ import { EventSimulatorModal } from './components/EventSimulatorModal';
 import { DisguisedCalculator } from './components/DisguisedCalculator';
 import { CamouflageSettingsModal } from './components/CamouflageSettingsModal';
 import { SmartInstaller } from './components/SmartInstaller';
+import { PWAInstallNotificationBanner } from './components/PWAInstallNotificationBanner';
 import { AdaptiveOnboardingView } from './components/AdaptiveOnboardingView';
 import { RuntimeControlView } from './components/RuntimeControlView';
 import { FounderConsoleView } from './components/FounderConsoleView';
 import { FounderIDEWorkspace } from './components/workspaces/FounderIDEWorkspace';
 import { PublicWorkspace } from './components/workspaces/PublicWorkspace';
 import { useAppStateMachine } from './engine/appStateMachine';
+import { CapabilityEngine } from './engine/CapabilityEngine';
 import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
 import { Bell, X } from 'lucide-react';
 import {
@@ -191,6 +193,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('portal_github_repo', githubRepo);
   }, [githubRepo]);
+
+  useEffect(() => {
+    CapabilityEngine.initInstallListener();
+  }, []);
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -577,6 +583,15 @@ export default function App() {
         onSimulateEvent={handleSimulateRandomEvent}
         onLockCamouflage={appStateMachine.lockApp}
         onOpenCamouflageSettings={() => appStateMachine.setCamouflageModalOpen(true)}
+      />
+
+      {/* PWA Install Notification Banner - ALWAYS triggered when opened via web link */}
+      <PWAInstallNotificationBanner
+        appName={calcTitle}
+        onOpenFullInstaller={() => {
+          setWorkspaceMode('founder');
+          appStateMachine.setActiveTab('installer');
+        }}
       />
 
       {/* Main Content Body */}

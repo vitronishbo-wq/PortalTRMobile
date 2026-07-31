@@ -3,6 +3,7 @@ import { Smartphone, QrCode, Battery, Wifi, ShieldCheck, Plus, Trash2, Send, Ref
 import QRCode from 'qrcode';
 import { Device } from '../types';
 import { ZeroTouchIdentity } from '../engine/provisioningEngine';
+import { BatteryUsageMonitor } from './BatteryUsageMonitor';
 
 interface DevicesViewProps {
   devices: Device[];
@@ -210,6 +211,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           );
         })}
       </div>
+
+      {/* Historical Battery Usage & Drain Monitor */}
+      <BatteryUsageMonitor devices={devices} />
 
       {/* QR Code Pair Modal */}
       {showPairModal && (

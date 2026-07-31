@@ -13,15 +13,17 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { EventStats } from '../types';
+import { EventStats, Device } from '../types';
+import { BatteryUsageMonitor } from './BatteryUsageMonitor';
 
 interface AnalyticsViewProps {
   stats: EventStats | null;
+  devices?: Device[];
 }
 
 const COLORS = ['#6366f1', '#ec4899', '#06b6d4', '#f59e0b', '#10b981', '#8b5cf6', '#64748b'];
 
-export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ stats }) => {
+export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ stats, devices = [] }) => {
   if (!stats) {
     return (
       <div className="p-12 text-center text-slate-500">
@@ -156,6 +158,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ stats }) => {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Battery Usage & Telemetry Analysis */}
+      <BatteryUsageMonitor devices={devices} />
     </div>
   );
 };
