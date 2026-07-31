@@ -164,6 +164,7 @@ export default function App() {
 
   // Workspace Mode State: 'public' (User PWA Portal) vs 'founder' (Founder IDE)
   const [workspaceMode, setWorkspaceMode] = useState<'public' | 'founder'>('public');
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState<boolean>(true);
 
   // Formal State Machine replacing scattered boolean flags
   const appStateMachine = useAppStateMachine(startCamouflaged);
@@ -591,11 +592,14 @@ export default function App() {
         onSimulateEvent={handleSimulateRandomEvent}
         onLockCamouflage={appStateMachine.lockApp}
         onOpenCamouflageSettings={() => appStateMachine.setCamouflageModalOpen(true)}
+        onOpenInstallModal={() => setIsInstallModalOpen(true)}
       />
 
-      {/* PWA Install Notification Banner - ALWAYS triggered when opened via web link */}
+      {/* PWA Install Center Notification Modal */}
       <PWAInstallNotificationBanner
         appName={calcTitle}
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
         onOpenFullInstaller={() => {
           setWorkspaceMode('founder');
           appStateMachine.setActiveTab('installer');

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Smartphone, Crown, Zap, Lock, LogOut, KeyRound, UserCheck } from 'lucide-react';
+import { Activity, Smartphone, Crown, Zap, Lock, LogOut, KeyRound, UserCheck, Download } from 'lucide-react';
 import { useIdentity } from '../engine/identityEngine';
 
 interface NavbarProps {
@@ -11,6 +11,7 @@ interface NavbarProps {
   onSimulateEvent: () => void;
   onLockCamouflage?: () => void;
   onOpenCamouflageSettings?: () => void;
+  onOpenInstallModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -19,7 +20,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   onLockCamouflage,
-  onOpenCamouflageSettings
+  onOpenCamouflageSettings,
+  onOpenInstallModal
 }) => {
   const { user: authUser, profile: userProfile } = useIdentity();
   const roleBadge = userProfile?.role ? userProfile.role.toUpperCase() : authUser ? 'AUTHENTICATED' : 'GUEST';
@@ -87,7 +89,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Mode Switcher & Security Controls */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            {onOpenInstallModal && (
+              <button
+                onClick={onOpenInstallModal}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 font-bold text-xs shadow-sm transition-all cursor-pointer"
+                title="Abrir Notificação de Instalação PWA"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span className="hidden sm:inline">Instalar PWA</span>
+              </button>
+            )}
+
             {onLockCamouflage && (
               <button
                 onClick={onLockCamouflage}
