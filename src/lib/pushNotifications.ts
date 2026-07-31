@@ -340,8 +340,8 @@ export async function sendNativeNotification(event: PortalEvent) {
     if (swRegistration && swRegistration.active) {
       const options: any = {
         body,
-        icon: '/icon.svg',
-        badge: '/icon.svg',
+        icon: '/app_icon.jpg',
+        badge: '/app_icon.jpg',
         tag: `evt-${event.id}`,
         renotify: true,
         data: {
@@ -366,7 +366,7 @@ export async function sendNativeNotification(event: PortalEvent) {
         payload: {
           title,
           body,
-          icon: '/icon.svg',
+          icon: '/app_icon.jpg',
           tag: `evt-${event.id}`,
           priority: event.priority,
           data: { eventId: event.id, url: '/' }
@@ -378,7 +378,7 @@ export async function sendNativeNotification(event: PortalEvent) {
     // Fallback to standard Notification constructor
     new Notification(title, {
       body,
-      icon: '/icon.svg',
+      icon: '/app_icon.jpg',
       tag: `evt-${event.id}`
     });
   } catch (err) {

@@ -22,7 +22,7 @@ interface PWAInstallNotificationBannerProps {
 }
 
 export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBannerProps> = ({
-  appName = 'Calculadora Padrão (Portal Mobile)',
+  appName = 'Portal TR Mobile',
   onOpenFullInstaller,
   isOpen: customIsOpen,
   onClose: customOnClose
@@ -166,7 +166,7 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
             <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
             <h4 className="font-extrabold text-emerald-300">Aplicação Instalada com Sucesso!</h4>
             <p className="text-xs text-emerald-200">
-              Aceda ao ecrã principal do seu telemóvel para abrir a PWA em Modo Camuflado de Calculadora.
+              Aceda ao ecrã principal do seu dispositivo para abrir a aplicação oficial em Modo Nativo.
             </p>
             <button
               onClick={handleCloseModal}
@@ -178,7 +178,7 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
         ) : (
           <div className="space-y-4 text-xs">
             <p className="text-slate-300 leading-relaxed text-xs">
-              Detetou-se acesso via navegador web. Para executar a app em <strong>Modo Camuflado Nativo (Calculadora)</strong>, sem barras de endereço e com arranque rápido, instale a PWA agora.
+              Detetou-se acesso via navegador web. Para executar a aplicação em <strong>Modo Nativo Dedicado</strong>, sem barras de endereço, com menor consumo de dados e arranque instantâneo, instale a PWA no seu dispositivo.
             </p>
 
             {/* Platform instructions or status */}
@@ -194,7 +194,7 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
                 </div>
                 <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
                   <span>Modo de Operação:</span>
-                  <span className="text-emerald-400 font-bold">Camuflagem PWA</span>
+                  <span className="text-emerald-400 font-bold">Aplicação Integrada (PWA)</span>
                 </div>
               </div>
             ) : (

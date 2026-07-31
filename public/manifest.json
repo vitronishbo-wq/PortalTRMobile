@@ -1,24 +1,30 @@
 {
   "short_name": "Calculadora",
-  "name": "Calculadora",
-  "description": "Calculadora Padrão do Sistema",
+  "name": "Portal TR Mobile - Calculadora",
+  "description": "Calculadora Padrão do Sistema PWA",
   "icons": [
     {
-      "src": "/icon.svg",
-      "type": "image/svg+xml",
+      "src": "/app_icon.jpg",
+      "type": "image/jpeg",
       "sizes": "192x192 512x512",
       "purpose": "any"
+    },
+    {
+      "src": "/app_icon.jpg",
+      "type": "image/jpeg",
+      "sizes": "192x192 512x512",
+      "purpose": "maskable"
     },
     {
       "src": "/icon.svg",
       "type": "image/svg+xml",
       "sizes": "192x192 512x512",
-      "purpose": "maskable"
+      "purpose": "any"
     }
   ],
   "start_url": "/",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
   "display": "standalone",
   "orientation": "portrait",
   "scope": "/",
