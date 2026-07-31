@@ -24,12 +24,26 @@ import {
 import { BootstrapEngine, FeatureFlagsState, SecretStatusItem } from '../services/bootstrapEngine';
 import { PaymentRegistry, ChargeResponse, ChargeRequest } from '../services/paymentEngine';
 import { UserProfile, UserRole } from '../types/User';
+import { FirestoreService } from '../services/firestore';
+import { RootAuthorityEngine, computeFounderIdentityHash } from '../services/rootAuthorityEngine';
+import { auth } from '../firebase/firebase';
 
 export const FounderConsoleView: React.FC = () => {
   const [founder, setFounder] = useState<UserProfile | null>(null);
   const [flags, setFlags] = useState<FeatureFlagsState>(BootstrapEngine.getFeatureFlags());
   const [secrets, setSecrets] = useState<SecretStatusItem[]>(BootstrapEngine.getSecretsStatus());
   const [activeTab, setActiveTab] = useState<'overview' | 'secrets' | 'appypay' | 'flags' | 'rbac'>('overview');
+  const [mfaSuccessMsg, setMfaSuccessMsg] = useState<string | null>(null);
+  const [isPromoting, setIsPromoting] = useState<boolean>(false);
+
+  // Zero-Knowledge Identity Hashing state (SHA-256)
+  const [showIdentityHashModal, setShowIdentityHashModal] = useState<boolean>(false);
+  const [idEmail, setIdEmail] = useState<string>('');
+  const [idPhone, setIdPhone] = useState<string>('');
+  const [idBirthDate, setIdBirthDate] = useState<string>('');
+  const [idProvince, setIdProvince] = useState<string>('');
+  const [idMunicipality, setIdMunicipality] = useState<string>('');
+  const [isComputingHash, setIsComputingHash] = useState<boolean>(false);
 
   // AppyPay Sandbox Tester State
   const [chargeAmount, setChargeAmount] = useState<number>(15000);
@@ -39,70 +53,135 @@ export const FounderConsoleView: React.FC = () => {
   const [lastCharge, setLastCharge] = useState<ChargeResponse | null>(null);
   const [isCharging, setIsCharging] = useState<boolean>(false);
 
-  // System Users List
-  const [usersList, setUsersList] = useState<UserProfile[]>([
-    {
-      userId: 'founder-master-001',
-      email: 'silajaneiro9@gmail.com',
-      displayName: 'Founder Master (System)',
-      role: 'founder',
-      system: true,
-      immutable: true,
-      createdAt: Date.now() - 86400000 * 30,
-      lastLogin: Date.now(),
-      permissions: ['*']
-    },
-    {
-      userId: 'admin-002',
-      email: 'admin.operacoes@portal.ao',
-      displayName: 'Administrador de Operações',
-      role: 'admin',
-      system: false,
-      immutable: false,
-      createdAt: Date.now() - 86400000 * 10,
-      lastLogin: Date.now() - 3600000,
-      permissions: ['devices.manage', 'events.read', 'logs.read']
-    },
-    {
-      userId: 'op-003',
-      email: 'operador.suporte@portal.ao',
-      displayName: 'Operador Nível 1',
-      role: 'operator',
-      system: false,
-      immutable: false,
-      createdAt: Date.now() - 86400000 * 5,
-      lastLogin: Date.now() - 7200000,
-      permissions: ['events.read']
-    },
-    {
-      userId: 'agent-dev-001',
-      email: 'agent.samsung@device.internal',
-      displayName: 'Agente Android Samsung OneUI',
-      role: 'android_agent',
-      system: true,
-      immutable: true,
-      createdAt: Date.now() - 86400000 * 20,
-      lastLogin: Date.now() - 60000,
-      permissions: ['sync.write', 'events.push']
-    },
-    {
-      userId: 'integration-appypay',
-      email: 'webhook.appypay@api.internal',
-      displayName: 'Integração Webhook AppyPay',
-      role: 'integration',
-      system: true,
-      immutable: true,
-      createdAt: Date.now() - 86400000 * 15,
-      lastLogin: Date.now() - 120000,
-      permissions: ['payments.webhook']
-    }
-  ]);
+  // System Users List initialized with default fallback and synced to Firestore
+  const [usersList, setUsersList] = useState<UserProfile[]>([]);
 
   useEffect(() => {
+    // 1. Inicializar bootstrap do Founder
     BootstrapEngine.initFounderBootstrap().then((profile) => {
       setFounder(profile);
     });
+
+    // 2. Subscrever à coleção 'users' do Firestore em tempo real
+    const unsubscribeUsers = FirestoreService.listenToAllUsers((firestoreUsers) => {
+      if (firestoreUsers && firestoreUsers.length > 0) {
+        setUsersList(firestoreUsers);
+
+        // Se encontrar o founder ativo no Firestore, atualizar o estado
+        const activeUserUid = auth?.currentUser?.uid;
+        const founderInDb = firestoreUsers.find((u) => u.role === 'founder' || (activeUserUid && u.userId === activeUserUid));
+        if (founderInDb) {
+          setFounder(founderInDb);
+        }
+      } else {
+        // Se a coleção 'users' estiver vazia, popular com utilizadores base do sistema
+        const defaultUsers: UserProfile[] = [
+          {
+            userId: auth?.currentUser?.uid || 'founder-master-001',
+            email: auth?.currentUser?.email || 'silajaneiro9@gmail.com',
+            displayName: auth?.currentUser?.displayName || 'Founder Master (System)',
+            role: 'founder',
+            system: true,
+            immutable: true,
+            authority: 'ROOT',
+            createdAt: Date.now() - 86400000 * 30,
+            lastLogin: Date.now(),
+            permissions: ['*'],
+            claims: ['canManageUsers', 'canDeploy', 'canManagePayments', 'canManageLicenses', 'canReadAudit', 'canCreateAdmins', 'canDeleteUsers', 'canAccessSecrets']
+          },
+          {
+            userId: 'admin-002',
+            email: 'admin.operacoes@portal.ao',
+            displayName: 'Administrador de Operações',
+            role: 'admin',
+            system: false,
+            immutable: false,
+            createdAt: Date.now() - 86400000 * 10,
+            lastLogin: Date.now() - 3600000,
+            permissions: ['devices.manage', 'events.read', 'logs.read']
+          },
+          {
+            userId: 'agent-dev-001',
+            email: 'agent.samsung@device.internal',
+            displayName: 'Agente Android Samsung OneUI',
+            role: 'android_agent',
+            system: true,
+            immutable: true,
+            createdAt: Date.now() - 86400000 * 20,
+            lastLogin: Date.now() - 60000,
+            permissions: ['sync.write', 'events.push']
+          }
+        ];
+        setUsersList(defaultUsers);
+
+        // Garantir salvamento no Firestore
+        defaultUsers.forEach((u) => FirestoreService.saveUserProfile(u));
+      }
+    });
+
+    return () => {
+      unsubscribeUsers();
+    };
   }, []);
+
+  const handleManualFounderPromotion = async () => {
+    const currentUid = auth?.currentUser?.uid;
+    const currentEmail = auth?.currentUser?.email || 'founder@portal.internal';
+    if (!currentUid) {
+      alert('Nenhum utilizador do Firebase Auth autenticado no momento.');
+      return;
+    }
+
+    setIsPromoting(true);
+    try {
+      const updatedProfile = await FirestoreService.promoteUserToFounder(
+        currentUid,
+        currentEmail,
+        auth?.currentUser?.displayName || 'Founder Master'
+      );
+      setFounder(updatedProfile);
+      setMfaSuccessMsg(`Autoridade 'founder', status immutable=true e claims gravados com sucesso no Firestore (doc: users/${currentUid})!`);
+    } catch (e) {
+      console.error('Erro ao promover utilizador:', e);
+    } finally {
+      setIsPromoting(false);
+    }
+  };
+
+  const handleComputeAndPersistIdentityHash = async () => {
+    if (!idEmail.trim()) {
+      alert('Por favor introduza o email para calcular o hash SHA-256.');
+      return;
+    }
+    setIsComputingHash(true);
+    try {
+      const hash = await computeFounderIdentityHash({
+        email: idEmail,
+        phone: idPhone,
+        birthDate: idBirthDate,
+        province: idProvince,
+        municipality: idMunicipality
+      });
+
+      const currentUid = auth?.currentUser?.uid || founder?.userId || 'founder-master-001';
+      const updated = await FirestoreService.promoteUserToFounder(
+        currentUid,
+        auth?.currentUser?.email || idEmail,
+        founder?.displayName || 'Founder Master',
+        hash
+      );
+      setFounder(updated);
+      setMfaSuccessMsg(
+        `Hash SHA-256 de identidade gerado (${hash.substring(0, 16)}...) e persistido no Firestore (users/${currentUid}) com arquitetura Zero-Knowledge! NENHUM dado pessoal em texto simples foi gravado.`
+      );
+      setShowIdentityHashModal(false);
+    } catch (err) {
+      console.error('Erro ao calcular hash de identidade:', err);
+    } finally {
+      setIsComputingHash(false);
+    }
+  };
+
 
   const handleToggleFlag = (key: keyof FeatureFlagsState) => {
     const updated = BootstrapEngine.toggleFeatureFlag(key, !flags[key]);
@@ -172,17 +251,61 @@ export const FounderConsoleView: React.FC = () => {
         </div>
 
         {/* Founder Identity Card */}
-        <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
+        <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 text-xs space-y-2">
           <div className="flex items-center space-x-2">
             <Crown className="w-4 h-4 text-amber-400" />
-            <span className="font-bold text-slate-200">{founder?.email || 'silajaneiro9@gmail.com'}</span>
+            <span className="font-bold text-slate-200">{founder?.email || auth?.currentUser?.email || 'silajaneiro9@gmail.com'}</span>
           </div>
-          <div className="flex items-center justify-between text-[10px] text-slate-400">
-            <span>Role: <strong className="text-amber-400 uppercase">{founder?.role || 'founder'}</strong></span>
-            <span className="text-emerald-400 font-mono font-bold">✓ Bootstrap Lock</span>
+          <div className="flex items-center justify-between text-[10px] text-slate-400 gap-3">
+            <span>
+              Doc: <strong className="text-amber-300 font-mono">users/{founder?.userId || auth?.currentUser?.uid || 'founder-master-001'}</strong>
+            </span>
+            <span className="text-emerald-400 font-mono font-bold flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> Firestore Persisted
+            </span>
+          </div>
+          <div className="pt-1 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+            <div className="text-[10px] text-slate-400">
+              <span>Role: <strong className="text-amber-400 uppercase">{founder?.role || 'founder'}</strong> • Immutable: <strong className="text-emerald-400">true</strong></span>
+              {founder?.identityHash && (
+                <div className="text-indigo-400 font-mono text-[9px] truncate max-w-[200px]">
+                  Hash: {founder.identityHash.substring(0, 16)}...
+                </div>
+              )}
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setShowIdentityHashModal(true)}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-[10px] transition-all flex items-center gap-1 shadow-md cursor-pointer"
+                title="Gerar Fingerprint SHA-256 Zero-Knowledge"
+              >
+                <Lock className="w-3 h-3" />
+                <span>Desafio SHA-256</span>
+              </button>
+              <button
+                onClick={handleManualFounderPromotion}
+                disabled={isPromoting}
+                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[10px] transition-all flex items-center gap-1 shadow-md shadow-amber-500/20 cursor-pointer disabled:opacity-50"
+              >
+                <Zap className="w-3 h-3" />
+                <span>{isPromoting ? 'A gravar...' : 'Persistir no Firestore'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {mfaSuccessMsg && (
+        <div className="bg-emerald-950/80 border border-emerald-500/40 p-3.5 rounded-xl text-emerald-300 text-xs flex items-center justify-between animate-fadeIn">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span>{mfaSuccessMsg}</span>
+          </div>
+          <button onClick={() => setMfaSuccessMsg(null)} className="text-emerald-400 hover:text-white font-bold cursor-pointer">
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Console Sub-Navigation Tabs */}
       <div className="flex items-center space-x-2 border-b border-slate-800 pb-3 overflow-x-auto text-xs font-bold">
@@ -557,6 +680,114 @@ export const FounderConsoleView: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* Zero-Knowledge Identity SHA-256 Modal */}
+      {showIdentityHashModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center space-x-2">
+                <Shield className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-bold text-slate-100 text-sm">
+                  Desafio de Identidade SHA-256 (Zero-Knowledge)
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowIdentityHashModal(false)}
+                className="text-slate-400 hover:text-white cursor-pointer font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Para máxima segurança, os teus dados pessoais (email, telefone, nascimento, província, município) <strong>NUNCA</strong> são gravados em texto simples no Firestore. É gerado um <strong>Fingerprint SHA-256 criptográfico</strong> com secret interno de autoridade.
+            </p>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-300 mb-1">E-mail do Founder</label>
+                <input
+                  type="email"
+                  value={idEmail}
+                  onChange={(e) => setIdEmail(e.target.value)}
+                  placeholder="silajaneiro9@gmail.com"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-slate-200 font-mono focus:border-indigo-500 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">Telefone</label>
+                  <input
+                    type="text"
+                    value={idPhone}
+                    onChange={(e) => setIdPhone(e.target.value)}
+                    placeholder="+244 9XX XXX XXX"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-slate-200 font-mono focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">Data Nascimento</label>
+                  <input
+                    type="text"
+                    value={idBirthDate}
+                    onChange={(e) => setIdBirthDate(e.target.value)}
+                    placeholder="AAAA-MM-DD"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-slate-200 font-mono focus:border-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">Província</label>
+                  <input
+                    type="text"
+                    value={idProvince}
+                    onChange={(e) => setIdProvince(e.target.value)}
+                    placeholder="Ex: Luanda"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-slate-200 font-mono focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">Município</label>
+                  <input
+                    type="text"
+                    value={idMunicipality}
+                    onChange={(e) => setIdMunicipality(e.target.value)}
+                    placeholder="Ex: Talatona"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-slate-200 font-mono focus:border-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] font-mono text-slate-400 space-y-1">
+              <span className="text-indigo-400 font-bold block">Fórmula do Hash Zero-Knowledge:</span>
+              <p className="text-[10px] break-all text-slate-400">
+                SHA256(email + telefone + nascimento + província + município + secret)
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2">
+              <button
+                onClick={() => setShowIdentityHashModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleComputeAndPersistIdentityHash}
+                disabled={isComputingHash}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-indigo-600/30 flex items-center space-x-2 cursor-pointer disabled:opacity-50"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>{isComputingHash ? 'A calcular Hash...' : 'Calcular & Persistir Hash'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

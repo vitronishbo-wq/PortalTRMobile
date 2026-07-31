@@ -1,5 +1,5 @@
 import { UserProfile, UserRole } from '../types/User';
-import { db } from '../firebase/firebase';
+import { db, auth } from '../firebase/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 export interface FeatureFlagsState {
@@ -51,47 +51,84 @@ export class BootstrapEngine {
   };
 
   /**
-   * Controlled Bootstrap: Guarantees a single Founder user exists, system-marked and immutable.
+   * Controlled Bootstrap: Guarantees a single Founder user exists in Firestore users/{uid}, system-marked and immutable.
    */
   static async initFounderBootstrap(): Promise<UserProfile> {
-    if (BootstrapEngine.founderProfile) {
-      return BootstrapEngine.founderProfile;
-    }
-
-    const defaultFounder: UserProfile = {
-      userId: 'deusfundador-master-001',
-      email: DEUS_FUNDADOR_CREDENTIALS.email,
-      displayName: 'Deus Fundador (Super Utilizador Master)',
-      role: 'founder',
-      system: true,
-      immutable: true,
-      createdAt: Date.now(),
-      lastLogin: Date.now(),
-      permissions: ['*']
-    };
+    const currentAuthUser = auth?.currentUser;
+    const activeUid = currentAuthUser?.uid || 'deusfundador-master-001';
+    const activeEmail = currentAuthUser?.email || DEUS_FUNDADOR_CREDENTIALS.email;
 
     if (db) {
       try {
-        const founderDocRef = doc(db, 'users', defaultFounder.userId);
+        // 1. Verificar se existe registo central no Firestore de Founder em system/founder
+        const systemFounderRef = doc(db, 'system', 'founder');
+        const systemFounderSnap = await getDoc(systemFounderRef);
+
+        let founderUid = activeUid;
+        if (systemFounderSnap.exists()) {
+          founderUid = systemFounderSnap.data().activeFounderUid || activeUid;
+        }
+
+        // 2. Procurar documento em users/{founderUid}
+        const founderDocRef = doc(db, 'users', founderUid);
         const snap = await getDoc(founderDocRef);
 
         if (snap.exists()) {
           BootstrapEngine.founderProfile = snap.data() as UserProfile;
         } else {
-          await setDoc(founderDocRef, defaultFounder);
-          BootstrapEngine.founderProfile = defaultFounder;
+          // 3. Se não existir, bootstrapar o utilizador ativo do Firebase Auth como Founder no Firestore
+          const newFounder: UserProfile = {
+            userId: founderUid,
+            email: activeEmail,
+            displayName: currentAuthUser?.displayName || 'Founder Master (System)',
+            role: 'founder',
+            system: true,
+            immutable: true,
+            authority: 'ROOT',
+            createdAt: Date.now(),
+            lastLogin: Date.now(),
+            permissions: ['*'],
+            claims: [
+              'canManageUsers',
+              'canDeploy',
+              'canManagePayments',
+              'canManageLicenses',
+              'canReadAudit',
+              'canCreateAdmins',
+              'canDeleteUsers',
+              'canAccessSecrets'
+            ]
+          };
+
+          await setDoc(founderDocRef, newFounder, { merge: true });
+          await setDoc(systemFounderRef, { activeFounderUid: founderUid, promotedAt: Date.now(), immutable: true }, { merge: true });
+          BootstrapEngine.founderProfile = newFounder;
         }
       } catch (err) {
-        console.warn('[BootstrapEngine] Firestore init warning, using local state:', err);
-        BootstrapEngine.founderProfile = defaultFounder;
+        console.warn('[BootstrapEngine] Firestore init warning, usando fallback local:', err);
       }
-    } else {
-      BootstrapEngine.founderProfile = defaultFounder;
+    }
+
+    if (!BootstrapEngine.founderProfile) {
+      BootstrapEngine.founderProfile = {
+        userId: activeUid,
+        email: activeEmail,
+        displayName: 'Founder Master (System)',
+        role: 'founder',
+        system: true,
+        immutable: true,
+        authority: 'ROOT',
+        createdAt: Date.now(),
+        lastLogin: Date.now(),
+        permissions: ['*'],
+        claims: ['*']
+      };
     }
 
     BootstrapEngine.bootstrapCompleted = true;
     return BootstrapEngine.founderProfile;
   }
+
 
   static getFounder(): UserProfile | null {
     return BootstrapEngine.founderProfile;

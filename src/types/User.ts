@@ -11,5 +11,8 @@ export interface UserProfile {
   createdAt: number | string;
   lastLogin: number | string;
   permissions?: string[];
+  authority?: 'ROOT' | 'ADMIN' | 'OPERATOR' | 'USER';
+  claims?: string[];
+  identityHash?: string;
 }
 

@@ -205,13 +205,153 @@ export class FirestoreService {
     if (!db) return;
     try {
       const userRef = doc(db, 'users', user.userId);
-      await setDoc(userRef, {
-        ...user,
-        lastLogin: Date.now()
-      }, { merge: true });
+      await setDoc(
+        userRef,
+        {
+          ...user,
+          lastLogin: Date.now()
+        },
+        { merge: true }
+      );
     } catch (error) {
       console.error('[FirestoreService] Erro ao salvar perfil do utilizador:', error);
     }
+  }
+
+  /**
+   * Obtém o perfil do utilizador pelo UID no Firestore
+   */
+  static async getUserProfile(uid: string): Promise<UserProfile | null> {
+    if (!db || !uid) return null;
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const userRef = doc(db, 'users', uid);
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        return snap.data() as UserProfile;
+      }
+      return null;
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao carregar perfil do utilizador:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Escuta em tempo real as alterações do perfil de um utilizador específico
+   */
+  static listenToUserProfile(
+    uid: string,
+    onData: (profile: UserProfile | null) => void,
+    onError?: (err: Error) => void
+  ): Unsubscribe {
+    if (!db || !uid) {
+      onData(null);
+      return () => {};
+    }
+    try {
+      const userRef = doc(db, 'users', uid);
+      return onSnapshot(
+        userRef,
+        (snap) => {
+          if (snap.exists()) {
+            onData(snap.data() as UserProfile);
+          } else {
+            onData(null);
+          }
+        },
+        (error) => {
+          console.warn('[FirestoreService] Erro ao escutar perfil:', error.message);
+          if (onError) onError(error);
+        }
+      );
+    } catch (e) {
+      console.error('[FirestoreService] Erro na subscrição do perfil:', e);
+      return () => {};
+    }
+  }
+
+  /**
+   * Escuta em tempo real a lista completa de utilizadores da coleção 'users'
+   */
+  static listenToAllUsers(
+    onData: (users: UserProfile[]) => void,
+    onError?: (err: Error) => void
+  ): Unsubscribe {
+    if (!db) {
+      onData([]);
+      return () => {};
+    }
+    try {
+      const usersRef = collection(db, 'users');
+      return onSnapshot(
+        usersRef,
+        (snapshot) => {
+          const usersList: UserProfile[] = snapshot.docs.map((d) => d.data() as UserProfile);
+          onData(usersList);
+        },
+        (error) => {
+          console.warn('[FirestoreService] Erro ao escutar lista de utilizadores:', error.message);
+          if (onError) onError(error);
+        }
+      );
+    } catch (e) {
+      console.error('[FirestoreService] Erro na subscrição de utilizadores:', e);
+      return () => {};
+    }
+  }
+
+  /**
+   * Promove de forma atómica um utilizador autenticado a Founder persistindo no documento users/{uid} no Firestore
+   */
+  static async promoteUserToFounder(
+    uid: string,
+    email: string,
+    displayName?: string,
+    identityHash?: string
+  ): Promise<UserProfile> {
+    const founderProfile: UserProfile = {
+      userId: uid,
+      email: email || 'founder@portal.internal',
+      displayName: displayName || 'Founder Master (System)',
+      role: 'founder',
+      system: true,
+      immutable: true,
+      authority: 'ROOT',
+      permissions: ['*'],
+      ...(identityHash ? { identityHash } : {}),
+      claims: [
+        'canManageUsers',
+        'canDeploy',
+        'canManagePayments',
+        'canManageLicenses',
+        'canReadAudit',
+        'canCreateAdmins',
+        'canDeleteUsers',
+        'canAccessSecrets'
+      ],
+      createdAt: Date.now(),
+      lastLogin: Date.now()
+    };
+
+    if (db) {
+      const userRef = doc(db, 'users', uid);
+      await setDoc(userRef, founderProfile, { merge: true });
+      // Registar na coleção de sistema com hash SHA-256 (zero-knowledge, sem dados pessoais em texto limpo)
+      const systemFounderRef = doc(db, 'system', 'founder');
+      await setDoc(
+        systemFounderRef,
+        {
+          activeFounderUid: uid,
+          promotedAt: Date.now(),
+          immutable: true,
+          ...(identityHash ? { identityHash } : {})
+        },
+        { merge: true }
+      );
+    }
+
+    return founderProfile;
   }
 
   /**
