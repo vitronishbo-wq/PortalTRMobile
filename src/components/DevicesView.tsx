@@ -117,9 +117,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
                 <div className="flex items-center space-x-1">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1 ${
-                    device.online ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-500'
+                    device.online ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-slate-800 text-slate-500'
                   }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${device.online ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`}></span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${device.online ? 'bg-amber-400 animate-ping' : 'bg-slate-500'}`}></span>
                     <span>{device.online ? 'ONLINE' : 'OFFLINE'}</span>
                   </span>
                 </div>
@@ -129,16 +129,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/90 space-y-2.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400 flex items-center space-x-1.5">
-                    <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                    <Activity className="w-3.5 h-3.5 text-amber-400" />
                     <span>Score de Saúde Agente:</span>
                   </span>
-                  <span className="font-bold text-emerald-400 font-mono">{healthScore}%</span>
+                  <span className="font-bold text-amber-400 font-mono">{healthScore}%</span>
                 </div>
 
                 {/* Health Progress Bar */}
                 <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
                   <div
-                    className="bg-gradient-to-r from-emerald-500 to-indigo-500 h-1.5 rounded-full"
+                    className="bg-gradient-to-r from-amber-500 to-indigo-500 h-1.5 rounded-full"
                     style={{ width: `${healthScore}%` }}
                   />
                 </div>
@@ -147,7 +147,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                   <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
                     <span className="text-slate-400">Listener:</span>
                     <span className={`font-semibold capitalize ${
-                      notificationStatus === 'active' ? 'text-emerald-400' : 'text-amber-400'
+                      notificationStatus === 'active' ? 'text-amber-400' : 'text-orange-400'
                     }`}>
                       {notificationStatus === 'active' ? '● Ativo' : '▲ Requer Reparo'}
                     </span>
@@ -164,11 +164,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
               <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300">
                 <div className="flex items-center space-x-1.5">
-                  <Battery className="w-3.5 h-3.5 text-emerald-400" />
+                  <Battery className="w-3.5 h-3.5 text-amber-400" />
                   <span>{device.batteryLevel ?? 98}%</span>
                 </div>
                 <div className="flex items-center space-x-1.5">
-                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <Zap className="w-3.5 h-3.5 text-orange-400" />
                   <span>Zero-Touch</span>
                 </div>
                 <div className="flex items-center space-x-1.5">
@@ -184,7 +184,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                   <button
                     onClick={() => handleAutoRepair(device.deviceId)}
                     disabled={isRepairing}
-                    className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-all cursor-pointer flex items-center space-x-1"
+                    className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition-all cursor-pointer flex items-center space-x-1"
                     title="Auto-Repair Background Listener"
                   >
                     <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />

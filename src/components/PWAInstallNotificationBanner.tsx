@@ -137,12 +137,12 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-800/80 pb-4">
           <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/20 shrink-0">
               <Download className="w-6 h-6 text-white animate-bounce" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-extrabold uppercase rounded-md font-mono border border-emerald-500/30">
+                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[10px] font-extrabold uppercase rounded-md font-mono border border-amber-500/30">
                   Notificação de Instalação
                 </span>
               </div>
@@ -162,15 +162,15 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
 
         {/* Body Content */}
         {installSuccess ? (
-          <div className="bg-emerald-950/80 border border-emerald-500/50 p-4 rounded-2xl text-center space-y-2">
-            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
-            <h4 className="font-extrabold text-emerald-300">Aplicação Instalada com Sucesso!</h4>
-            <p className="text-xs text-emerald-200">
+          <div className="bg-amber-950/80 border border-amber-500/50 p-4 rounded-2xl text-center space-y-2">
+            <CheckCircle2 className="w-10 h-10 text-amber-400 mx-auto" />
+            <h4 className="font-extrabold text-amber-300">Aplicação Instalada com Sucesso!</h4>
+            <p className="text-xs text-amber-200">
               Aceda ao ecrã principal do seu dispositivo para abrir a aplicação oficial.
             </p>
             <button
               onClick={handleCloseModal}
-              className="mt-2 px-5 py-2 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl shadow cursor-pointer"
+              className="mt-2 px-5 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl shadow cursor-pointer"
             >
               Concluir
             </button>
@@ -185,7 +185,7 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
               <div className="space-y-3">
                 {deviceType === 'android' && (
                   <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2 text-[11px]">
-                    <span className="font-bold text-emerald-400 block">📱 Passo a Passo Android (Chrome/Edge):</span>
+                    <span className="font-bold text-amber-400 block">📱 Passo a Passo Android (Chrome/Edge):</span>
                     <ol className="list-decimal list-inside space-y-1.5 text-slate-300">
                       <li>Toque no menu <strong>(⋮)</strong> do navegador no canto superior.</li>
                       <li>Clique em <strong>"Adicionar ao ecrã principal"</strong> ou <strong>"Instalar aplicação"</strong>.</li>
@@ -223,9 +223,9 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
             <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
               <button
                 onClick={handleInstallClick}
-                className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs rounded-2xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center space-x-2 cursor-pointer transform active:scale-95"
+                className="flex-1 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-orange-500 text-slate-950 font-black text-xs rounded-2xl shadow-lg shadow-amber-600/30 transition-all flex items-center justify-center space-x-2 cursor-pointer transform active:scale-95"
               >
-                <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
+                <Sparkles className="w-4 h-4 text-white animate-spin" />
                 <span>Instalar Agora</span>
               </button>
 

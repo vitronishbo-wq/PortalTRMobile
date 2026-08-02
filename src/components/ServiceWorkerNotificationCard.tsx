@@ -156,7 +156,7 @@ export const ServiceWorkerNotificationCard: React.FC = () => {
           </div>
           <div className="flex items-center space-x-2">
             {swStatus.active ? (
-              <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Ativo (/sw.js)</span>
               </span>
@@ -182,14 +182,14 @@ export const ServiceWorkerNotificationCard: React.FC = () => {
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400 font-medium">Permissão do Navegador</span>
             {swStatus.permission === 'granted' ? (
-              <Bell className="w-4 h-4 text-emerald-400" />
+              <Bell className="w-4 h-4 text-amber-400" />
             ) : (
               <BellOff className="w-4 h-4 text-amber-400" />
             )}
           </div>
           <div className="flex items-center space-x-2">
             {swStatus.permission === 'granted' ? (
-              <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Permitido</span>
               </span>
@@ -218,7 +218,7 @@ export const ServiceWorkerNotificationCard: React.FC = () => {
           </div>
           <div className="flex items-center space-x-2">
             {pushStatus.subscribed ? (
-              <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Subscrito (Active)</span>
               </span>

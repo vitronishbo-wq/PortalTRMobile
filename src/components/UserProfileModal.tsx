@@ -123,10 +123,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
         {savedSuccess ? (
           <div className="py-8 text-center space-y-3">
-            <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto">
+            <div className="w-12 h-12 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full flex items-center justify-center mx-auto">
               <Check className="w-6 h-6" />
             </div>
-            <p className="font-bold text-emerald-400 text-sm">Perfil guardado com sucesso!</p>
+            <p className="font-bold text-amber-400 text-sm">Perfil guardado com sucesso!</p>
           </div>
         ) : (
           <form onSubmit={handleSave} className="space-y-4">
@@ -178,7 +178,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
             {/* Telefone Alvo */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
-                <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                <Phone className="w-3.5 h-3.5 text-amber-400" />
                 <span>Telefone Alvo</span>
               </label>
               <input
@@ -186,7 +186,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 value={targetPhone}
                 onChange={(e) => setTargetPhone(e.target.value)}
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 transition-colors font-mono"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 transition-colors font-mono"
                 placeholder="+244 9XX XXX XXX"
               />
               <p className="text-[10px] text-slate-500">Número de telefone emparelhado para receção de eventos.</p>
@@ -216,10 +216,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               </label>
               <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-bold text-emerald-400 block">{accountPlan}</span>
+                  <span className="text-xs font-bold text-amber-400 block">{accountPlan}</span>
                   <span className="text-[10px] text-slate-500 block">Sincronização Ativa 24/7</span>
                 </div>
-                <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20">
+                <div className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
               </div>

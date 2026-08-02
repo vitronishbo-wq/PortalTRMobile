@@ -24,10 +24,12 @@ import {
   Check,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  FileSpreadsheet
 } from 'lucide-react';
 import { TrialEngine, LicenseRecord } from '../../services/trialEngine';
 import { useIdentity, IdentityEngine } from '../../engine/identityEngine';
+import { exportEventsToCsv } from '../../lib/csvExporter';
 import { SwipeableEventCard, DeviceEvent } from '../SwipeableEventCard';
 
 const SUPER_ADMIN_EMAILS = [
@@ -278,13 +280,23 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({ onOpenFounderW
                   </div>
 
                   <div className="flex items-center space-x-2">
+                    {/* CSV Export Button */}
+                    <button
+                      onClick={() => exportEventsToCsv(filteredEvents)}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center space-x-1.5 cursor-pointer transition-all shadow-sm shadow-amber-500/10"
+                      title="Exportar os eventos filtrados em CSV"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Exportar CSV ({filteredEvents.length})</span>
+                    </button>
+
                     {/* Modal Filter Trigger Button */}
                     <button
                       onClick={() => setFilterModalOpen(true)}
                       className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-xs font-bold flex items-center space-x-1.5 cursor-pointer transition-all shadow-sm"
                     >
                       <Filter className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Filtrar Visualização</span>
+                      <span>Filtrar</span>
                     </button>
 
                     <button

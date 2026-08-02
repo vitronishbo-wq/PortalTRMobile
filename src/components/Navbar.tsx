@@ -114,11 +114,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             {onOpenInstallModal && (
               <button
                 onClick={onOpenInstallModal}
-                className="p-2 sm:p-2.5 rounded-xl bg-emerald-500/25 hover:bg-emerald-500/40 text-emerald-300 border border-emerald-400/60 shadow-md shadow-emerald-500/20 cursor-pointer flex items-center justify-center transition-all shrink-0"
+                className="p-2 sm:p-2.5 rounded-xl bg-amber-500/25 hover:bg-amber-500/40 text-amber-300 border border-amber-400/60 shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center transition-all shrink-0"
                 title="Instalar Aplicação"
                 aria-label="Instalar Aplicação"
               >
-                <Download className="w-4 h-4 text-emerald-300 animate-pulse" />
+                <Download className="w-4 h-4 text-amber-300 animate-pulse" />
               </button>
             )}
 
