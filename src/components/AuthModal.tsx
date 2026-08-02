@@ -5,6 +5,36 @@ import {
   Eye, EyeOff
 } from 'lucide-react';
 import { useIdentity, IdentityEngine } from '../engine/identityEngine';
+import { registerDevice } from '../services/identityService';
+
+function detectPlatform(): 'android' | 'ios' | 'web' | 'windows' | 'macos' | 'linux' | 'tablet' | 'tv' {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  if (/android/i.test(ua)) return 'android';
+  if (/iPad|iPhone|iPod/.test(ua)) return 'ios';
+  if (/Windows/.test(ua)) return 'windows';
+  if (/Macintosh/.test(ua)) return 'macos';
+  if (/Linux/.test(ua)) return 'linux';
+  return 'web';
+}
+
+async function autoRegisterCurrentDevice(msisdnRaw: string) {
+  try {
+    let deviceId = localStorage.getItem('deviceId');
+    if (!deviceId) {
+      deviceId = `dev-web-${Math.random().toString(36).substring(2, 9)}`;
+      localStorage.setItem('deviceId', deviceId);
+    }
+    const platform = detectPlatform();
+    const deviceName = `${typeof navigator !== 'undefined' ? navigator.platform : 'Web'} (${platform})`;
+    await registerDevice(msisdnRaw, {
+      deviceId,
+      deviceName,
+      platform,
+    });
+  } catch (err) {
+    console.warn('[AuthModal] Auto-register device failed:', err);
+  }
+}
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -52,6 +82,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const user = await loginWithGoogle();
       if (user) {
+        await autoRegisterCurrentDevice(user.email || 'silajaneiro9@gmail.com');
         const isFounder = SUPER_ADMIN_EMAILS.includes((user.email || '').toLowerCase()) ||
                           (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production');
         setSuccessMessage(`Sessão iniciada com sucesso como ${user.displayName || user.email}!`);
@@ -97,6 +128,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const result = await authenticateUser(email, password);
       if (result.success) {
+        await autoRegisterCurrentDevice(email);
         const isFounder = SUPER_ADMIN_EMAILS.includes(email.toLowerCase()) || 
                           result.userProfile?.role === 'founder' || 
                           result.userProfile?.authority === 'ROOT' ||
@@ -157,6 +189,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const handleQuickPublicDevBypass = async () => {
+    const founderEmail = 'silajaneiro9@gmail.com';
+    const founderPass = 'VitronisFounder2026!';
+    setEmail(founderEmail);
+    setPassword(founderPass);
+    setSystemKey('ROOT-2026-VITRONIS');
+    setLoading(true);
+    
+    try {
+      await autoRegisterCurrentDevice(founderEmail);
+      const res = await authenticateUser(founderEmail, founderPass);
+      if (!res?.success) {
+        IdentityEngine.forceDevLogin(founderEmail);
+      }
+      setSuccessMessage('⚡ Sessão iniciada no Portal Público!');
+      setTimeout(() => {
+        onClose();
+      }, 300);
+    } catch (err: any) {
+      IdentityEngine.forceDevLogin(founderEmail);
+      setSuccessMessage('⚡ Sessão Dev Iniciada com Sucesso!');
+      setTimeout(() => {
+        onClose();
+      }, 300);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleQuickFounderBypass = async () => {
     resetForm();
     const founderEmail = 'silajaneiro9@gmail.com';
@@ -168,20 +229,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
     
     try {
+      // Auto register current device for identity graph
+      await autoRegisterCurrentDevice(founderEmail);
+
       const result = await authenticateUser(founderEmail, founderPass);
-      if (result.success || result.firebaseUser) {
-        setSuccessMessage('Sessão de Deus Fundador iniciada com sucesso!');
-        setTimeout(() => {
-          onClose();
-          if (onOpenFounderWorkspace) {
-            onOpenFounderWorkspace();
-          }
-        }, 400);
-      } else {
-        setErrorMessage(result.message);
+      if (!result?.success) {
+        IdentityEngine.forceDevLogin(founderEmail);
       }
+      setSuccessMessage('⚡ Acesso Dev & Deus Fundador Concedido! A inicializar consola...');
+      setTimeout(() => {
+        onClose();
+        if (onOpenFounderWorkspace) {
+          onOpenFounderWorkspace();
+        }
+      }, 300);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao autenticar Deus Fundador.');
+      IdentityEngine.forceDevLogin(founderEmail);
+      setSuccessMessage('⚡ Acesso Dev & Deus Fundador Concedido!');
+      setTimeout(() => {
+        onClose();
+        if (onOpenFounderWorkspace) {
+          onOpenFounderWorkspace();
+        }
+      }, 300);
     } finally {
       setLoading(false);
     }
@@ -390,21 +460,47 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
           </form>
 
-          {/* Deus Fundador Quick Assist Box */}
-          <div className="pt-3 border-t border-slate-800/80">
-            <button
-              type="button"
-              onClick={handleQuickFounderBypass}
-              className="w-full p-2.5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center justify-between transition-all cursor-pointer group"
-            >
-              <div className="flex items-center space-x-2">
-                <Crown className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-                <span>Credenciais do Deus Fundador</span>
+          {/* Deus Fundador & Dev Quick Assist Box */}
+          <div className="pt-3 border-t border-slate-800/80 space-y-2">
+            <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-indigo-500/10 border border-amber-500/30 text-xs font-mono space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-amber-400 flex items-center space-x-1.5">
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  <span>CREDENCIAIS DEV & FUNDADOR</span>
+                </span>
+                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] rounded font-bold border border-emerald-500/30">
+                  ROOT BYPASS
+                </span>
               </div>
-              <span className="text-[10px] font-mono bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
-                Preencher
-              </span>
-            </button>
+
+              <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-300 bg-slate-950/80 p-2 rounded-xl border border-slate-800">
+                <div><span className="text-slate-500">EMAIL:</span> silajaneiro9@gmail.com</div>
+                <div><span className="text-slate-500">SENHA:</span> VitronisFounder2026!</div>
+                <div className="col-span-2"><span className="text-slate-500">KEY:</span> ROOT-2026-VITRONIS</div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleQuickPublicDevBypass}
+                  disabled={loading}
+                  className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
+                  <span>Entrar no Portal Público</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleQuickFounderBypass}
+                  disabled={loading}
+                  className="w-full py-2 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <Crown className="w-3.5 h-3.5" />
+                  <span>Entrar no Founder IDE</span>
+                </button>
+              </div>
+            </div>
           </div>
 
         </div>

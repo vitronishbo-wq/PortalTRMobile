@@ -18,6 +18,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { MultiDeviceMeshEngine, DeviceNode, PlatformType, MultiDeviceUnifiedSession } from '../engine/multiDeviceMeshEngine';
+import { QRCodePairing } from './QRCodePairing';
 
 export const MultiDeviceMeshView: React.FC = () => {
   const [session, setSession] = useState<MultiDeviceUnifiedSession | null>(MultiDeviceMeshEngine.getActiveSession());
@@ -207,6 +208,11 @@ export const MultiDeviceMeshView: React.FC = () => {
               <span>Conectar ao Mesh Unificado</span>
             </button>
           </form>
+
+          {/* Zero-Touch QR Code Pairing Section */}
+          <div className="pt-4 border-t border-slate-800 space-y-3">
+            <QRCodePairing msisdn={phoneNumber.replace(/\s+/g, '')} />
+          </div>
 
           {/* Shared Clipboard Feature */}
           <div className="pt-4 border-t border-slate-800 space-y-3">

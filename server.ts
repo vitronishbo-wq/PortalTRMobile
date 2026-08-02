@@ -10,6 +10,7 @@ import { retryQueue } from './src/services/retryQueue.js';
 import { dlqAlertService } from './src/services/dlqAlertService.js';
 import { queuePersistenceEngine } from './src/services/queuePersistence.js';
 import { WebhookRetryQueueEngine } from './src/services/webhookRetryQueue.js';
+import { generatePairingToken, claimPairingToken, getIdentity, updateDeviceHeartbeat } from './src/services/identityService.js';
 import { ApiGatewayRateLimiter } from './src/services/apiGatewayRateLimiter.js';
 import { apiGateway, apiGatewayMiddleware, requireApiKey } from './src/middleware/apiGateway.js';
 import { requireFounder } from './src/middleware/founderAuth.js';
@@ -160,6 +161,80 @@ app.post('/api/automation/rules', (req, res) => {
     rule,
     message: `Regra '${rule.name}' criada com sucesso!`
   });
+});
+
+// --- FASE 1: IDENTITY GRAPH & ZERO-TOUCH PAIRING ENDPOINTS ---
+app.post('/api/v1/pair/generate', async (req, res) => {
+  try {
+    const { msisdn, workspaceId } = req.body;
+    if (!msisdn) {
+      return res.status(400).json({ error: 'msisdn é obrigatório' });
+    }
+    const targetWorkspace = workspaceId || 'ws-vitronis-default';
+    const token = await generatePairingToken(msisdn, targetWorkspace);
+    const host = req.headers.host || 'localhost:3000';
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    res.json({
+      token,
+      qrContent: `${protocol}://${host}/pair?token=${token}`,
+      expiresIn: 300,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/v1/pair/claim', async (req, res) => {
+  try {
+    const { token, deviceName, platform, publicKey, pushToken, deviceId } = req.body;
+    if (!token || !deviceName || !platform) {
+      return res.status(400).json({ error: 'token, deviceName e platform são obrigatórios' });
+    }
+
+    const assignedDeviceId = deviceId || `dev-paired-${Math.random().toString(36).substring(2, 9)}`;
+    const result = await claimPairingToken(token, {
+      deviceId: assignedDeviceId,
+      deviceName,
+      platform,
+      publicKey: publicKey || '',
+      pushToken: pushToken || '',
+    });
+
+    res.json({
+      success: true,
+      msisdn: result.msisdn,
+      workspaceId: result.workspaceId,
+      deviceId: result.deviceId,
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/v1/identity/heartbeat', async (req, res) => {
+  try {
+    const { msisdn, deviceId } = req.body;
+    if (!msisdn || !deviceId) {
+      return res.status(400).json({ error: 'msisdn e deviceId são obrigatórios' });
+    }
+    await updateDeviceHeartbeat(msisdn, deviceId);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/v1/identity/:msisdn', async (req, res) => {
+  try {
+    const { msisdn } = req.params;
+    const identity = await getIdentity(msisdn);
+    if (!identity) {
+      return res.status(404).json({ error: 'Identidade não encontrada' });
+    }
+    res.json(identity);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // --- E2EE CIPHER ENDPOINTS (AES-256-GCM) ---
