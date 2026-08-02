@@ -2,6 +2,10 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { validateViteEnvVars } from '../utils/envValidator';
+
+// Executa a validação de variáveis de ambiente no arranque do Firebase
+validateViteEnvVars();
 
 // Helper helper for safe env retrieval
 const getEnvVar = (key: string, fallback: string): string => {
@@ -24,8 +28,8 @@ export const firebaseConfig = {
   projectId: getEnvVar('FIREBASE_PROJECT_ID', 'portaltrmobile'),
   storageBucket: getEnvVar('FIREBASE_STORAGE_BUCKET', 'portaltrmobile.firebasestorage.app'),
   messagingSenderId: getEnvVar('FIREBASE_MESSAGING_SENDER_ID', '703051403619'),
-  appId: getEnvVar('FIREBASE_APP_ID', '1:703051403619:web:26f152ba7d9468e60bc356'),
-  measurementId: getEnvVar('FIREBASE_MEASUREMENT_ID', 'G-E0XC9ZC157')
+  appId: getEnvVar('FIREBASE_APP_ID', '1:703051403619:web:f4886d2cddaaf0460bc356'),
+  measurementId: getEnvVar('FIREBASE_MEASUREMENT_ID', 'G-WL35V04XQG')
 };
 
 let app: FirebaseApp;
