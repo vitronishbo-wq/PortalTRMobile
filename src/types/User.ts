@@ -9,6 +9,7 @@ export type UserRole =
   | 'admin' 
   | 'operator' 
   | 'user' 
+  | 'dev_client'
   | 'android_agent' 
   | 'integration';
 
@@ -56,14 +57,14 @@ export interface UserProfile extends UserPermissions {
 }
 
 export function resolveRootLevel(role?: UserRole, authority?: string): RootLevel {
-  if (role === 'founder' || authority === 'ROOT') return 'ROOT';
+  if (role === 'founder' || role === 'dev_client' || authority === 'ROOT') return 'ROOT';
   if (role === 'co_founder' || role === 'cto' || role === 'admin' || authority === 'ADMIN') return 'LEVEL_1';
   if (role === 'finance' || role === 'operator' || authority === 'OPERATOR') return 'LEVEL_2';
   return 'LEVEL_3';
 }
 
 export function getDefaultPermissionsForRole(role?: UserRole, authority?: string): UserPermissions {
-  if (role === 'founder' || authority === 'ROOT') {
+  if (role === 'founder' || role === 'dev_client' || authority === 'ROOT') {
     return {
       canDeploy: true,
       canAudit: true,

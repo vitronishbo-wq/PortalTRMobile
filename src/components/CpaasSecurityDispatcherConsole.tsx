@@ -26,7 +26,7 @@ import { ApiGatewayRateLimiter, ApiKeyRecord } from '../services/apiGatewayRateL
 import { NodeSecurityEngine, encryptPayload, decryptPayload } from '../lib/crypto';
 
 export const CpaasSecurityDispatcherConsole: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'DISPATCHER' | 'E2EE' | 'WEBHOOK_RETRY' | 'CPAAS_KEYS'>('DISPATCHER');
+  const [activeTab, setActiveTab] = useState<'DISPATCHER' | 'E2EE' | 'WEBHOOK_RETRY' | 'CPAAS_KEYS' | 'ANDROID_AGENT_SPEC'>('DISPATCHER');
 
   // Command Dispatcher State
   const [commands, setCommands] = useState<OutboundCommand[]>(OutboundCommandDispatcher.getAllCommands());
@@ -174,6 +174,18 @@ export const CpaasSecurityDispatcherConsole: React.FC = () => {
           >
             <Key className="w-3.5 h-3.5" />
             <span>API Gateway & Keys</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ANDROID_AGENT_SPEC')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+              activeTab === 'ANDROID_AGENT_SPEC'
+                ? 'bg-purple-500 text-slate-950 shadow-md shadow-purple-500/20'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            <span>Agente Android Native (Kotlin)</span>
           </button>
         </div>
       </div>
@@ -528,6 +540,154 @@ export const CpaasSecurityDispatcherConsole: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: ANDROID NATIVE AGENT KOTLIN ARCHITECTURE SPEC */}
+      {activeTab === 'ANDROID_AGENT_SPEC' && (
+        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-5 font-mono text-xs">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center space-x-2">
+              <Smartphone className="w-5 h-5 text-purple-400" />
+              <div>
+                <h3 className="font-bold text-slate-100">Agente Android Nativo (Kotlin Architecture Spec)</h3>
+                <p className="text-[10px] text-slate-400">Foreground Service • Android Keystore AES-256-GCM • BroadcastReceivers • WebSocket Auto-Reconnect</p>
+              </div>
+            </div>
+            <span className="text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded">
+              Android 8.0+ (API 26+)
+            </span>
+          </div>
+
+          {/* Directory Tree Spec */}
+          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+            <span className="text-purple-400 font-bold block text-[11px]">📁 Estrutura de Pastas Kotlin (com.vitronis.agent)</span>
+            <pre className="text-[10px] text-slate-300 bg-slate-900 p-3 rounded border border-slate-800 leading-relaxed overflow-x-auto">
+{`app/src/main/java/com/vitronis/agent/
+├── MainActivity.kt
+├── service/
+│   ├── ForegroundService.kt   (WakeLock 10min + NotificationChannel)
+│   ├── NotificationListener.kt(Captura notificações de bancos/BAI/Multicaixa)
+│   ├── SmsReceiver.kt         (Telephony.Sms.SMS_RECEIVED_ACTION)
+│   └── CallReceiver.kt        (Monitoramento de chamadas)
+├── websocket/
+│   ├── WebSocketClient.kt     (OkHttpClient + ping interval 30s + auto-reconnect)
+│   └── MessageHandler.kt
+├── crypto/
+│   ├── AES256GCM.kt           (Cipher AES/GCM/NoPadding + AndroidKeyStore)
+│   └── KeyStoreManager.kt
+├── command/
+│   ├── CommandExecutor.kt     (Execução de SMS, USSD e chamadas)
+│   └── SmsSender.kt
+└── model/
+    ├── COSEvent.kt
+    └── DeviceCapabilities.kt`}
+            </pre>
+          </div>
+
+          {/* Code Tabs Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* AES-256-GCM Spec */}
+            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-indigo-400 font-bold text-[11px]">AES256GCM.kt (Keystore + PBKDF2)</span>
+                <span className="text-[9px] text-slate-500">javax.crypto</span>
+              </div>
+              <pre className="text-[9px] text-slate-300 bg-slate-900 p-2.5 rounded border border-slate-800 max-h-48 overflow-y-auto">
+{`class AES256GCM(private val keystore: KeyStore) {
+    fun encrypt(plaintext: String, secret: String): EncryptedPayload {
+        val key = deriveKey(secret)
+        val iv = ByteArray(12)
+        SecureRandom().nextBytes(iv)
+        
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
+        val ciphertext = cipher.doFinal(plaintext.toByteArray())
+        
+        return EncryptedPayload(
+            iv = Base64.encodeToString(iv, Base64.NO_WRAP),
+            ciphertext = Base64.encodeToString(ciphertext, Base64.NO_WRAP),
+            authTag = Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP)
+        )
+    }
+}`}
+              </pre>
+            </div>
+
+            {/* Foreground Service Spec */}
+            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-emerald-400 font-bold text-[11px]">ForegroundService.kt (WakeLock)</span>
+                <span className="text-[9px] text-slate-500">android.app.Service</span>
+              </div>
+              <pre className="text-[9px] text-slate-300 bg-slate-900 p-2.5 rounded border border-slate-800 max-h-48 overflow-y-auto">
+{`class ForegroundService : Service() {
+    private lateinit var wakeLock: PowerManager.WakeLock
+    
+    override fun onCreate() {
+        super.onCreate()
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "Vitronis:COSWakeLock"
+        )
+        wakeLock.acquire(10 * 60 * 1000L)
+        startForeground(1, createNotification())
+    }
+}`}
+              </pre>
+            </div>
+
+            {/* SmsReceiver Spec */}
+            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-amber-400 font-bold text-[11px]">SmsReceiver.kt (SMS Banking Listener)</span>
+                <span className="text-[9px] text-slate-500">BroadcastReceiver</span>
+              </div>
+              <pre className="text-[9px] text-slate-300 bg-slate-900 p-2.5 rounded border border-slate-800 max-h-48 overflow-y-auto">
+{`class SmsReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
+            val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+            for (msg in messages) {
+                val event = COSEvent(
+                    eventId = UUID.randomUUID().toString(),
+                    type = EventType.SMS,
+                    payload = mapOf("body" to msg.messageBody, "sender" to msg.displayOriginatingAddress)
+                )
+                sendToServer(event)
+            }
+        }
+    }
+}`}
+              </pre>
+            </div>
+
+            {/* WebSocket Client Spec */}
+            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sky-400 font-bold text-[11px]">WebSocketClient.kt (OkHttp Realtime)</span>
+                <span className="text-[9px] text-slate-500">okhttp3.WebSocket</span>
+              </div>
+              <pre className="text-[9px] text-slate-300 bg-slate-900 p-2.5 rounded border border-slate-800 max-h-48 overflow-y-auto">
+{`class WebSocketClient(val serverUrl: String, val nodeId: String) {
+    private val client = OkHttpClient.Builder()
+        .pingInterval(30, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
+        
+    fun connect() {
+        val request = Request.Builder().url("$serverUrl/ws?nodeId=$nodeId").build()
+        webSocket = client.newWebSocket(request, object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                handleCommand(Gson().fromJson(text, Map::class.java))
+            }
+        })
+    }
+}`}
+              </pre>
             </div>
           </div>
         </div>

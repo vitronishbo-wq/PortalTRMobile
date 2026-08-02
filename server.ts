@@ -6,8 +6,13 @@ import { AutomationEngine } from './src/services/automationEngine.js';
 import { NodeSecurityEngine, encryptPayload, decryptPayload } from './src/lib/crypto.js';
 import { OutboundCommandDispatcher, OutboundCommandType } from './src/services/commandDispatcher.js';
 import { commandQueue } from './src/services/commandQueue.js';
+import { retryQueue } from './src/services/retryQueue.js';
+import { dlqAlertService } from './src/services/dlqAlertService.js';
+import { queuePersistenceEngine } from './src/services/queuePersistence.js';
 import { WebhookRetryQueueEngine } from './src/services/webhookRetryQueue.js';
 import { ApiGatewayRateLimiter } from './src/services/apiGatewayRateLimiter.js';
+import { apiGateway, apiGatewayMiddleware, requireApiKey } from './src/middleware/apiGateway.js';
+import { requireFounder } from './src/middleware/founderAuth.js';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -45,6 +50,19 @@ function broadcastSSE(event: InFlightEvent) {
     }
   });
 }
+
+// Connect retry queue to SSE broadcaster
+retryQueue.setBroadcaster((data) => {
+  broadcastSSE({
+    eventId: `dlq-${Date.now()}`,
+    workspaceId: 'ws-vitronis-default',
+    nodeId: 'cloud-server',
+    type: 'DLQ_ALERT',
+    payload: data,
+    timestamp: Date.now(),
+    receivedAt: Date.now()
+  });
+});
 
 // Flush Memory Queue to Firestore (Simulated Batch Write optimization - reduces Firestore writes by >90%)
 function flushMemoryQueue() {
@@ -171,7 +189,7 @@ app.post('/api/v1/crypto/decrypt', (req, res) => {
 });
 
 // --- OUTBOUND COMMAND DISPATCHER ENDPOINTS ---
-app.post('/api/v1/commands/dispatch', (req, res) => {
+app.post('/api/v1/commands/dispatch', apiGatewayMiddleware, (req, res) => {
   const { nodeId, type, recipient, message, payload } = req.body;
   if (!nodeId || !type || !recipient) {
     return res.status(400).json({ success: false, message: 'nodeId, type e recipient são obrigatórios.' });
@@ -188,20 +206,20 @@ app.post('/api/v1/commands/dispatch', (req, res) => {
   res.json({ success: true, command, message: `Comando ${type} enfileirado para o nó ${nodeId}.` });
 });
 
-app.get('/api/v1/commands/poll', (req, res) => {
+app.get('/api/v1/commands/poll', apiGatewayMiddleware, (req, res) => {
   const nodeId = String(req.query.nodeId || 'node-angola-luanda-01');
   const commands = OutboundCommandDispatcher.getPendingCommandsForNode(nodeId);
   res.json({ success: true, nodeId, pendingCount: commands.length, commands });
 });
 
-app.post('/api/v1/commands/ack', (req, res) => {
+app.post('/api/v1/commands/ack', apiGatewayMiddleware, (req, res) => {
   const { commandId, status, resultPayload, error } = req.body;
   const updated = OutboundCommandDispatcher.acknowledgeCommand(commandId, status, resultPayload, error);
   res.json({ success: true, command: updated });
 });
 
 // --- COMMAND QUEUE NODE API (WEBSOCKET / REST PULL FOR ANDROID AGENT) ---
-app.post('/api/v1/nodes/:nodeId/commands', (req, res) => {
+app.post('/api/v1/nodes/:nodeId/commands', apiGatewayMiddleware, (req, res) => {
   const { nodeId } = req.params;
   const { type, payload, workspaceId } = req.body;
 
@@ -215,29 +233,166 @@ app.post('/api/v1/nodes/:nodeId/commands', (req, res) => {
   res.json({ success: true, commandId, status: 'accepted' });
 });
 
-app.get('/api/v1/nodes/:nodeId/commands/dequeue', (req, res) => {
+app.get('/api/v1/nodes/:nodeId/commands/dequeue', apiGatewayMiddleware, (req, res) => {
   const { nodeId } = req.params;
   const command = commandQueue.dequeue(nodeId);
   res.json({ success: true, nodeId, command });
 });
 
-app.post('/api/v1/nodes/commands/ack', (req, res) => {
-  const { commandId, status, result } = req.body;
-  const acked = commandQueue.acknowledge(commandId, status, result);
+app.get('/api/v1/nodes/:nodeId/commands/next', apiGatewayMiddleware, (req, res) => {
+  const { nodeId } = req.params;
+  const command = commandQueue.dequeue(nodeId);
+  if (!command) {
+    return res.status(204).send();
+  }
+  res.json(command);
+});
+
+app.post('/api/v1/nodes/commands/ack', apiGatewayMiddleware, (req, res) => {
+  const { commandId, status, result, error } = req.body;
+  const acked = commandQueue.acknowledge({ commandId, status, result, error });
+  res.json({ success: true, command: acked });
+});
+
+app.post('/api/v1/commands/ack', (req, res) => {
+  const { commandId, status, result, error } = req.body;
+  const acked = commandQueue.acknowledge({ commandId, status, result, error });
   res.json({ success: true, command: acked });
 });
 
 // --- WEBHOOK RETRY QUEUE ENDPOINTS ---
 app.get('/api/v1/webhooks/queue', (req, res) => {
-  res.json({ success: true, jobs: WebhookRetryQueueEngine.getJobs() });
+  res.json({ success: true, jobs: retryQueue.getJobs() });
 });
 
 app.post('/api/v1/webhooks/dispatch', (req, res) => {
   const { url, payload } = req.body;
   if (!url || !payload) return res.status(400).json({ success: false, message: 'url e payload são obrigatórios' });
 
-  const job = WebhookRetryQueueEngine.enqueueWebhook(url, payload);
-  res.json({ success: true, job, message: 'Webhook agendado com Exponential Backoff.' });
+  const jobId = retryQueue.enqueue(url, payload);
+  res.json({ success: true, jobId, message: 'Webhook agendado com Exponential Backoff.' });
+});
+
+// --- ADMIN RETRY QUEUE & DLQ MONITORING ENDPOINTS (RESTRITO AO FUNDADOR) ---
+app.get('/api/admin/retry-queue/stats', requireFounder, (req, res) => {
+  try {
+    const stats = retryQueue.getStats();
+    res.json(stats);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/retry-queue/deadletter', requireFounder, (req, res) => {
+  try {
+    const jobs = retryQueue.getDeadLetterJobs();
+    res.json(jobs);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/retry-queue/requeue/:jobId', requireFounder, (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const success = retryQueue.requeueFromDeadLetter(jobId);
+    if (!success) {
+      return res.status(404).json({ error: 'Job not found in DLQ' });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/retry-queue/force', requireFounder, (req, res) => {
+  try {
+    retryQueue.forceProcessAll();
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/admin/retry-queue/deadletter', requireFounder, (req, res) => {
+  try {
+    retryQueue.clearDeadLetter();
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/retry-queue/test', requireFounder, (req, res) => {
+  try {
+    const { url, payload } = req.body;
+    if (!url || !payload) return res.status(400).json({ error: 'Missing url or payload' });
+    const jobId = retryQueue.enqueue(url, payload);
+    res.json({ success: true, jobId });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/retry-queue/persistence', requireFounder, (req, res) => {
+  try {
+    const info = queuePersistenceEngine.getDriverInfo();
+    res.json({ success: true, info });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/retry-queue/persistence', requireFounder, async (req, res) => {
+  try {
+    const { driver } = req.body;
+    if (driver && ['file', 'redis', 'dynamodb', 'memory'].includes(driver)) {
+      queuePersistenceEngine.setDriver(driver);
+      await queuePersistenceEngine.saveSnapshot(retryQueue.getJobs(), retryQueue.getDeadLetterJobs());
+      res.json({ success: true, message: `Driver de Persistência alterado para: ${driver}`, info: queuePersistenceEngine.getDriverInfo() });
+    } else {
+      res.status(400).json({ success: false, error: 'Driver inválido. Escolha entre: file, redis, dynamodb, memory' });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- DLQ ALERTS CONFIGURATION & MONITORING (RESTRITO AO FUNDADOR) ---
+app.get('/api/admin/dlq-alerts/config', requireFounder, (req, res) => {
+  try {
+    const config = dlqAlertService.getConfig();
+    res.json({ success: true, config });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/dlq-alerts/config', requireFounder, (req, res) => {
+  try {
+    const updated = dlqAlertService.updateConfig(req.body);
+    res.json({ success: true, config: updated, message: 'Configurações de Alerta DLQ atualizadas com sucesso.' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/admin/dlq-alerts/logs', requireFounder, (req, res) => {
+  try {
+    const logs = dlqAlertService.getAlertLogs();
+    res.json({ success: true, logs });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/dlq-alerts/test', requireFounder, async (req, res) => {
+  try {
+    const alertResult = await dlqAlertService.sendTestAlert();
+    res.json({ success: true, alertResult, message: 'Alerta de teste DLQ disparado!' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // --- CPaaS API GATEWAY WITH RATE LIMITING ---
@@ -277,12 +432,12 @@ app.post('/api/v1/cpaas/sms/send', (req, res) => {
   });
 });
 
-app.get('/api/v1/cpaas/keys', (req, res) => {
+app.get('/api/v1/cpaas/keys', requireFounder, (req, res) => {
   res.json({ success: true, keys: ApiGatewayRateLimiter.getAllApiKeys() });
 });
 
-// POST /api/events/batch - High performance batch receiver for Android Agent with E2EE support
-app.post('/api/events/batch', async (req, res) => {
+// POST /api/events/batch - High performance batch receiver for Android Agent with E2EE support & API Gateway Rate Limiting
+app.post('/api/events/batch', apiGatewayMiddleware, async (req, res) => {
   const { workspaceId, nodeId, encryptedEvents, encryptionSalt, events: rawEvents } = req.body;
   const now = Date.now();
 
@@ -456,7 +611,7 @@ app.post('/api/agent/autodiscovery', (req, res) => {
   });
 });
 
-app.post('/api/export', (req, res) => {
+app.post('/api/export', requireFounder, (req, res) => {
   res.json({
     success: true,
     timestamp: Date.now(),
@@ -469,7 +624,7 @@ app.post('/api/export', (req, res) => {
   });
 });
 
-app.post('/api/backup', (req, res) => {
+app.post('/api/backup', requireFounder, (req, res) => {
   const backupId = `bkp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   res.json({
     success: true,

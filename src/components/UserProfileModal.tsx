@@ -35,37 +35,45 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
     return (localStorage.getItem('user_profile_sync_mode') as 'realtime' | 'economic') || 'realtime';
   });
 
+  const [role, setRole] = useState<string>(() => {
+    return localStorage.getItem('user_profile_role') || userProfile?.role || 'dev_client';
+  });
+
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
 
   // Preset profile choices corresponding to each avatar photo
   const profilePresets = [
     {
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      name: 'Cliente Dev (Tempo Real)',
+      email: 'dev.client@vitronis.co.ao',
+      targetPhone: '+244 999 000 777',
+      accountPlan: 'Cliente Dev (Acesso Total Tempo Real)',
+      role: 'dev_client'
+    },
+    {
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       name: 'Sila Janeiro',
       email: 'silajaneiro9@gmail.com',
       targetPhone: '+244 912 345 678',
-      accountPlan: 'Premium (Ativo - 7 Dias Restantes)'
+      accountPlan: 'Premium (Ativo - 7 Dias Restantes)',
+      role: 'founder'
     },
     {
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
       name: 'Carlos Mendoza',
       email: 'carlos.mendoza@portal.ao',
       targetPhone: '+244 923 112 400',
-      accountPlan: 'Enterprise (Ativo - Licença Vitalícia)'
+      accountPlan: 'Enterprise (Ativo - Licença Vitalícia)',
+      role: 'admin'
     },
     {
       avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
       name: 'Ana Sofia Silva',
       email: 'ana.silva@telecom.co.ao',
       targetPhone: '+244 945 889 201',
-      accountPlan: 'Pro (Ativo - 30 Dias Restantes)'
-    },
-    {
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-      name: 'Mateus Fernandes',
-      email: 'mateus.f@sec-device.org',
-      targetPhone: '+244 991 700 310',
-      accountPlan: 'Standard (Ativo - 15 Dias Restantes)'
+      accountPlan: 'Pro (Ativo - 30 Dias Restantes)',
+      role: 'user'
     }
   ];
 
@@ -77,6 +85,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
       setEmail(selected.email);
       setTargetPhone(selected.targetPhone);
       setAccountPlan(selected.accountPlan);
+      if (selected.role) {
+        setRole(selected.role);
+      }
     }
   };
 
@@ -91,10 +102,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
     localStorage.setItem('user_profile_plan', accountPlan);
     localStorage.setItem('user_profile_avatar', avatarIndex.toString());
     localStorage.setItem('user_profile_sync_mode', syncMode);
+    localStorage.setItem('user_profile_role', role);
 
     // Dispatch event so components can update immediately
     window.dispatchEvent(new CustomEvent('user-profile-updated', {
-      detail: { name, email, targetPhone, accountPlan, syncMode, avatar: profilePresets[avatarIndex]?.avatar }
+      detail: { name, email, targetPhone, accountPlan, syncMode, role, avatar: profilePresets[avatarIndex]?.avatar }
     }));
 
     setSavedSuccess(true);
@@ -277,16 +289,46 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
                 <CreditCard className="w-3.5 h-3.5 text-sky-400" />
-                <span>Conta</span>
+                <span>Conta & Permissões</span>
               </label>
               <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
                 <div>
                   <span className="text-xs font-bold text-amber-400 block">{accountPlan}</span>
-                  <span className="text-[10px] text-slate-500 block">Sincronização Ativa 24/7</span>
+                  <span className="text-[10px] text-slate-500 block">Perfil: {role === 'dev_client' ? 'Cliente Dev (Acesso Total Tempo Real)' : role.toUpperCase()}</span>
                 </div>
                 <div className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
+              </div>
+
+              {/* Quick Dev Client Switcher */}
+              <div className="bg-gradient-to-r from-amber-500/10 to-indigo-500/10 border border-amber-500/30 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-extrabold text-white">Modo Usuário Cliente Dev</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRole('dev_client');
+                      setName('Dev Client (Tempo Real)');
+                      setEmail('dev.client@vitronis.co.ao');
+                      setAccountPlan('Cliente Dev (Acesso Total Tempo Real)');
+                      setSyncMode('realtime');
+                    }}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                      role === 'dev_client'
+                        ? 'bg-amber-500 text-slate-950 font-black'
+                        : 'bg-slate-800 text-amber-400 border border-amber-500/40 hover:bg-slate-700'
+                    }`}
+                  >
+                    {role === 'dev_client' ? '⚡ CLIENTE DEV ATIVO' : 'ATIVAR MODO CLIENTE DEV'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Ativa o acesso instantâneo a eventos, comandos outbound, E2EE e barra de stream SSE em tempo real.
+                </p>
               </div>
             </div>
 

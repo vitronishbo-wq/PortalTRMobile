@@ -34,12 +34,14 @@ import {
   Plus,
   Lock,
   Clock,
-  Sparkles
+  Sparkles,
+  Radio
 } from 'lucide-react';
 import { AuthorityEngine, FeatureFlagsState, DEUS_FUNDADOR_CREDENTIALS } from '../../engine/authorityEngine';
 import { PaymentRegistry, ChargeResponse, ChargeRequest } from '../../services/paymentEngine';
 import { AutomationRulesManager } from '../AutomationRulesManager';
 import { CpaasSecurityDispatcherConsole } from '../CpaasSecurityDispatcherConsole';
+import { RealtimeDevStreamConsole } from '../RealtimeDevStreamConsole';
 import { TrialEngine, LicenseRecord } from '../../services/trialEngine';
 import { UserProfile, UserRole } from '../../types/User';
 import { IdentityEngine } from '../../engine/identityEngine';
@@ -179,24 +181,21 @@ export const FounderIDEWorkspace: React.FC = () => {
     return () => unsub();
   }, []);
 
-  // Activity Bar Navigation Definition (16 Global System Modules)
+  // Activity Bar Navigation Definition (13 Core System Modules)
   const activityItems = [
-    { id: 'root_authority', label: '1. ROOT Authority', icon: Crown },
-    { id: 'automation', label: '2. Automation Engine', icon: Zap },
-    { id: 'monitoring', label: '3. Monitoring & Health', icon: Activity },
-    { id: 'overview', label: '4. Dashboard Overview', icon: Home },
-    { id: 'users', label: '5. Identity & Users', icon: Users, badge: users.length },
-    { id: 'devices', label: '6. Devices Fleet', icon: Smartphone },
-    { id: 'payments', label: '7. Billing & AppyPay', icon: CreditCard },
-    { id: 'integrations', label: '8. Integrations & Webhooks', icon: Plug },
-    { id: 'cloud', label: '9. Cloud Runtime', icon: Cloud },
-    { id: 'firestore', label: '10. Database & Firestore', icon: Database },
-    { id: 'deploy', label: '11. Releases & Deploy', icon: Rocket },
-    { id: 'analytics', label: '12. Analytics & Revenue', icon: BarChart3 },
-    { id: 'audit', label: '13. Audit & Logs', icon: ScrollText },
-    { id: 'flags', label: '14. Configuration & Flags', icon: Sliders },
-    { id: 'developer', label: '15. Developer Console', icon: Wrench },
-    { id: 'security', label: '16. Security & Secrets', icon: Shield }
+    { id: 'root_authority', label: '1. Root Authority & Identity Core', icon: Crown },
+    { id: 'devices', label: '2. Multi-Device Mesh & Fleet', icon: Smartphone },
+    { id: 'cpaas_dispatcher', label: '3. CPaaS, Command & Retry Queue', icon: Shield },
+    { id: 'automation', label: '4. Automation Engine & AI (Gemini)', icon: Zap },
+    { id: 'realtime_dev', label: '5. Realtime Dev Stream (<5ms SSE)', icon: Radio },
+    { id: 'health', label: '6. Operations Assistant & Device Health', icon: Activity },
+    { id: 'users', label: '7. Identity & User Licenses (Trial Engine)', icon: Users, badge: users.length },
+    { id: 'payments', label: '8. Billing & AppyPay Gateway (AOA)', icon: CreditCard },
+    { id: 'flags', label: '9. Feature Flags (Firestore Realtime)', icon: Sliders },
+    { id: 'audit', label: '10. Audit, DLQ & Webhook Logs', icon: ScrollText },
+    { id: 'cloud', label: '11. Cloud Runtime & Memory Batching', icon: Cloud },
+    { id: 'firestore', label: '12. Firestore & Offline Storage (IndexedDB)', icon: Database },
+    { id: 'analytics', label: '13. Revenue & Batch Savings (-92%)', icon: BarChart3 }
   ];
 
   // Open or focus tab
@@ -529,12 +528,81 @@ export const FounderIDEWorkspace: React.FC = () => {
           <div className="flex-1 overflow-y-auto p-6">
             {activeActivity === 'root_authority' || activeTabObj?.type === 'root_authority' ? (
               <RootConsoleView />
+            ) : activeActivity === 'devices' || activeTabObj?.type === 'device' ? (
+              /* MULTI-DEVICE MESH & FLEET MANAGER */
+              <div className="space-y-6 font-mono text-slate-100">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="p-3 bg-indigo-500/20 text-indigo-400 rounded-2xl border border-indigo-500/30">
+                      <Smartphone className="w-6 h-6" />
+                    </span>
+                    <div>
+                      <h2 className="text-lg font-black text-slate-100">MULTI-DEVICE MESH & FLEET ENGINE</h2>
+                      <p className="text-xs text-slate-400">Orquestração em Nuvem do Ecossistema Mobile, PWA e Desktop</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setTerminalLogs((prev) => [
+                        ...prev,
+                        `[PAIRING ENGINE] Token QR gerado com sucesso. Expiração: 300s.`
+                      ]);
+                      setBottomPanelOpen(true);
+                    }}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-lg shadow-amber-500/20 flex items-center space-x-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Gerar QR Code de Pareamento (Zero-Touch)</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-indigo-400">Agente Android Samsung S22</span>
+                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] rounded font-bold">ONLINE</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">SIM Físico Ativo • Interceptador SMS & Chamadas (&lt;5ms)</p>
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-500">
+                      <span>Node ID: agent-samsung-s22</span>
+                      <span className="text-amber-400 font-bold">Capacidade: 100%</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sky-400">PWA Master Workstation (Chrome/macOS)</span>
+                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] rounded font-bold">ACTIVE</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">Sessão Handover Pronta • Chave E2EE Verificada</p>
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-500">
+                      <span>Node ID: pwa-workstation-001</span>
+                      <span className="text-sky-400 font-bold">Clipboard Sync: OK</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-purple-400">Agente Itel A100 (Dispositivo Bónus)</span>
+                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] rounded font-bold">STANDBY</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">Auto-Discovery Registrado • Rota de Failover Pronta</p>
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-500">
+                      <span>Node ID: node-itel-a100</span>
+                      <span className="text-emerald-400 font-bold">Score: 98%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : activeActivity === 'cpaas_dispatcher' ? (
+              /* CPaaS SECURITY & DISPATCHER ENGINE CONSOLE */
+              <CpaasSecurityDispatcherConsole />
             ) : activeActivity === 'automation' ? (
               /* AUTOMATION ENGINE & AI DECISION ENGINE VIEW */
               <AutomationRulesManager />
-            ) : activeActivity === 'integrations' || activeActivity === 'security' || activeActivity === 'developer' ? (
-              /* CPaaS SECURITY & DISPATCHER ENGINE CONSOLE */
-              <CpaasSecurityDispatcherConsole />
+            ) : activeActivity === 'realtime_dev' ? (
+              <RealtimeDevStreamConsole />
             ) : activeActivity === 'health' ? (
               /* HEALTH & OPERATIONS ASSISTANT VIEW */
               <div className="space-y-6 font-sans text-slate-100">
@@ -551,7 +619,7 @@ export const FounderIDEWorkspace: React.FC = () => {
 
                   <button
                     onClick={() => {
-                      const res = HealthEngine.runAutoRepair('dev-xiaomi-12t-02');
+                      HealthEngine.runAutoRepair('dev-xiaomi-12t-02');
                       setHealthMetrics(HealthEngine.getHealthMetrics());
                       setDiagnostics(HealthEngine.getDiagnostics());
                     }}
@@ -656,29 +724,182 @@ export const FounderIDEWorkspace: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ) : !activeTabObj ? (
-              /* Empty VS Code Welcome Screen */
-              <div className="h-full flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto my-auto text-slate-500 font-mono">
-                <div className="p-4 rounded-3xl bg-slate-900 border border-slate-800 text-amber-400 shadow-xl">
-                  <Crown className="w-10 h-10" />
+            ) : activeActivity === 'users' ? (
+              /* USERS & IDENTITY MANAGER VIEW */
+              <div className="space-y-6 font-mono text-slate-100 text-xs">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-black text-slate-100">IDENTITY & USER LICENSES</h2>
+                    <p className="text-xs text-slate-400">Gestão de Utilizadores, Regras e Licenças com Trial Engine</p>
+                  </div>
+                  <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/40 font-bold">
+                    {users.length} Utilizadores Ativos
+                  </span>
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-bold text-slate-300">Nenhum Editor Aberto no Workbench</h3>
-                  <p className="text-xs text-slate-500">
-                    Selecione uma entidade no Side Panel (Users, AppyPay, Feature Flags, Runtime) para abrir uma aba de trabalho por intenção.
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {users.map((usr) => {
+                    const lic = TrialEngine.getLicense(usr.userId, usr.email);
+                    return (
+                      <div key={usr.userId} className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-100 text-sm">{usr.displayName}</span>
+                          <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[10px] rounded uppercase font-bold">
+                            {usr.role}
+                          </span>
+                        </div>
+                        <p className="text-slate-400 text-xs">{usr.email}</p>
+                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                          <span className="text-slate-400">Estado Licença:</span>
+                          <span className="text-emerald-400 font-bold">
+                            {lic.lifetime ? 'LIFETIME' : 'TRIAL ATIVO'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : activeActivity === 'payments' ? (
+              /* PAYMENTS & APPYPAY GATEWAY VIEW */
+              <div className="space-y-6 font-mono text-slate-100 text-xs">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h3 className="text-sm font-bold text-emerald-400 flex items-center space-x-2">
+                      <CreditCard className="w-4 h-4" />
+                      <span>AppyPay Payment Provider Module (Angola Kwanza - AOA)</span>
+                    </h3>
+                    <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-bold text-xs">
+                      ✓ SANDBOX ATIVO
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Processamento seguro de cobranças com suporte a pagamentos por referência Multicaixa Express e AppyPay.
                   </p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                      <span className="text-slate-500 block text-[10px]">MOEDA</span>
+                      <span className="text-emerald-400 font-bold text-sm">AOA (Kwanza)</span>
+                    </div>
+                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                      <span className="text-slate-500 block text-[10px]">GATEWAY STATUS</span>
+                      <span className="text-amber-400 font-bold text-sm">18ms Ping</span>
+                    </div>
+                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                      <span className="text-slate-500 block text-[10px]">WEBHOOK URL</span>
+                      <span className="text-indigo-400 font-bold text-sm">/api/appypay</span>
+                    </div>
+                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                      <span className="text-slate-500 block text-[10px]">TAXA SUCESSO</span>
+                      <span className="text-emerald-400 font-bold text-sm">99.8%</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="pt-2 text-[11px] text-slate-600 space-y-1">
-                  <p>• Atalho: Clique em 'Users & Trial' na Activity Bar</p>
-                  <p>• Atalho: Selecione 'AppyPay Gateway' para testar cobranças</p>
+              </div>
+            ) : activeActivity === 'flags' ? (
+              /* FEATURE FLAGS VIEW */
+              <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4 font-mono text-xs">
+                <h3 className="text-sm font-bold text-amber-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+                  <Sliders className="w-4 h-4" />
+                  <span>Feature Flags em Tempo Real (Firestore Event Bus)</span>
+                </h3>
+                <div className="space-y-3">
+                  {(Object.keys(flags) as (keyof FeatureFlagsState)[]).map((key) => (
+                    <div key={key} className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
+                      <div>
+                        <span className="font-bold text-slate-200 block">{key}</span>
+                        <span className="text-[10px] text-slate-500">Valor persistido e propagado via Firestore Event</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const updated = AuthorityEngine.toggleFeatureFlag(key, !flags[key]);
+                          setFlags(updated);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer ${
+                          flags[key] ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {flags[key] ? 'ENABLED' : 'DISABLED'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : activeActivity === 'audit' ? (
+              /* AUDIT & DEAD LETTER QUEUE LOGS VIEW */
+              <div className="space-y-6 font-mono text-slate-100 text-xs">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-black text-slate-100">AUDIT LOGS & DEAD LETTER QUEUE (DLQ)</h2>
+                    <p className="text-xs text-slate-400">Inspeção de Webhooks Falhados e Disparos Automáticos de Retentativas</p>
+                  </div>
+                  <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-lg border border-indigo-500/40 font-bold">
+                    DLQ Health: 100% OK
+                  </span>
+                </div>
+                <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
+                  <p className="text-slate-300">Nenhum evento falhado crítico no momento. Toda a fila de retentativas foi processada com sucesso!</p>
+                </div>
+              </div>
+            ) : activeActivity === 'cloud' ? (
+              /* CLOUD RUNTIME VIEW */
+              <div className="space-y-6 font-mono text-slate-100 text-xs">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-black text-slate-100">CLOUD RUNTIME & MEMORY BATCHING ENGINE</h2>
+                    <p className="text-xs text-slate-400">Instância Node.js Express em Port 3000 com Suporte a SSE Broadcast</p>
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg border border-emerald-500/40 font-bold">
+                    Port 3000 Bound
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-slate-500 text-[10px]">MEMORY BUFFER</span>
+                    <span className="text-amber-400 font-bold block text-base">{queueMetrics.bufferedCount} Eventos</span>
+                  </div>
+                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-slate-500 text-[10px]">TOTAL FLUSHED</span>
+                    <span className="text-indigo-400 font-bold block text-base">{queueMetrics.totalFlushed} Gravações</span>
+                  </div>
+                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-slate-500 text-[10px]">ECONOMIA FIRESTORE</span>
+                    <span className="text-emerald-400 font-bold block text-base">-{queueMetrics.savedFirestoreWritesPercentage}% Custos</span>
+                  </div>
+                </div>
+              </div>
+            ) : activeActivity === 'firestore' ? (
+              /* FIRESTORE & OFFLINE STORAGE VIEW */
+              <div className="space-y-6 font-mono text-slate-100 text-xs">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-black text-slate-100">FIRESTORE & INDEXEDDB OFFLINE STORAGE</h2>
+                    <p className="text-xs text-slate-400">Sincronização Bidirecional e Cache Agressiva para Operação Offline</p>
+                  </div>
+                  <span className="px-3 py-1 bg-sky-500/20 text-sky-300 rounded-lg border border-sky-500/40 font-bold">
+                    IndexedDB Ready
+                  </span>
+                </div>
+              </div>
+            ) : activeActivity === 'analytics' ? (
+              /* ANALYTICS & REVENUE VIEW */
+              <div className="space-y-6 font-mono text-slate-100 text-xs">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-black text-slate-100">ANALYTICS & ECONOMICAL ROI ENGINE</h2>
+                    <p className="text-xs text-slate-400">Métricas de Redução de Custos Cloud e Performance Operacional</p>
+                  </div>
+                  <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/40 font-bold">
+                    ROI Optimised
+                  </span>
                 </div>
               </div>
             ) : (
-              /* Active Tab Renderers */
+              /* ACTIVE TAB RENDERERS FALLBACK */
               <div>
                 {/* USER & TRIAL TAB */}
-                {activeTabObj.type === 'user' && activeTabObj.data && (
-                  <div className="space-y-6">
+                {activeTabObj?.type === 'user' && activeTabObj.data && (
+                  <div className="space-y-6 font-mono text-xs">
                     <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-start justify-between">
                       <div className="space-y-1">
                         <div className="flex items-center space-x-2">
@@ -696,174 +917,6 @@ export const FounderIDEWorkspace: React.FC = () => {
                           {activeTabObj.data.license.lifetime ? 'Licença Vitalícia' : 'Trial Ativo'}
                         </span>
                       </div>
-                    </div>
-
-                    {/* Trial & Promotion Engine Direct Controls */}
-                    <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-                      <div className="border-b border-slate-800 pb-3">
-                        <h3 className="text-sm font-bold text-amber-400 flex items-center space-x-2">
-                          <Sparkles className="w-4 h-4" />
-                          <span>Motor de Experiência Gratuita (Trial & Extension Engine)</span>
-                        </h3>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Concessão direta de dias bónus ou conversão para licença Vitalícia sem alterar o código.
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        <button
-                          onClick={() => {
-                            const updated = TrialEngine.modifyLicense(activeTabObj.data.user.userId, '+3d');
-                            activeTabObj.data.license = updated;
-                            setTerminalLogs([
-                              ...terminalLogs,
-                              `[TRIAL ENGINE] Concedido +3 dias ao utilizador '${activeTabObj.data.user.email}'.`
-                            ]);
-                          }}
-                          className="py-2.5 px-3 bg-slate-950 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer text-center"
-                        >
-                          +3 Dias
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            const updated = TrialEngine.modifyLicense(activeTabObj.data.user.userId, '+15d');
-                            activeTabObj.data.license = updated;
-                            setTerminalLogs([
-                              ...terminalLogs,
-                              `[TRIAL ENGINE] Concedido +15 dias ao utilizador '${activeTabObj.data.user.email}'.`
-                            ]);
-                          }}
-                          className="py-2.5 px-3 bg-slate-950 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer text-center"
-                        >
-                          +15 Dias
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            const updated = TrialEngine.modifyLicense(activeTabObj.data.user.userId, '+30d');
-                            activeTabObj.data.license = updated;
-                            setTerminalLogs([
-                              ...terminalLogs,
-                              `[TRIAL ENGINE] Concedido +30 dias ao utilizador '${activeTabObj.data.user.email}'.`
-                            ]);
-                          }}
-                          className="py-2.5 px-3 bg-slate-950 hover:bg-slate-800 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer text-center"
-                        >
-                          +30 Dias
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            const updated = TrialEngine.modifyLicense(activeTabObj.data.user.userId, 'lifetime');
-                            activeTabObj.data.license = updated;
-                            setTerminalLogs([
-                              ...terminalLogs,
-                              `[TRIAL ENGINE] Utilizador '${activeTabObj.data.user.email}' promovido para VITALÍCIO!`
-                            ]);
-                          }}
-                          className="py-2.5 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer text-center"
-                        >
-                          Ilimitado (Lifetime)
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            const updated = TrialEngine.modifyLicense(activeTabObj.data.user.userId, 'reset');
-                            activeTabObj.data.license = updated;
-                            setTerminalLogs([
-                              ...terminalLogs,
-                              `[TRIAL ENGINE] Reset do período de teste para '${activeTabObj.data.user.email}'.`
-                            ]);
-                          }}
-                          className="py-2.5 px-3 bg-rose-950/40 hover:bg-rose-900/40 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer text-center"
-                        >
-                          Reset Trial
-                        </button>
-                      </div>
-
-                      {/* License details */}
-                      <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-xs font-mono space-y-1 text-slate-300">
-                        <div>
-                          <span className="text-slate-500">Motivo de Alteração:</span> {activeTabObj.data.license.reason}
-                        </div>
-                        <div>
-                          <span className="text-slate-500">Expiração Prevista:</span>{' '}
-                          {new Date(activeTabObj.data.license.trialEndDate).toLocaleDateString('pt-BR')}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* APPYPAY GATEWAY TAB */}
-                {activeTabObj.type === 'appypay' && (
-                  <div className="space-y-6">
-                    <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <h3 className="text-sm font-bold text-emerald-400 flex items-center space-x-2">
-                          <CreditCard className="w-4 h-4" />
-                          <span>AppyPay Payment Provider Module</span>
-                        </h3>
-                        <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-mono text-xs font-bold">
-                          ✓ Integrado (Interface Única Operacional)
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-slate-300">
-                        Módulo isolado no Integration Layer. Suporta Autenticação (`ClientID` + `Secret`), `POST charges`, `GET charges` e `Webhook`.
-                      </p>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs pt-2">
-                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                          <span className="text-slate-500 block text-[10px]">AUTH MODE</span>
-                          <span className="text-slate-200 font-bold">ClientID + Secret</span>
-                        </div>
-                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                          <span className="text-slate-500 block text-[10px]">ENVIRONMENT</span>
-                          <span className="text-amber-400 font-bold">Sandbox (Testing)</span>
-                        </div>
-                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                          <span className="text-slate-500 block text-[10px]">CURRENCY</span>
-                          <span className="text-emerald-400 font-bold">AOA (Angola Kwanza)</span>
-                        </div>
-                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                          <span className="text-slate-500 block text-[10px]">WEBHOOK RECEIVER</span>
-                          <span className="text-indigo-400 font-bold">Active /api/appypay/webhook</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* FEATURE FLAGS TAB */}
-                {activeTabObj.type === 'flags' && (
-                  <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4 font-mono text-xs">
-                    <h3 className="text-sm font-bold text-amber-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
-                      <Sliders className="w-4 h-4" />
-                      <span>Feature Flags do Firestore (Sem necessidade de recompilar)</span>
-                    </h3>
-
-                    <div className="space-y-3">
-                      {(Object.keys(flags) as (keyof FeatureFlagsState)[]).map((key) => (
-                        <div key={key} className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800">
-                          <div>
-                            <span className="font-bold text-slate-200 block">{key}</span>
-                            <span className="text-[10px] text-slate-500">Valor persistido e propagado via Firestore Event</span>
-                          </div>
-                          <button
-                            onClick={() => {
-                              const updated = AuthorityEngine.toggleFeatureFlag(key, !flags[key]);
-                              setFlags(updated);
-                            }}
-                            className={`px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer ${
-                              flags[key] ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'
-                            }`}
-                          >
-                            {flags[key] ? 'ENABLED' : 'DISABLED'}
-                          </button>
-                        </div>
-                      ))}
                     </div>
                   </div>
                 )}

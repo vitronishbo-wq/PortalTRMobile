@@ -1,3 +1,5 @@
+import { retryQueue } from './retryQueue';
+
 export interface RuleCondition {
   field: 'type' | 'payload.body' | 'payload.title' | 'payload.sender' | 'aiCategory';
   operator: 'CONTAINS' | 'EQUALS' | 'STARTS_WITH' | 'NOT_CONTAINS' | 'REGEX';
@@ -303,27 +305,19 @@ export class AutomationEngine {
         if (rule.actionConfig?.type === 'WEBHOOK' && rule.actionConfig.webhookUrl) {
           const webhookUrl = rule.actionConfig.webhookUrl;
           try {
-            // Attempt fetch if in browser or server
-            if (typeof fetch !== 'undefined') {
-              const res = await fetch(webhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  ruleId: rule.id,
-                  ruleName: rule.name,
-                  triggeredAt: now,
-                  event
-                })
-              }).catch((e) => null);
+            const payload = {
+              ruleId: rule.id,
+              ruleName: rule.name,
+              event,
+              triggeredAt: now
+            };
 
-              if (res) {
-                actionOutput = `HTTP ${res.status} ${res.statusText} -> Webhook disparado para ${webhookUrl}`;
-              } else {
-                actionOutput = `Simulação Webhook POST enviado com sucesso para ${webhookUrl}`;
-              }
-            } else {
-              actionOutput = `Webhook POST encaminhado para ${webhookUrl}`;
-            }
+            const jobId = retryQueue.enqueue(webhookUrl, payload, {
+              'X-Vitronis-Rule-Id': rule.id,
+              'X-Vitronis-Event-Id': event.eventId || `evt-${now}`
+            });
+
+            actionOutput = `Webhook enfileirado na Retry Queue (Job ID: ${jobId}) para ${webhookUrl}`;
           } catch (e: any) {
             resultStatus = 'FAILED';
             actionOutput = `Erro no Webhook (${webhookUrl}): ${e.message}`;

@@ -25,12 +25,15 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Radio
 } from 'lucide-react';
 import { TrialEngine, LicenseRecord } from '../../services/trialEngine';
 import { useIdentity, IdentityEngine } from '../../engine/identityEngine';
 import { exportEventsToCsv } from '../../lib/csvExporter';
 import { SwipeableEventCard, DeviceEvent } from '../SwipeableEventCard';
+import { RealtimeDevStreamConsole } from '../RealtimeDevStreamConsole';
+import { MultiDeviceMeshView } from '../MultiDeviceMeshView';
 
 const SUPER_ADMIN_EMAILS = [
   'silajaneiro9@gmail.com',
@@ -59,7 +62,7 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
 
   const [guestDismissed, setGuestDismissed] = useState<boolean>(false);
   const [pinEnabled, setPinEnabled] = useState<boolean>(false);
-  const [activePublicTab, setActivePublicTab] = useState<'timeline' | 'search' | 'favorites' | 'devices' | null>('timeline');
+  const [activePublicTab, setActivePublicTab] = useState<'timeline' | 'search' | 'favorites' | 'devices' | 'realtime_dev' | 'mesh' | null>('timeline');
 
   // Event Category Filter Modal State
   const [filterModalOpen, setFilterModalOpen] = useState<boolean>(false);
@@ -208,6 +211,32 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
           {/* Quick Actions */}
           <div className="flex items-center gap-2 shrink-0">
             <button
+              onClick={() => setActivePublicTab((prev) => (prev === 'mesh' ? 'timeline' : 'mesh'))}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 shrink-0 ${
+                activePublicTab === 'mesh'
+                  ? 'bg-emerald-500 text-slate-950 font-black shadow-lg shadow-emerald-500/20'
+                  : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30'
+              }`}
+              title="Sessão Unificada Multi-Dispositivo (1 Número)"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+              <span>📱 Mesh 1-Número</span>
+            </button>
+
+            <button
+              onClick={() => setActivePublicTab((prev) => (prev === 'realtime_dev' ? 'timeline' : 'realtime_dev'))}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 shrink-0 ${
+                activePublicTab === 'realtime_dev'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20'
+                  : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
+              }`}
+              title="Acesso Console Cliente Dev Stream Tempo Real"
+            >
+              <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+              <span>⚡ Stream Dev</span>
+            </button>
+
+            <button
               onClick={handleLogout}
               className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
               title="Sair"
@@ -314,6 +343,16 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
               </div>
             ) : (
               <>
+                {/* TAB: MESH UNIFICADO MULTI-DISPOSITIVO */}
+                {activePublicTab === 'mesh' && (
+                  <MultiDeviceMeshView />
+                )}
+
+                {/* TAB: REALTIME DEV STREAM CONSOLE */}
+                {activePublicTab === 'realtime_dev' && (
+                  <RealtimeDevStreamConsole />
+                )}
+
                 {/* TAB: TIMELINE */}
             {activePublicTab === 'timeline' && (
               <div className="space-y-4">
