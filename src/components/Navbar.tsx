@@ -2,6 +2,7 @@ import React from 'react';
 import { Crown, Zap, Lock, LogOut, KeyRound, UserCheck, Download, Settings, WifiOff, Wifi } from 'lucide-react';
 import { useIdentity } from '../engine/identityEngine';
 import { useOnlineStatus } from '../lib/offlineCache';
+import { TrialEngine } from '../services/trialEngine';
 
 interface NavbarProps {
   workspaceMode: 'public' | 'founder';
@@ -41,13 +42,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     userProfile?.authority === 'ROOT'
   );
 
-  const roleBadge = isDevGodMode
-    ? 'DEUS FUNDADOR (DEV)'
-    : userProfile?.role
-      ? userProfile.role.toUpperCase()
-      : authUser
-        ? 'AUTHENTICATED'
-        : 'GUEST';
+  const displayEmail = userProfile?.email || authUser?.email || 'silajaneiro9@gmail.com';
+  const license = TrialEngine.getLicense(authUser?.uid || 'usr-public-001', displayEmail);
+  const evalState = TrialEngine.evaluateState(license);
+  const daysLabel = license.lifetime || license.plan === 'founder' || license.state === 'Lifetime'
+    ? 'Licença Vitalícia'
+    : evalState.daysRemaining > 0
+      ? `${evalState.daysRemaining} ${evalState.daysRemaining === 1 ? 'dia restante' : 'dias restantes'}`
+      : 'Subscrição Expirada';
 
   return (
     <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-slate-100 select-none font-sans w-full max-w-[100vw] overflow-x-hidden">
@@ -73,6 +75,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="font-extrabold text-xs sm:text-base tracking-tight text-white truncate block">
                 {workspaceMode === 'founder' ? 'Founder Root Workspace' : 'Portal Mobile'}
               </span>
+              {workspaceMode === 'public' && (
+                <span className="text-[10px] text-amber-400 font-mono font-bold block truncate -mt-0.5">
+                  {daysLabel}
+                </span>
+              )}
             </div>
           </div>
 

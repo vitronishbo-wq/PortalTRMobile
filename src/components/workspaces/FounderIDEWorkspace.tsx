@@ -41,6 +41,8 @@ import { AuthorityEngine, FeatureFlagsState, DEUS_FUNDADOR_CREDENTIALS } from '.
 import { PaymentRegistry, ChargeResponse, ChargeRequest } from '../../services/paymentEngine';
 import { AutomationRulesManager } from '../AutomationRulesManager';
 import { CpaasSecurityDispatcherConsole } from '../CpaasSecurityDispatcherConsole';
+import { APIKeysManager } from '../APIKeysManager';
+import { VirtualNumbersManager } from '../VirtualNumbersManager';
 import { RealtimeDevStreamConsole } from '../RealtimeDevStreamConsole';
 import { TrialEngine, LicenseRecord } from '../../services/trialEngine';
 import { UserProfile, UserRole } from '../../types/User';
@@ -596,8 +598,14 @@ export const FounderIDEWorkspace: React.FC = () => {
                 </div>
               </div>
             ) : activeActivity === 'cpaas_dispatcher' ? (
-              /* CPaaS SECURITY & DISPATCHER ENGINE CONSOLE */
-              <CpaasSecurityDispatcherConsole />
+              /* CPaaS SECURITY, DISPATCHER ENGINE, API KEYS & VIRTUAL NUMBERS */
+              <div className="space-y-6 font-sans">
+                <CpaasSecurityDispatcherConsole />
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <APIKeysManager />
+                  <VirtualNumbersManager />
+                </div>
+              </div>
             ) : activeActivity === 'automation' ? (
               /* AUTOMATION ENGINE & AI DECISION ENGINE VIEW */
               <AutomationRulesManager />

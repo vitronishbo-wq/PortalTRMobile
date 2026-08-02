@@ -11,6 +11,10 @@ import { dlqAlertService } from './src/services/dlqAlertService.js';
 import { queuePersistenceEngine } from './src/services/queuePersistence.js';
 import { WebhookRetryQueueEngine } from './src/services/webhookRetryQueue.js';
 import { generatePairingToken, claimPairingToken, getIdentity, updateDeviceHeartbeat } from './src/services/identityService.js';
+import { performHandover } from './src/services/sessionSyncService.js';
+import { sendMessage } from './src/services/gatewayService.js';
+import { buyNumber, listVirtualNumbers, assignNumberToNode } from './src/services/virtualNumberService.js';
+import { generateApiKey, listApiKeys, deleteApiKey } from './src/services/apiKeyService.js';
 import { ApiGatewayRateLimiter } from './src/services/apiGatewayRateLimiter.js';
 import { apiGateway, apiGatewayMiddleware, requireApiKey } from './src/middleware/apiGateway.js';
 import { requireFounder } from './src/middleware/founderAuth.js';
@@ -232,6 +236,162 @@ app.get('/api/v1/identity/:msisdn', async (req, res) => {
       return res.status(404).json({ error: 'Identidade não encontrada' });
     }
     res.json(identity);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- FASE 2: SESSION STATE MIRRORING & HANDOVER ENDPOINTS ---
+app.get('/api/v1/sessions/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  
+  const msisdn = req.query.msisdn as string;
+  if (!msisdn) {
+    res.status(400).json({ error: 'msisdn query param required' });
+    return;
+  }
+  
+  // Listener para eventos de estado via commandQueue
+  const listener = (data: any) => {
+    if (data.msisdn === msisdn) {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }
+  };
+  
+  commandQueue.on('state:updated', listener);
+  
+  req.on('close', () => {
+    commandQueue.off('state:updated', listener);
+    res.end();
+  });
+});
+
+app.post('/api/v1/sessions/handover', async (req, res) => {
+  try {
+    const { msisdn, newDeviceId } = req.body;
+    if (!msisdn || !newDeviceId) {
+      return res.status(400).json({ error: 'msisdn e newDeviceId são obrigatórios' });
+    }
+    const state = await performHandover(msisdn, newDeviceId);
+    res.json({ success: true, state });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/v1/clipboard/sync', async (req, res) => {
+  try {
+    const { msisdn, text } = req.body;
+    if (!msisdn || text === undefined) {
+      return res.status(400).json({ error: 'msisdn e text são obrigatórios' });
+    }
+    commandQueue.emit('clipboard:updated', { msisdn, text });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- FASE 3: CPAAS & VIRTUAL NUMBERS ENDPOINTS ---
+app.post('/api/founder/api-keys', async (req, res) => {
+  try {
+    const { name, permissions, rateLimit, workspaceId } = req.body;
+    const wsId = workspaceId || 'ws-vitronis-default';
+    const key = await generateApiKey(wsId, name || 'Chave do Cliente', permissions, rateLimit);
+    res.json({ success: true, key });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/founder/api-keys', async (req, res) => {
+  try {
+    const workspaceId = (req.query.workspaceId as string) || 'ws-vitronis-default';
+    const keys = await listApiKeys(workspaceId);
+    res.json({ success: true, keys });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/founder/api-keys/:key', async (req, res) => {
+  try {
+    await deleteApiKey(req.params.key);
+    res.json({ success: true, message: 'Chave revogada e eliminada' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/founder/numbers/buy', async (req, res) => {
+  try {
+    const { areaCode, workspaceId } = req.body;
+    const wsId = workspaceId || 'ws-vitronis-default';
+    const number = await buyNumber(wsId, areaCode);
+    res.json({ success: true, number });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/founder/numbers', async (req, res) => {
+  try {
+    const workspaceId = (req.query.workspaceId as string) || 'ws-vitronis-default';
+    const numbers = await listVirtualNumbers(workspaceId);
+    res.json({ success: true, numbers });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/founder/numbers/:numberId/assign', async (req, res) => {
+  try {
+    const { nodeId } = req.body;
+    await assignNumberToNode(req.params.numberId, nodeId);
+    res.json({ success: true, message: 'Número atribuído com sucesso' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/v1/messages/send', apiGatewayMiddleware, async (req, res) => {
+  try {
+    const messageReq = req.body;
+    const workspaceId = (req as any).apiKeyRecord?.workspaceId || (req as any).workspaceId || 'ws-vitronis-default';
+    const response = await sendMessage(messageReq, workspaceId);
+    res.json(response);
+  } catch (error: any) {
+    res.status(500).json({ messageId: 'error', status: 'failed', gateway: 'none', error: error.message });
+  }
+});
+
+app.post('/api/v1/calls/initiate', apiGatewayMiddleware, async (req, res) => {
+  try {
+    const { to, from } = req.body;
+    if (!to) {
+      return res.status(400).json({ error: 'Número de destino "to" é obrigatório' });
+    }
+    const callId = `call_${Math.random().toString(36).substring(2, 10)}_${Date.now()}`;
+    res.json({
+      success: true,
+      callId,
+      status: 'initiated',
+      to,
+      from: from || process.env.TWILIO_PHONE_NUMBER || '+244900000000',
+      provider: process.env.TWILIO_ACCOUNT_SID ? 'twilio' : 'simulated_webrtc'
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/v1/webhooks/status', async (req, res) => {
+  try {
+    const { messageId, status, error } = req.body;
+    console.log(`[CPaaS Webhook] Status recebido: ${messageId} -> ${status} ${error ? `(Erro: ${error})` : ''}`);
+    res.status(200).json({ success: true, receivedAt: Date.now() });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

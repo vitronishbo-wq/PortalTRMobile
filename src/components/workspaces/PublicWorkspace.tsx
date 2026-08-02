@@ -34,6 +34,7 @@ import { exportEventsToCsv } from '../../lib/csvExporter';
 import { SwipeableEventCard, DeviceEvent } from '../SwipeableEventCard';
 import { RealtimeDevStreamConsole } from '../RealtimeDevStreamConsole';
 import { MultiDeviceMeshView } from '../MultiDeviceMeshView';
+import { useSessionSync } from '../../hooks/useSessionSync';
 
 const SUPER_ADMIN_EMAILS = [
   'silajaneiro9@gmail.com',
@@ -76,6 +77,22 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
   const [pinEnabled, setPinEnabled] = useState<boolean>(false);
   const [activePublicTab, setActivePublicTab] = useState<'timeline' | 'search' | 'favorites' | 'devices' | 'realtime_dev' | 'mesh' | null>('timeline');
 
+  // Session Sync & Handover Hook (Fase 2)
+  const deviceId = typeof localStorage !== 'undefined'
+    ? (localStorage.getItem('deviceId') || 'web-pwa-001')
+    : 'web-pwa-001';
+  const { sessionState, updateState, triggerHandover } = useSessionSync(deviceId);
+
+  // Sync state tab when remote state changes
+  useEffect(() => {
+    if (sessionState?.activeTab) {
+      const tab = sessionState.activeTab as any;
+      if (['timeline', 'search', 'favorites', 'devices', 'realtime_dev', 'mesh'].includes(tab)) {
+        setActivePublicTab(tab);
+      }
+    }
+  }, [sessionState?.activeTab]);
+
   // Event Category Filter Modal State
   const [filterModalOpen, setFilterModalOpen] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'sms' | 'call' | 'whatsapp' | 'system'>('all');
@@ -84,15 +101,24 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
   useEffect(() => {
     const handleSwitchTab = (e: CustomEvent<string>) => {
       const tab = e.detail as 'timeline' | 'search' | 'favorites' | 'devices';
-      setActivePublicTab((prev) => (prev === tab ? null : tab));
+      setActivePublicTab((prev) => {
+        const next = prev === tab ? null : tab;
+        if (next) {
+          updateState({ activeTab: next as any });
+        }
+        return next;
+      });
     };
     window.addEventListener('switch-public-tab' as any, handleSwitchTab);
     return () => window.removeEventListener('switch-public-tab' as any, handleSwitchTab);
-  }, []);
+  }, [updateState]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('public-tab-changed', { detail: activePublicTab }));
-  }, [activePublicTab]);
+    if (activePublicTab) {
+      updateState({ activeTab: activePublicTab as any });
+    }
+  }, [activePublicTab, updateState]);
 
   // Device Events State for gesture swipe handling
   const [events, setEvents] = useState<DeviceEvent[]>([
@@ -195,116 +221,7 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 select-none font-sans w-full max-w-full overflow-hidden">
-      {/* 2. Top Header Card (only shown when authenticated) */}
-      {!isGuest && (
-        <div className="bg-slate-900/80 backdrop-blur-xl p-4 sm:p-6 rounded-2xl border border-slate-800/80 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 sm:gap-4 w-full max-w-full overflow-hidden flex-wrap">
-          <div className="flex items-center space-x-3.5 sm:space-x-4 min-w-0 flex-1 w-full sm:w-auto">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-amber-500 flex items-center justify-center text-white font-black text-base sm:text-lg shadow-md shrink-0">
-              {displayName ? displayName[0].toUpperCase() : 'U'}
-            </div>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center space-x-2 min-w-0 flex-wrap">
-                <h1 className="text-base sm:text-lg font-extrabold text-slate-100 truncate max-w-full">{displayName}</h1>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase font-mono shrink-0 ${
-                    evalState.active
-                      ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-400/50 shadow-sm shadow-emerald-500/20'
-                      : 'bg-rose-500/25 text-rose-300 border border-rose-400/50'
-                  }`}
-                >
-                  {evalState.label}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-full">{displayEmail}</p>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setActivePublicTab((prev) => (prev === 'mesh' ? 'timeline' : 'mesh'))}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 shrink-0 ${
-                activePublicTab === 'mesh'
-                  ? 'bg-emerald-500 text-slate-950 font-black shadow-lg shadow-emerald-500/20'
-                  : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30'
-              }`}
-              title="Sessão Unificada Multi-Dispositivo (1 Número)"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-              <span>📱 Mesh 1-Número</span>
-            </button>
-
-            <button
-              onClick={() => setActivePublicTab((prev) => (prev === 'realtime_dev' ? 'timeline' : 'realtime_dev'))}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 shrink-0 ${
-                activePublicTab === 'realtime_dev'
-                  ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20'
-                  : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30'
-              }`}
-              title="Acesso Console Cliente Dev Stream Tempo Real"
-            >
-              <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-              <span>⚡ Stream Dev</span>
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
-              title="Sair"
-            >
-              <LogOut className="w-4 h-4 shrink-0" />
-            </button>
-
-            {isFounder && onOpenFounderWorkspace && (
-              <button
-                onClick={onOpenFounderWorkspace}
-                className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1 shrink-0"
-                title="Acesso Founder"
-              >
-                <KeyRound className="w-3.5 h-3.5 shrink-0" />
-                <span>Founder</span>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 3. Quick Status Summary Card */}
-      <div className="w-full max-w-full">
-        <div className="bg-slate-900/80 p-3 rounded-2xl border border-slate-800 flex items-center justify-between space-x-3 w-full max-w-full flex-wrap min-w-0">
-          <div className="flex items-center space-x-3 min-w-0">
-            <div className={`p-2.5 rounded-xl shrink-0 border ${
-              evalState.active
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-            }`}>
-              {evalState.active ? <Clock className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-            </div>
-            <div className="min-w-0">
-              <span className={`text-xs sm:text-sm font-extrabold block truncate ${
-                evalState.active ? 'text-emerald-300' : 'text-amber-400'
-              }`}>
-                {license.lifetime || license.plan === 'founder' || license.state === 'Lifetime'
-                  ? 'Licença Vitalícia Ativa'
-                  : evalState.daysRemaining > 0
-                    ? `${evalState.daysRemaining} ${evalState.daysRemaining === 1 ? 'dia restante' : 'dias restantes'}`
-                    : 'Renove sua subinscrição'}
-              </span>
-            </div>
-          </div>
-          {(!evalState.active || evalState.daysRemaining <= 3) && (!license.lifetime && license.plan !== 'founder') && (
-            <button
-              onClick={() => {
-                alert('Para renovar a sua subinscrição, contacte o suporte ou o administrador fundador.');
-              }}
-              className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all cursor-pointer shrink-0"
-            >
-              Renovar Subscrição
-            </button>
-          )}
-        </div>
-      </div>
 
       {/* 5. Tab Views Content */}
       <AnimatePresence mode="wait">
@@ -319,7 +236,7 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
           >
             {isGuest ? (
               /* Security Gate Card for Non-Authenticated Visitors */
-              <div className="py-6 px-4 text-center space-y-4 max-w-md mx-auto">
+              <div className="py-6 px-4 text-center space-y-4 max-w-sm mx-auto">
                 <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto text-amber-400 shadow-md">
                   <Lock className="w-6 h-6" />
                 </div>
@@ -328,45 +245,25 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                     Autenticação Requerida
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Aceda ao Portal Público para gerir eventos, sincronizar mesh de dispositivos e ver relatórios.
-                  </p>
                 </div>
 
-                {/* Dev Quick Credential Box */}
-                <div className="p-3.5 bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-indigo-500/10 border border-amber-500/30 rounded-2xl space-y-2 text-left font-mono">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-extrabold text-amber-400 flex items-center space-x-1.5">
-                      <Sparkles className="w-4 h-4 text-amber-400" />
-                      <span>ACESSO RÁPIDO DEV & FUNDADOR</span>
-                    </span>
-                    <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] rounded font-bold border border-emerald-500/30">
-                      1-CLIQUE
-                    </span>
-                  </div>
+                {/* Compact Smart Dev Button for Mobile */}
+                <button
+                  onClick={handleQuickDevLogin}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
+                >
+                  <KeyRound className="w-4 h-4" />
+                  <span>Entrar como Dev (1-Clique)</span>
+                </button>
 
-                  <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-300 bg-slate-950/80 p-2 rounded-xl border border-slate-800">
-                    <div><span className="text-slate-500">DEV:</span> silajaneiro9@gmail.com</div>
-                    <div><span className="text-slate-500">SENHA:</span> VitronisFounder2026!</div>
-                  </div>
-
-                  <button
-                    onClick={handleQuickDevLogin}
-                    className="w-full py-2.5 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
-                  >
-                    <KeyRound className="w-4 h-4" />
-                    <span>Entrar no Portal Público como Dev (1-Clique)</span>
-                  </button>
-                </div>
-
-                <div className="pt-1 flex flex-col sm:flex-row items-center justify-center gap-2.5">
+                <div className="pt-1 flex items-center justify-center gap-2">
                   {onOpenAuthModal && (
                     <button
                       onClick={onOpenAuthModal}
-                      className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer flex items-center justify-center space-x-1.5 active:scale-95"
+                      className="w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer flex items-center justify-center space-x-1.5 active:scale-95"
                     >
                       <KeyRound className="w-3.5 h-3.5" />
-                      <span>Outras Credenciais</span>
+                      <span>Credenciais</span>
                     </button>
                   )}
 
