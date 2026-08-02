@@ -147,7 +147,12 @@ export default function App() {
   const { user: authUser, profile: userProfile, loading: authLoading } = useIdentity();
 
   // Reactive role & claim verification directly from authenticated Firestore document users/{uid}
-  const isFounderUser = userProfile?.role === 'founder' || userProfile?.authority === 'ROOT' || AuthorityEngine.hasClaim(userProfile, 'canDeploy');
+  const isFounderUser = Boolean(
+    (authUser?.email && ['silajaneiro9@gmail.com', 'deusfundador@vitronis.co.ao'].includes(authUser.email.toLowerCase())) ||
+    userProfile?.role === 'founder' ||
+    userProfile?.authority === 'ROOT' ||
+    AuthorityEngine.hasClaim(userProfile, 'canDeploy')
+  );
 
   const [secretPin, setSecretPin] = useState<string>(() => {
     return localStorage.getItem('portal_camouflage_pin') || '12345';
@@ -525,7 +530,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white relative">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white relative w-full max-w-[100vw] overflow-x-hidden">
       
       {/* Toast Notifications Floating Stack */}
       <div className="fixed top-5 right-5 z-50 space-y-2.5 max-w-sm w-full px-4 sm:px-0 pointer-events-none">
@@ -607,9 +612,9 @@ export default function App() {
       />
 
       {/* Main Content Body */}
-      <main className="flex-1 w-full mx-auto py-4 px-4 sm:px-6 lg:px-8">
-        {workspaceMode === 'public' ? (
-          <PublicWorkspace onOpenFounderWorkspace={() => setWorkspaceMode('founder')} />
+      <main className="flex-1 w-full max-w-[100vw] mx-auto py-3 sm:py-4 px-2.5 sm:px-6 lg:px-8 overflow-x-hidden">
+        {workspaceMode === 'public' || !isFounderUser ? (
+          <PublicWorkspace onOpenFounderWorkspace={isFounderUser ? () => setWorkspaceMode('founder') : undefined} />
         ) : (
           <FounderIDEWorkspace />
         )}
