@@ -1,6 +1,24 @@
+export interface DigitalTwinCapabilities {
+  sms: boolean;
+  calls: boolean;
+  accessibility: boolean;
+  biometrics: boolean;
+  whatsapp?: boolean;
+}
+
+export interface DeviceHealth {
+  battery: number;
+  network: string; // e.g. "AFRICELL_4G", "UNITEL_5G", "WIFI"
+  storageFreeMb?: number;
+  memoryUsagePct?: number;
+  lastPingMs?: number;
+}
+
 export interface Device {
   deviceId: string;
+  nodeId?: string; // Digital Twin node ID (e.g. "node-itel-a100")
   userId?: string;
+  workspaceId?: string; // Multi-tenant (Empresa)
   uid?: string;
   name: string;
   model: string;
@@ -9,6 +27,10 @@ export interface Device {
   online: boolean;
   batteryLevel?: number;
   pairedAt: number | string;
+
+  // Vitronis COS Device Digital Twin
+  capabilities?: DigitalTwinCapabilities;
+  health?: DeviceHealth;
 
   // Zero-Touch Health Diagnostics
   oemProfile?: 'samsung' | 'xiaomi' | 'pixel' | 'oppo' | 'generic';
@@ -20,4 +42,5 @@ export interface Device {
   unprocessedBatchCount?: number;
   installationUUID?: string;
 }
+
 

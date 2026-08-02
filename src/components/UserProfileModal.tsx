@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, ShieldCheck, Camera, Check, X, Sparkles, CreditCard } from 'lucide-react';
+import { User, Phone, Mail, ShieldCheck, Camera, Check, X, Sparkles, CreditCard, RefreshCw, Zap, Gauge, WifiOff } from 'lucide-react';
 import { useIdentity } from '../engine/identityEngine';
 
 interface UserProfileModalProps {
@@ -29,6 +29,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
   const [avatarIndex, setAvatarIndex] = useState<number>(() => {
     return parseInt(localStorage.getItem('user_profile_avatar') || '0', 10);
+  });
+
+  const [syncMode, setSyncMode] = useState<'realtime' | 'economic'>(() => {
+    return (localStorage.getItem('user_profile_sync_mode') as 'realtime' | 'economic') || 'realtime';
   });
 
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
@@ -86,10 +90,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
     localStorage.setItem('user_profile_target_phone', targetPhone);
     localStorage.setItem('user_profile_plan', accountPlan);
     localStorage.setItem('user_profile_avatar', avatarIndex.toString());
+    localStorage.setItem('user_profile_sync_mode', syncMode);
 
     // Dispatch event so components can update immediately
     window.dispatchEvent(new CustomEvent('user-profile-updated', {
-      detail: { name, email, targetPhone, accountPlan, avatar: profilePresets[avatarIndex]?.avatar }
+      detail: { name, email, targetPhone, accountPlan, syncMode, avatar: profilePresets[avatarIndex]?.avatar }
     }));
 
     setSavedSuccess(true);
@@ -206,6 +211,66 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 transition-colors"
                 placeholder="exemplo@email.com"
               />
+            </div>
+
+            {/* Modo de Sincronização & Otimização de Dados Móveis */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                <span className="flex items-center space-x-1.5">
+                  <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Modo de Sincronização</span>
+                </span>
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+                  syncMode === 'realtime'
+                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                }`}>
+                  {syncMode === 'realtime' ? 'Tempo Real' : 'Econômico (60s)'}
+                </span>
+              </label>
+
+              <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSyncMode('realtime')}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-bold flex flex-col items-center justify-center space-y-1 transition-all cursor-pointer ${
+                    syncMode === 'realtime'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/10'
+                      : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center space-x-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Tempo Real</span>
+                  </div>
+                  <span className="text-[9.5px] text-slate-400 font-normal text-center">
+                    Listeners Firestore
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSyncMode('economic')}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-bold flex flex-col items-center justify-center space-y-1 transition-all cursor-pointer ${
+                    syncMode === 'economic'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/10'
+                      : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center space-x-1.5">
+                    <Gauge className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Econômica</span>
+                  </div>
+                  <span className="text-[9.5px] text-slate-400 font-normal text-center">
+                    Poupa Dados Móveis
+                  </span>
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                {syncMode === 'realtime'
+                  ? '⚡ Firestore onSnapshot ativo: atualizações instantâneas de notificações.'
+                  : '🍃 Sincronização por intervalos maiores (60s) para otimizar consumo de bateria e dados móveis.'}
+              </p>
             </div>
 
             {/* Conta / Plano */}

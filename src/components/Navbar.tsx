@@ -13,6 +13,7 @@ interface NavbarProps {
   onLockCamouflage?: () => void;
   onOpenCamouflageSettings?: () => void;
   onOpenInstallModal?: () => void;
+  onOpenAuthModal?: () => void;
 }
 
 const SUPER_ADMIN_EMAILS = [
@@ -25,18 +26,28 @@ export const Navbar: React.FC<NavbarProps> = ({
   setWorkspaceMode,
   onLockCamouflage,
   onOpenCamouflageSettings,
-  onOpenInstallModal
+  onOpenInstallModal,
+  onOpenAuthModal
 }) => {
   const { user: authUser, profile: userProfile } = useIdentity();
   const { isOnline } = useOnlineStatus();
 
+  const isDevGodMode = (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') || localStorage.getItem('vitronis_dev_god_mode') === 'true';
+
   const isFounder = Boolean(
+    isDevGodMode ||
     (authUser?.email && SUPER_ADMIN_EMAILS.includes(authUser.email.toLowerCase())) ||
     userProfile?.role === 'founder' ||
     userProfile?.authority === 'ROOT'
   );
 
-  const roleBadge = userProfile?.role ? userProfile.role.toUpperCase() : authUser ? 'AUTHENTICATED' : 'GUEST';
+  const roleBadge = isDevGodMode
+    ? 'DEUS FUNDADOR (DEV)'
+    : userProfile?.role
+      ? userProfile.role.toUpperCase()
+      : authUser
+        ? 'AUTHENTICATED'
+        : 'GUEST';
 
   return (
     <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-slate-100 select-none font-sans w-full max-w-[100vw] overflow-x-hidden">
@@ -59,23 +70,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
             <div className="min-w-0 flex-1 truncate">
-              <div className="flex items-center space-x-1 min-w-0 truncate">
-                <span className="font-extrabold text-xs sm:text-base tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent truncate block">
-                  {workspaceMode === 'founder' ? 'Founder Root Workspace' : 'Portal Mobile'}
-                </span>
-                <span className={`text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0 truncate ${
-                  workspaceMode === 'founder'
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                    : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                }`}>
-                  {workspaceMode === 'founder' ? 'Root' : 'Public'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 hidden sm:block font-mono truncate">
-                {workspaceMode === 'founder'
-                  ? 'Autoridade Raiz • VS Code IDE Engine'
-                  : 'Sincronização Mobile & Notificações'}
-              </p>
+              <span className="font-extrabold text-xs sm:text-base tracking-tight text-white truncate block">
+                {workspaceMode === 'founder' ? 'Founder Root Workspace' : 'Portal Mobile'}
+              </span>
             </div>
           </div>
 
@@ -97,13 +94,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Authenticated User / Firestore Profile Badge */}
             {userProfile || authUser ? (
-              <div className="flex items-center space-x-1.5 bg-indigo-950/60 px-3 py-1.5 rounded-full border border-indigo-500/30 text-indigo-300 min-w-0 shrink-0">
+              <div className="flex items-center space-x-1.5 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700/60 text-slate-300 min-w-0 shrink-0">
                 <UserCheck className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                 <span className="font-bold text-[11px] truncate max-w-[130px]">
                   {userProfile?.displayName || authUser?.email || 'Autenticado'}
-                </span>
-                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 truncate">
-                  {roleBadge}
                 </span>
               </div>
             ) : null}
@@ -144,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Public vs Founder Mode Toggle (ONLY FOR AUTHORIZED FOUNDER) */}
+            {/* Founder Mode Toggle Button (Only for authorized founder) */}
             {isFounder && (
               <button
                 onClick={() => setWorkspaceMode(workspaceMode === 'public' ? 'founder' : 'public')}

@@ -125,25 +125,66 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 </div>
               </div>
 
-              {/* Zero-Touch Device Health Diagnostics Panel */}
+              {/* Zero-Touch & Digital Twin Diagnostics Panel */}
               <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/90 space-y-2.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400 flex items-center space-x-1.5">
+                  <span className="text-slate-400 flex items-center space-x-1.5 font-mono">
                     <Activity className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Score de Saúde Agente:</span>
+                    <span className="font-bold text-slate-300">Digital Twin Node:</span>
+                    <span className="text-amber-400 font-bold">{device.nodeId || `node-${device.deviceId.substring(0, 8)}`}</span>
                   </span>
                   <span className="font-bold text-amber-400 font-mono">{healthScore}%</span>
                 </div>
 
-                {/* Health Progress Bar */}
-                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-amber-500 to-indigo-500 h-1.5 rounded-full"
-                    style={{ width: `${healthScore}%` }}
-                  />
+                {/* Digital Twin Capabilities & Health Matrix */}
+                <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider font-mono">Capacidades Digital Twin:</span>
+                    <span className="text-emerald-400 font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20">
+                      {device.health?.network || 'AFRICELL_4G'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                      device.capabilities?.sms !== false
+                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        : 'bg-slate-800 text-slate-500 border-slate-700'
+                    }`}>
+                      <span>SMS</span>
+                      <span>{device.capabilities?.sms !== false ? '✓' : '✕'}</span>
+                    </span>
+
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                      device.capabilities?.calls !== false
+                        ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                        : 'bg-slate-800 text-slate-500 border-slate-700'
+                    }`}>
+                      <span>CHAMADAS</span>
+                      <span>{device.capabilities?.calls !== false ? '✓' : '✕'}</span>
+                    </span>
+
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                      device.capabilities?.biometrics !== false
+                        ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                        : 'bg-slate-800 text-slate-500 border-slate-700'
+                    }`}>
+                      <span>BIOMETRIA</span>
+                      <span>{device.capabilities?.biometrics !== false ? '✓' : '✕'}</span>
+                    </span>
+
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                      device.capabilities?.accessibility
+                        ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+                        : 'bg-slate-800/80 text-slate-400 border-slate-800'
+                    }`}>
+                      <span>ACESSIBILIDADE</span>
+                      <span>{device.capabilities?.accessibility ? '✓' : 'OFF'}</span>
+                    </span>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
                     <span className="text-slate-400">Listener:</span>
                     <span className={`font-semibold capitalize ${
@@ -154,7 +195,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                   </div>
 
                   <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                    <span className="text-slate-400">Latência:</span>
+                    <span className="text-slate-400">Latência Barramento:</span>
                     <span className="font-mono text-indigo-300 font-bold">
                       {device.syncDelayMs ?? 12}ms
                     </span>

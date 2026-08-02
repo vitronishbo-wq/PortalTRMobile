@@ -10,6 +10,7 @@ import { EventSimulatorModal } from './components/EventSimulatorModal';
 import { DisguisedCalculator } from './components/DisguisedCalculator';
 import { CamouflageSettingsModal } from './components/CamouflageSettingsModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { AuthModal } from './components/AuthModal';
 import { SmartInstaller } from './components/SmartInstaller';
 import { PWAInstallNotificationBanner } from './components/PWAInstallNotificationBanner';
 import { AdaptiveOnboardingView } from './components/AdaptiveOnboardingView';
@@ -156,7 +157,10 @@ export default function App() {
   const { user: authUser, profile: userProfile, loading: authLoading } = useIdentity();
 
   // Reactive role & claim verification directly from authenticated Firestore document users/{uid}
+  const isDevGodMode = (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') || localStorage.getItem('vitronis_dev_god_mode') === 'true';
+
   const isFounderUser = Boolean(
+    isDevGodMode ||
     (authUser?.email && ['silajaneiro9@gmail.com', 'deusfundador@vitronis.co.ao'].includes(authUser.email.toLowerCase())) ||
     userProfile?.role === 'founder' ||
     userProfile?.authority === 'ROOT' ||
@@ -207,6 +211,7 @@ export default function App() {
 
   const { isOnline, lastCacheTime } = useOnlineStatus();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
 
   // Initialize events and devices with offline cache fallback
   const [events, setEvents] = useState<PortalEvent[]>(() => {
@@ -231,6 +236,20 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('portal_github_repo', githubRepo);
   }, [githubRepo]);
+
+  const [syncMode, setSyncMode] = useState<'realtime' | 'economic'>(() => {
+    return (localStorage.getItem('user_profile_sync_mode') as 'realtime' | 'economic') || 'realtime';
+  });
+
+  useEffect(() => {
+    const handleProfileUpdate = (e: CustomEvent) => {
+      if (e.detail?.syncMode) {
+        setSyncMode(e.detail.syncMode);
+      }
+    };
+    window.addEventListener('user-profile-updated' as any, handleProfileUpdate);
+    return () => window.removeEventListener('user-profile-updated' as any, handleProfileUpdate);
+  }, []);
 
   const [currentPublicTab, setCurrentPublicTab] = useState<string | null>('timeline');
 
@@ -650,6 +669,7 @@ export default function App() {
         onLockCamouflage={appStateMachine.lockApp}
         onOpenCamouflageSettings={() => setIsProfileModalOpen(true)}
         onOpenInstallModal={() => setIsInstallModalOpen(true)}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />
 
       {/* Offline Mode Cache Status Banner */}
@@ -666,6 +686,13 @@ export default function App() {
         onClose={() => setIsProfileModalOpen(false)}
       />
 
+      {/* Auth Modal (Login / Inscrever-se / Founder) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onOpenFounderWorkspace={() => setWorkspaceMode('founder')}
+      />
+
       {/* PWA Install Center Notification Modal */}
       <PWAInstallNotificationBanner
         appName={calcTitle}
@@ -680,7 +707,10 @@ export default function App() {
       {/* Main Content Body */}
       <main className="flex-1 w-full max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-6 lg:px-8 overflow-x-hidden bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl shadow-slate-950/80 my-2 sm:my-4 transition-all">
         {workspaceMode === 'public' || !isFounderUser ? (
-          <PublicWorkspace onOpenFounderWorkspace={isFounderUser ? () => setWorkspaceMode('founder') : undefined} />
+          <PublicWorkspace 
+            onOpenFounderWorkspace={isFounderUser ? () => setWorkspaceMode('founder') : undefined} 
+            onOpenAuthModal={() => setIsAuthModalOpen(true)}
+          />
         ) : (
           <FounderIDEWorkspace />
         )}

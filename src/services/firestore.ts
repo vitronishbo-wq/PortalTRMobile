@@ -87,14 +87,31 @@ export class FirestoreService {
             const data = docSnap.data();
             return {
               deviceId: docSnap.id,
+              nodeId: data.nodeId || `node-${docSnap.id.substring(0, 8)}`,
               userId: data.userId || data.uid || 'usr-default',
+              workspaceId: data.workspaceId || 'ws-vitronis-default',
               name: data.name || 'Dispositivo Android',
               model: data.model || 'Android',
               osVersion: data.osVersion || 'Android 14',
               lastSync: data.lastSync || Date.now(),
               online: data.online ?? true,
-              batteryLevel: data.batteryLevel ?? 100,
-              pairedAt: data.pairedAt || Date.now()
+              batteryLevel: data.health?.battery ?? data.batteryLevel ?? 100,
+              pairedAt: data.pairedAt || Date.now(),
+              capabilities: data.capabilities || {
+                sms: true,
+                calls: true,
+                accessibility: false,
+                biometrics: true,
+                whatsapp: true
+              },
+              health: data.health || {
+                battery: data.batteryLevel ?? 88,
+                network: 'AFRICELL_4G'
+              },
+              oemProfile: data.oemProfile || 'generic',
+              permissionScore: data.permissionScore ?? 98,
+              notificationListenerStatus: data.notificationListenerStatus || 'active',
+              syncDelayMs: data.syncDelayMs ?? 12
             };
           });
           onData(devices);
