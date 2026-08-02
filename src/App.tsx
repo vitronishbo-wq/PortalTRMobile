@@ -705,11 +705,15 @@ export default function App() {
       />
 
       {/* Main Content Body */}
-      <main className="flex-1 w-full max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-6 lg:px-8 overflow-x-hidden bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl shadow-slate-950/80 my-2 sm:my-4 transition-all">
+      <main className="flex-1 w-full max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-6 lg:px-8 overflow-x-hidden bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl shadow-slate-950/80 my-2 sm:my-4 pb-24 transition-all">
         {workspaceMode === 'public' || !isFounderUser ? (
           <PublicWorkspace 
             onOpenFounderWorkspace={isFounderUser ? () => setWorkspaceMode('founder') : undefined} 
             onOpenAuthModal={() => setIsAuthModalOpen(true)}
+            devices={devices}
+            onAddDevice={handleAddDevice}
+            onRemoveDevice={handleRemoveDevice}
+            onSimulateEvent={handleSimulateRandomEvent}
           />
         ) : (
           <FounderIDEWorkspace />

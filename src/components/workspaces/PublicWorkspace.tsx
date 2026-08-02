@@ -34,7 +34,9 @@ import { exportEventsToCsv } from '../../lib/csvExporter';
 import { SwipeableEventCard, DeviceEvent } from '../SwipeableEventCard';
 import { RealtimeDevStreamConsole } from '../RealtimeDevStreamConsole';
 import { MultiDeviceMeshView } from '../MultiDeviceMeshView';
+import { DevicesView } from '../DevicesView';
 import { useSessionSync } from '../../hooks/useSessionSync';
+import { Device } from '../../types';
 
 const SUPER_ADMIN_EMAILS = [
   'silajaneiro9@gmail.com',
@@ -44,11 +46,46 @@ const SUPER_ADMIN_EMAILS = [
 interface PublicWorkspaceProps {
   onOpenFounderWorkspace?: () => void;
   onOpenAuthModal?: () => void;
+  devices?: Device[];
+  onAddDevice?: (device: Partial<Device>) => void;
+  onRemoveDevice?: (id: string) => void;
+  onSimulateEvent?: () => void;
 }
+
+const defaultDevicesList: Device[] = [
+  {
+    deviceId: 'dev-pixel-8',
+    userId: 'usr-default',
+    uid: 'usr-default',
+    name: 'Google Pixel 8 Pro',
+    model: 'Pixel 8 Pro (Android 14)',
+    osVersion: 'Android 14 (API 34)',
+    lastSync: Date.now() - 2 * 60 * 1000,
+    online: true,
+    batteryLevel: 88,
+    pairedAt: Date.now() - 7 * 24 * 3600 * 1000
+  },
+  {
+    deviceId: 'dev-samsung-s23',
+    userId: 'usr-default',
+    uid: 'usr-default',
+    name: 'Samsung Galaxy S23',
+    model: 'SM-S911B (One UI 6)',
+    osVersion: 'Android 14 (API 34)',
+    lastSync: Date.now() - 45 * 60 * 1000,
+    online: true,
+    batteryLevel: 62,
+    pairedAt: Date.now() - 14 * 24 * 3600 * 1000
+  }
+];
 
 export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({ 
   onOpenFounderWorkspace,
-  onOpenAuthModal 
+  onOpenAuthModal,
+  devices,
+  onAddDevice,
+  onRemoveDevice,
+  onSimulateEvent
 }) => {
   const { user: authUser, profile: userProfile, loginWithGoogle, logout, authenticateUser, forceDevLogin } = useIdentity();
 
@@ -96,6 +133,33 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
   // Event Category Filter Modal State
   const [filterModalOpen, setFilterModalOpen] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'sms' | 'call' | 'whatsapp' | 'system'>('all');
+
+  // Search Query State
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Fallback Local Devices State
+  const [localDevices, setLocalDevices] = useState<Device[]>(defaultDevicesList);
+  const activeDevicesList = devices && devices.length > 0 ? devices : localDevices;
+
+  const handleAddLocalDevice = (d: Partial<Device>) => {
+    const newDev: Device = {
+      deviceId: d.deviceId || `dev-${Date.now()}`,
+      userId: 'usr-default',
+      uid: 'usr-default',
+      name: d.name || 'Novo Dispositivo Android',
+      model: d.model || 'Android Phone',
+      osVersion: d.osVersion || 'Android 14',
+      lastSync: Date.now(),
+      online: true,
+      batteryLevel: 100,
+      pairedAt: Date.now()
+    };
+    setLocalDevices((prev) => [...prev, newDev]);
+  };
+
+  const handleRemoveLocalDevice = (id: string) => {
+    setLocalDevices((prev) => prev.filter((dev) => dev.deviceId !== id));
+  };
 
   // Sync tab switching via global events for bottom footer navigation
   useEffect(() => {
@@ -155,6 +219,16 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
       isFavorite: false,
     }
   ]);
+
+  const searchedEvents = events.filter((evt) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      evt.title.toLowerCase().includes(q) ||
+      evt.detail.toLowerCase().includes(q) ||
+      evt.type.toLowerCase().includes(q)
+    );
+  });
 
   const toggleTab = (tab: 'timeline' | 'search' | 'favorites' | 'devices') => {
     setActivePublicTab((prev) => (prev === tab ? null : tab));
@@ -423,11 +497,65 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
               </div>
             )}
 
-            {/* TAB: SEARCH & DEVICES */}
-            {['search', 'devices'].includes(activePublicTab) && (
-              <div className="py-8 text-center text-xs text-slate-500 font-mono">
-                Módulo {activePublicTab?.toUpperCase()} ativo e pronto para utilização.
+            {/* TAB: SEARCH */}
+            {activePublicTab === 'search' && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2 bg-slate-950/90 border border-slate-800 rounded-2xl px-3.5 py-3 shadow-inner">
+                  <Search className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Pesquisar por remetente, aplicativo, texto ou tipo..."
+                    className="bg-transparent text-xs sm:text-sm text-white w-full outline-none placeholder:text-slate-500 font-sans"
+                    autoFocus
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {searchedEvents.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-500 font-mono bg-slate-950/50 rounded-xl border border-dashed border-slate-800">
+                    Nenhum evento corresponde à pesquisa "{searchQuery}".
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <AnimatePresence mode="popLayout">
+                      {searchedEvents.map((evt) => (
+                        <motion.div
+                          key={evt.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <SwipeableEventCard
+                            event={evt}
+                            onDelete={handleDeleteEvent}
+                            onToggleFavorite={handleToggleFavorite}
+                          />
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
+            )}
+
+            {/* TAB: DEVICES */}
+            {activePublicTab === 'devices' && (
+              <DevicesView
+                devices={activeDevicesList}
+                onAddDevice={onAddDevice || handleAddLocalDevice}
+                onRemoveDevice={onRemoveDevice || handleRemoveLocalDevice}
+                onSimulateEvent={onSimulateEvent || (() => {})}
+              />
             )}
               </>
             )}
