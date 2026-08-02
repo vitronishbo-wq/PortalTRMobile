@@ -150,7 +150,7 @@ export const CamouflageSettingsModal: React.FC<CamouflageSettingsModalProps> = (
                     <span>Iniciar Sempre em Modo Calculadora</span>
                   </span>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Sempre que abrir a PWA ou o ícone do telemóvel, abre primeiro a tela de Calculadora. Quem mexer no telefone verá apenas uma calculadora comum.
+                    Sempre que abrir a aplicação ou o ícone do telemóvel, abre primeiro a tela de Calculadora. Quem mexer no telefone verá apenas uma calculadora comum.
                   </p>
                 </div>
               </label>

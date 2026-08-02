@@ -96,11 +96,19 @@ export const SwipeableEventCard: React.FC<SwipeableEventCardProps> = ({
                 <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
               )}
             </div>
-            {event.detail && event.detail.toLowerCase() !== event.title.toLowerCase() && (
-              <span className="text-slate-400 text-[10px] sm:text-[11px] truncate block mt-0.5 max-w-full leading-tight">
-                {event.detail.replace(new RegExp(`^${event.title}[:\\s-]*`, 'i'), '') || event.detail}
-              </span>
-            )}
+            {(() => {
+              if (!event.detail || event.detail.toLowerCase() === event.title.toLowerCase()) return null;
+              let cleanDetail = event.detail;
+              if (cleanDetail.toLowerCase().startsWith(event.title.toLowerCase())) {
+                const stripped = cleanDetail.slice(event.title.length).replace(/^[:\s-]+/, '');
+                cleanDetail = stripped || cleanDetail;
+              }
+              return (
+                <span className="text-slate-400 text-[10px] sm:text-[11px] truncate block mt-0.5 max-w-full leading-tight">
+                  {cleanDetail}
+                </span>
+              );
+            })()}
           </div>
         </div>
 

@@ -33,6 +33,34 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Fetch Event - Offline Cache Handler
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+  // Ignore API/Firestore requests from SW cache
+  if (event.request.url.includes('firestore.googleapis.com') || event.request.url.includes('identitytoolkit')) {
+    return;
+  }
+
+  event.respondWith(
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+        });
+      })
+  );
+});
+
 // Message Listener from Main Thread
 self.addEventListener('message', (event) => {
   if (!event.data) return;

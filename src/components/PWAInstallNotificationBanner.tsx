@@ -143,7 +143,7 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
             <div>
               <div className="flex items-center space-x-2">
                 <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-extrabold uppercase rounded-md font-mono border border-emerald-500/30">
-                  Notificação de Instalação PWA
+                  Notificação de Instalação
                 </span>
               </div>
               <h3 className="text-base font-extrabold text-white tracking-tight mt-0.5">
@@ -166,7 +166,7 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
             <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
             <h4 className="font-extrabold text-emerald-300">Aplicação Instalada com Sucesso!</h4>
             <p className="text-xs text-emerald-200">
-              Aceda ao ecrã principal do seu dispositivo para abrir a aplicação oficial em Modo Nativo.
+              Aceda ao ecrã principal do seu dispositivo para abrir a aplicação oficial.
             </p>
             <button
               onClick={handleCloseModal}
@@ -178,26 +178,10 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
         ) : (
           <div className="space-y-4 text-xs">
             <p className="text-slate-300 leading-relaxed text-xs">
-              Detetou-se acesso via navegador web. Para executar a aplicação em <strong>Modo Nativo Dedicado</strong>, sem barras de endereço, com menor consumo de dados e arranque instantâneo, instale a PWA no seu dispositivo.
+              Instale a aplicação no seu dispositivo para acesso direto e otimizado ao portal.
             </p>
 
-            {/* Platform instructions or status */}
-            {!showGuide ? (
-              <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800/80 space-y-2.5">
-                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>Plataforma detetada:</span>
-                  <span className="text-indigo-300 font-bold uppercase flex items-center space-x-1">
-                    {deviceType === 'ios' && <Apple className="w-3.5 h-3.5 inline text-slate-200" />}
-                    {deviceType === 'android' && <Smartphone className="w-3.5 h-3.5 inline text-emerald-400" />}
-                    <span>{deviceType}</span>
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                  <span>Modo de Operação:</span>
-                  <span className="text-emerald-400 font-bold">Aplicação Integrada (PWA)</span>
-                </div>
-              </div>
-            ) : (
+            {showGuide && (
               <div className="space-y-3">
                 {deviceType === 'android' && (
                   <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2 text-[11px]">
@@ -242,7 +226,7 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
                 className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs rounded-2xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center space-x-2 cursor-pointer transform active:scale-95"
               >
                 <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
-                <span>Instalar Agora (PWA)</span>
+                <span>Instalar Agora</span>
               </button>
 
               <button

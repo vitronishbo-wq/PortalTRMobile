@@ -89,7 +89,7 @@ export const SmartInstaller: React.FC<SmartInstallerProps> = ({
         <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-600 p-4 text-center text-white relative">
           <div className="inline-flex items-center space-x-2 bg-black/30 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold border border-white/20">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Portal Mobile PWA Direct</span>
+            <span>Portal Mobile Direct</span>
           </div>
           <h1 className="text-xl font-black mt-2 tracking-tight">
             {appName}

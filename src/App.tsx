@@ -9,6 +9,7 @@ import { DeploymentGuideView } from './components/DeploymentGuideView';
 import { EventSimulatorModal } from './components/EventSimulatorModal';
 import { DisguisedCalculator } from './components/DisguisedCalculator';
 import { CamouflageSettingsModal } from './components/CamouflageSettingsModal';
+import { UserProfileModal } from './components/UserProfileModal';
 import { SmartInstaller } from './components/SmartInstaller';
 import { PWAInstallNotificationBanner } from './components/PWAInstallNotificationBanner';
 import { AdaptiveOnboardingView } from './components/AdaptiveOnboardingView';
@@ -21,7 +22,7 @@ import { CapabilityEngine } from './engine/CapabilityEngine';
 import { useIdentity, IdentityEngine } from './engine/identityEngine';
 import { AuthorityEngine } from './engine/authorityEngine';
 import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
-import { Bell, X } from 'lucide-react';
+import { Bell, X, Activity, Star, Search, Smartphone } from 'lucide-react';
 import {
   subscribeToEvents,
   subscribeToDevices,
@@ -33,6 +34,14 @@ import {
   defaultFirestoreConfig
 } from './lib/firebase';
 import { registerServiceWorker, sendNativeNotification } from './lib/pushNotifications';
+import {
+  saveEventsToCache,
+  loadEventsFromCache,
+  saveDevicesToCache,
+  loadDevicesFromCache,
+  useOnlineStatus
+} from './lib/offlineCache';
+import { OfflineBanner } from './components/OfflineBanner';
 
 interface ToastItem {
   id: string;
@@ -196,9 +205,24 @@ export default function App() {
     localStorage.setItem('portal_camouflage_hide_btn', String(val));
   };
 
-  const [events, setEvents] = useState<PortalEvent[]>(initialEvents);
-  const [devices, setDevices] = useState<Device[]>(initialDevices);
-  const [lastSyncTime, setLastSyncTime] = useState<number | null>(Date.now());
+  const { isOnline, lastCacheTime } = useOnlineStatus();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+
+  // Initialize events and devices with offline cache fallback
+  const [events, setEvents] = useState<PortalEvent[]>(() => {
+    const cached = loadEventsFromCache();
+    return (cached.events && cached.events.length > 0) ? cached.events : initialEvents;
+  });
+
+  const [devices, setDevices] = useState<Device[]>(() => {
+    const cached = loadDevicesFromCache();
+    return (cached.devices && cached.devices.length > 0) ? cached.devices : initialDevices;
+  });
+
+  const [lastSyncTime, setLastSyncTime] = useState<number | null>(() => {
+    return lastCacheTime || Date.now();
+  });
+
   const [firestoreConfig, setFirestoreConfig] = useState<FirestoreConfig>(defaultFirestoreConfig);
   const [githubRepo, setGithubRepo] = useState<string>(() => {
     return localStorage.getItem('portal_github_repo') || 'https://github.com/vitronishbo-wq/PortalTRMobile';
@@ -208,9 +232,19 @@ export default function App() {
     localStorage.setItem('portal_github_repo', githubRepo);
   }, [githubRepo]);
 
+  const [currentPublicTab, setCurrentPublicTab] = useState<string | null>('timeline');
+
   useEffect(() => {
-    CapabilityEngine.initInstallListener();
+    const handleTabChanged = (e: CustomEvent<string | null>) => {
+      setCurrentPublicTab(e.detail);
+    };
+    window.addEventListener('public-tab-changed' as any, handleTabChanged);
+    return () => window.removeEventListener('public-tab-changed' as any, handleTabChanged);
   }, []);
+
+  const triggerTabSwitch = (tab: string) => {
+    window.dispatchEvent(new CustomEvent('switch-public-tab', { detail: tab }));
+  };
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -275,6 +309,7 @@ export default function App() {
 
       if (fetchedEvents.length > 0) {
         setEvents(fetchedEvents);
+        saveEventsToCache(fetchedEvents);
 
         // Real-time toast & native Web Push notification detection for newly added events via onSnapshot
         if (initialLoadDoneRef.current) {
@@ -309,6 +344,7 @@ export default function App() {
     const unsubDevices = subscribeToDevices(firestoreConfig, (fetchedDevices) => {
       if (fetchedDevices.length > 0) {
         setDevices(fetchedDevices);
+        saveDevicesToCache(fetchedDevices);
       }
     });
 
@@ -333,26 +369,42 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== toastId));
   };
 
-  // Handlers
+  // Handlers with Offline Cache persistence
   const handleToggleFavorite = async (id: string, current: boolean) => {
-    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, favorite: !current } : e)));
+    setEvents((prev) => {
+      const updated = prev.map((e) => (e.id === id ? { ...e, favorite: !current } : e));
+      saveEventsToCache(updated);
+      return updated;
+    });
     updateEventInFirestore(firestoreConfig, id, { favorite: !current });
   };
 
   const handleMarkRead = async (id: string, current: boolean) => {
-    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, read: !current } : e)));
+    setEvents((prev) => {
+      const updated = prev.map((e) => (e.id === id ? { ...e, read: !current } : e));
+      saveEventsToCache(updated);
+      return updated;
+    });
     updateEventInFirestore(firestoreConfig, id, { read: !current });
   };
 
   const handleMarkAllRead = async () => {
-    setEvents((prev) => prev.map((e) => ({ ...e, read: true })));
+    setEvents((prev) => {
+      const updated = prev.map((e) => ({ ...e, read: true }));
+      saveEventsToCache(updated);
+      return updated;
+    });
     events.forEach((e) => {
       updateEventInFirestore(firestoreConfig, e.id, { read: true });
     });
   };
 
   const handleDeleteEvent = async (id: string) => {
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+    setEvents((prev) => {
+      const updated = prev.filter((e) => e.id !== id);
+      saveEventsToCache(updated);
+      return updated;
+    });
     deleteEventFromFirestore(firestoreConfig, id);
   };
 
@@ -596,8 +648,22 @@ export default function App() {
         unreadCount={unreadCount}
         onSimulateEvent={handleSimulateRandomEvent}
         onLockCamouflage={appStateMachine.lockApp}
-        onOpenCamouflageSettings={() => appStateMachine.setCamouflageModalOpen(true)}
+        onOpenCamouflageSettings={() => setIsProfileModalOpen(true)}
         onOpenInstallModal={() => setIsInstallModalOpen(true)}
+      />
+
+      {/* Offline Mode Cache Status Banner */}
+      <OfflineBanner
+        isOnline={isOnline}
+        cachedEventsCount={events.length}
+        lastCacheTime={lastCacheTime || lastSyncTime}
+        onForceRefresh={() => window.location.reload()}
+      />
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
       />
 
       {/* PWA Install Center Notification Modal */}
@@ -612,7 +678,7 @@ export default function App() {
       />
 
       {/* Main Content Body */}
-      <main className="flex-1 w-full max-w-[100vw] mx-auto py-3 sm:py-4 px-2.5 sm:px-6 lg:px-8 overflow-x-hidden">
+      <main className="flex-1 w-full max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-6 lg:px-8 overflow-x-hidden bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl shadow-slate-950/80 my-2 sm:my-4 transition-all">
         {workspaceMode === 'public' || !isFounderUser ? (
           <PublicWorkspace onOpenFounderWorkspace={isFounderUser ? () => setWorkspaceMode('founder') : undefined} />
         ) : (
@@ -642,15 +708,60 @@ export default function App() {
       />
 
 
-      {/* Footer */}
-      <footer className="bg-slate-900/80 border-t border-slate-800 py-4 text-center text-xs text-slate-500 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Portal Mobile • Sincronização Direta Android ↔ Firestore 24/7</span>
-          <div className="flex items-center space-x-3 text-[11px]">
-            <span className="text-emerald-400 font-semibold">● Firestore Realtime (onSnapshot)</span>
-            <span>•</span>
-            <span className="text-indigo-400 font-semibold">● Firebase Auth & Hosting</span>
-          </div>
+      {/* Aesthetic Icon-Only Navigation Dock Footer */}
+      <footer className="bg-slate-900/95 border-t border-slate-800/80 py-2.5 text-center text-xs text-slate-500 mt-auto sticky bottom-0 z-30 backdrop-blur-md">
+        <div className="max-w-md mx-auto px-4 flex items-center justify-center space-x-6 sm:space-x-8">
+          <button
+            onClick={() => triggerTabSwitch('timeline')}
+            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+              currentPublicTab === 'timeline'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400/50'
+                : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
+            }`}
+            title="Linha do Tempo"
+            aria-label="Linha do Tempo"
+          >
+            <Activity className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+          </button>
+
+          <button
+            onClick={() => triggerTabSwitch('favorites')}
+            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+              currentPublicTab === 'favorites'
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 scale-105 ring-1 ring-amber-300/50'
+                : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
+            }`}
+            title="Favoritos"
+            aria-label="Favoritos"
+          >
+            <Star className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+          </button>
+
+          <button
+            onClick={() => triggerTabSwitch('search')}
+            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+              currentPublicTab === 'search'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400/50'
+                : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
+            }`}
+            title="Pesquisa"
+            aria-label="Pesquisa"
+          >
+            <Search className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+          </button>
+
+          <button
+            onClick={() => triggerTabSwitch('devices')}
+            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+              currentPublicTab === 'devices'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400/50'
+                : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
+            }`}
+            title="Dispositivo"
+            aria-label="Dispositivo"
+          >
+            <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+          </button>
         </div>
       </footer>
     </div>

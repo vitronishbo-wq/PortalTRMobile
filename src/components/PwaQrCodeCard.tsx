@@ -69,7 +69,7 @@ export const PwaQrCodeCard: React.FC<PwaQrCodeCardProps> = ({ defaultUrl }) => {
           </div>
           <div>
             <h3 className="font-bold text-slate-100 text-base flex items-center space-x-2">
-              <span>QR Code para Instalação PWA (iOS & Android)</span>
+              <span>QR Code para Instalação (iOS & Android)</span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 100% Sem Cabos
               </span>

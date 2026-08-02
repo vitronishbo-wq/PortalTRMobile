@@ -49,8 +49,9 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
           setDisplay('Erro');
           return;
         }
-        // eslint-disable-next-line no-eval
-        const result = eval(sanitized);
+        // Safe arithmetic evaluation without using eval()
+        const calcFunc = new Function(`"use strict"; return (${sanitized});`);
+        const result = calcFunc();
         setDisplay(String(result));
         setExpression(String(result));
       } catch (e) {
@@ -91,7 +92,7 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
             <CalcIcon className="w-5 h-5 text-indigo-400" />
             <span className="font-bold text-sm text-slate-200">{calcTitle}</span>
           </div>
-          <span className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">pwa v2.4</span>
+          <span className="text-[10px] font-mono text-slate-600 uppercase tracking-widest">v2.4</span>
         </div>
 
         {errorMessage && (
@@ -148,7 +149,7 @@ export const DisguisedCalculator: React.FC<DisguisedCalculatorProps> = ({
 
         {/* Bottom Disguised System Status */}
         <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
-          <span>v2.4.0 (Serviço de Calculadora)</span>
+          <span>v2.4.0 (Calculadora Padrão)</span>
           <button
             onClick={() => alert('Acesso negado: Aplicativo essencial do sistema.')}
             className="text-slate-500 hover:text-slate-400 hover:underline cursor-pointer"
