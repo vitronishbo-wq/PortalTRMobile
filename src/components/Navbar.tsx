@@ -92,7 +92,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
               <div className="min-w-0 flex-1 truncate">
                 <span className="font-extrabold text-xs sm:text-base tracking-tight text-white truncate block">
-                  {workspaceMode === 'founder' ? 'Founder Root Workspace' : 'Portal Mobile'}
+                  {workspaceMode === 'founder' ? 'Founder Root Workspace' : 'PORTALTRMOBILE'}
                 </span>
                 {workspaceMode === 'public' && (
                   <span className="text-[10px] text-amber-400 font-mono font-bold block truncate -mt-0.5">
@@ -231,31 +231,33 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                   )}
 
-                  {/* Option: SuperDeus / Founder Mode (Only if authorized) */}
+                  {/* Option: Founder Mode (Only if authorized) */}
                   {isFounder && (
                     <button
                       onClick={() => {
                         setIsMenuOpen(false);
                         setWorkspaceMode(workspaceMode === 'public' ? 'founder' : 'public');
                       }}
-                      className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-left transition-all cursor-pointer group active:scale-[0.98]"
+                      className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-left transition-all cursor-pointer group active:scale-[0.98]"
                     >
                       <div className="flex items-center space-x-3.5">
-                        <div className="p-2.5 rounded-xl bg-amber-500/30 text-amber-300 border border-amber-400/50 group-hover:scale-105 transition-transform shrink-0">
+                        <div className="p-2.5 rounded-xl bg-slate-800 text-amber-400 border border-slate-700 group-hover:scale-105 transition-transform shrink-0">
                           {workspaceMode === 'public' ? (
-                            <KeyRound className="w-4 h-4 text-amber-300" />
+                            <KeyRound className="w-4 h-4 text-amber-400" />
                           ) : (
-                            <LogOut className="w-4 h-4 text-amber-300" />
+                            <LogOut className="w-4 h-4 text-amber-400" />
                           )}
                         </div>
                         <div>
-                          <span className="block text-xs sm:text-sm font-black text-amber-300">
-                            {workspaceMode === 'public' ? 'SuperDeus / Founder Console' : 'Voltar ao Modo Público'}
+                          <span className="block text-xs sm:text-sm font-black text-slate-100">
+                            {workspaceMode === 'public' ? 'Console Avançado' : 'Voltar ao Portal Público'}
                           </span>
-                          <span className="block text-[11px] text-slate-400 font-medium">Acesso Root e Infraestrutura</span>
+                          <span className="block text-[11px] text-slate-400 font-medium">
+                            {workspaceMode === 'public' ? 'Ambiente de Administração' : 'Alternar para visualização móvel'}
+                          </span>
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-amber-400/60 group-hover:text-amber-300 transition-colors shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-amber-400 transition-colors shrink-0" />
                     </button>
                   )}
 

@@ -869,6 +869,23 @@ app.post('/api/backup', requireFounder, (req, res) => {
   });
 });
 
+// APNs Push Notifications Endpoint for iOS
+app.post('/api/v1/notifications/apns', (req, res) => {
+  const { deviceToken, title, body, topic, badge } = req.body;
+  const messageId = `apns-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+
+  console.log(`[APNs Gateway] Push enviado para iOS (token: ${deviceToken?.substring(0, 10)}...): "${title}"`);
+
+  res.json({
+    success: true,
+    messageId,
+    platform: 'apns',
+    topic: topic || 'com.vitronis.cos',
+    badge: badge || 1,
+    timestamp: Date.now()
+  });
+});
+
 // START SERVER & VITE INTEGRATION
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

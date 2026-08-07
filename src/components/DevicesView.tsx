@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, QrCode, Battery, Wifi, ShieldCheck, Plus, Trash2, Send, RefreshCw, CheckCircle2, Activity, Cpu, Wrench, Zap } from 'lucide-react';
+import { Smartphone, QrCode, Battery, Wifi, ShieldCheck, Plus, Trash2, Send, RefreshCw, CheckCircle2, Activity, Cpu, Wrench, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Device } from '../types';
 import { ZeroTouchIdentity } from '../engine/provisioningEngine';
@@ -24,6 +24,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [newDeviceName, setNewDeviceName] = useState('');
   const [newDeviceModel, setNewDeviceModel] = useState('');
   const [repairingMap, setRepairingMap] = useState<Record<string, boolean>>({});
+  const [isBatteryExpanded, setIsBatteryExpanded] = useState<boolean>(false);
+  const [expandedDeviceMap, setExpandedDeviceMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     // Generate pairing token & QR Code
@@ -62,6 +64,23 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     }, 1200);
   };
 
+  const toggleDeviceExpanded = (deviceId: string) => {
+    setExpandedDeviceMap((prev) => ({ ...prev, [deviceId]: !prev[deviceId] }));
+  };
+
+  const getDeviceOem = (device: Device): string => {
+    if (device.oemProfile) return device.oemProfile;
+    const fullName = `${device.name || ''} ${device.model || ''}`.toLowerCase();
+    if (fullName.includes('samsung') || fullName.includes('galaxy') || fullName.includes('sm-')) return 'samsung';
+    if (fullName.includes('pixel') || fullName.includes('google')) return 'pixel';
+    if (fullName.includes('xiaomi') || fullName.includes('redmi') || fullName.includes('poco') || fullName.includes('hyperos') || fullName.includes('miui')) return 'xiaomi';
+    if (fullName.includes('oppo') || fullName.includes('realme') || fullName.includes('oneplus')) return 'oppo';
+    if (fullName.includes('apple') || fullName.includes('iphone') || fullName.includes('ipad')) return 'apple';
+    if (fullName.includes('itel')) return 'itel';
+    if (fullName.includes('huawei') || fullName.includes('honor')) return 'huawei';
+    return 'generic';
+  };
+
   return (
     <div className="space-y-6">
       
@@ -73,7 +92,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             <span>Dispositivos & DeviceHealth ({devices.length})</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Monitorização de Saúde Zero-Touch, permissões OEM e latência de sincronização em lote.
+            Exibição simplificada de marca e modelo. Clique num dispositivo para ver a telemetria detalhada.
           </p>
         </div>
 
@@ -92,16 +111,18 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           const isRepairing = repairingMap[device.deviceId];
           const healthScore = device.permissionScore ?? 98;
           const notificationStatus = device.notificationListenerStatus || 'active';
-          const oem = device.oemProfile || 'xiaomi';
+          const oem = getDeviceOem(device);
+          const isExpanded = !!expandedDeviceMap[device.deviceId];
 
           return (
             <div
               key={device.deviceId}
               className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800 shadow-lg relative space-y-4 hover:border-slate-700 transition-all"
             >
-              <div className="flex items-start justify-between">
+              {/* Main Visible Bar: Brand, Model, Online Status & Expand Toggle */}
+              <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
                     <Smartphone className="w-6 h-6" />
                   </div>
                   <div>
@@ -115,146 +136,177 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-2">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1 ${
                     device.online ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-slate-800 text-slate-500'
                   }`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${device.online ? 'bg-amber-400 animate-ping' : 'bg-slate-500'}`}></span>
                     <span>{device.online ? 'ONLINE' : 'OFFLINE'}</span>
                   </span>
-                </div>
-              </div>
-
-              {/* Zero-Touch & Digital Twin Diagnostics Panel */}
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/90 space-y-2.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400 flex items-center space-x-1.5 font-mono">
-                    <Activity className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="font-bold text-slate-300">Digital Twin Node:</span>
-                    <span className="text-amber-400 font-bold">{device.nodeId || `node-${device.deviceId.substring(0, 8)}`}</span>
-                  </span>
-                  <span className="font-bold text-amber-400 font-mono">{healthScore}%</span>
-                </div>
-
-                {/* Digital Twin Capabilities & Health Matrix */}
-                <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider font-mono">Capacidades Digital Twin:</span>
-                    <span className="text-emerald-400 font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20">
-                      {device.health?.network || 'AFRICELL_4G'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                      device.capabilities?.sms !== false
-                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                        : 'bg-slate-800 text-slate-500 border-slate-700'
-                    }`}>
-                      <span>SMS</span>
-                      <span>{device.capabilities?.sms !== false ? '✓' : '✕'}</span>
-                    </span>
-
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                      device.capabilities?.calls !== false
-                        ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
-                        : 'bg-slate-800 text-slate-500 border-slate-700'
-                    }`}>
-                      <span>CHAMADAS</span>
-                      <span>{device.capabilities?.calls !== false ? '✓' : '✕'}</span>
-                    </span>
-
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                      device.capabilities?.biometrics !== false
-                        ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                        : 'bg-slate-800 text-slate-500 border-slate-700'
-                    }`}>
-                      <span>BIOMETRIA</span>
-                      <span>{device.capabilities?.biometrics !== false ? '✓' : '✕'}</span>
-                    </span>
-
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                      device.capabilities?.accessibility
-                        ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
-                        : 'bg-slate-800/80 text-slate-400 border-slate-800'
-                    }`}>
-                      <span>ACESSIBILIDADE</span>
-                      <span>{device.capabilities?.accessibility ? '✓' : 'OFF'}</span>
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                    <span className="text-slate-400">Listener:</span>
-                    <span className={`font-semibold capitalize ${
-                      notificationStatus === 'active' ? 'text-amber-400' : 'text-orange-400'
-                    }`}>
-                      {notificationStatus === 'active' ? '● Ativo' : '▲ Requer Reparo'}
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                    <span className="text-slate-400">Latência Barramento:</span>
-                    <span className="font-mono text-indigo-300 font-bold">
-                      {device.syncDelayMs ?? 12}ms
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300">
-                <div className="flex items-center space-x-1.5">
-                  <Battery className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{device.batteryLevel ?? 98}%</span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <Zap className="w-3.5 h-3.5 text-orange-400" />
-                  <span>Zero-Touch</span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Sem Limites</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                <span>Último Heartbeat: {new Date(device.lastSync).toLocaleTimeString('pt-BR')}</span>
-                
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleAutoRepair(device.deviceId)}
-                    disabled={isRepairing}
-                    className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition-all cursor-pointer flex items-center space-x-1"
-                    title="Auto-Repair Background Listener"
-                  >
-                    <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
-                    <span className="text-[10px]">Auto-Repair</span>
-                  </button>
 
                   <button
-                    onClick={onSimulateEvent}
-                    className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all cursor-pointer"
-                    title="Testar Envio de Evento do Celular"
+                    onClick={() => toggleDeviceExpanded(device.deviceId)}
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold flex items-center space-x-1 cursor-pointer transition-all active:scale-95 shadow-md"
+                    title={isExpanded ? "Ocultar Detalhes" : "Clique para ver detalhes do smartphone"}
                   >
-                    <Send className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => onRemoveDevice(device.deviceId)}
-                    className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer"
-                    title="Desconectar Dispositivo"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    {isExpanded ? (
+                      <>
+                        <span className="hidden sm:inline">Ocultar</span>
+                        <ChevronUp className="w-4 h-4 text-amber-400" />
+                      </>
+                    ) : (
+                      <>
+                        <span className="hidden sm:inline">Ver Detalhes</span>
+                        <ChevronDown className="w-4 h-4 text-amber-400" />
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
+
+              {/* VOLUNTARY EXPANDED DETAILS PANEL */}
+              {isExpanded && (
+                <div className="space-y-4 pt-2 border-t border-slate-800/80 animate-fadeIn">
+                  {/* Zero-Touch & Digital Twin Diagnostics Panel */}
+                  <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/90 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400 flex items-center space-x-1.5 font-mono">
+                        <Activity className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="font-bold text-slate-300">Digital Twin Node:</span>
+                        <span className="text-amber-400 font-bold">{device.nodeId || `node-${device.deviceId.substring(0, 8)}`}</span>
+                      </span>
+                      <span className="font-bold text-amber-400 font-mono">{healthScore}%</span>
+                    </div>
+
+                    {/* Digital Twin Capabilities & Health Matrix */}
+                    <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider font-mono">Capacidades Digital Twin:</span>
+                        <span className="text-emerald-400 font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20">
+                          {device.health?.network || 'AFRICELL_4G'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                          device.capabilities?.sms !== false
+                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                            : 'bg-slate-800 text-slate-500 border-slate-700'
+                        }`}>
+                          <span>SMS</span>
+                          <span>{device.capabilities?.sms !== false ? '✓' : '✕'}</span>
+                        </span>
+
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                          device.capabilities?.calls !== false
+                            ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                            : 'bg-slate-800 text-slate-500 border-slate-700'
+                        }`}>
+                          <span>CHAMADAS</span>
+                          <span>{device.capabilities?.calls !== false ? '✓' : '✕'}</span>
+                        </span>
+
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                          device.capabilities?.biometrics !== false
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                            : 'bg-slate-800 text-slate-500 border-slate-700'
+                        }`}>
+                          <span>BIOMETRIA</span>
+                          <span>{device.capabilities?.biometrics !== false ? '✓' : '✕'}</span>
+                        </span>
+
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                          device.capabilities?.accessibility
+                            ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+                            : 'bg-slate-800/80 text-slate-400 border-slate-800'
+                        }`}>
+                          <span>ACESSIBILIDADE</span>
+                          <span>{device.capabilities?.accessibility ? '✓' : 'OFF'}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                        <span className="text-slate-400">Listener:</span>
+                        <span className={`font-semibold capitalize ${
+                          notificationStatus === 'active' ? 'text-amber-400' : 'text-orange-400'
+                        }`}>
+                          {notificationStatus === 'active' ? '● Ativo' : '▲ Requer Reparo'}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                        <span className="text-slate-400">Latência Barramento:</span>
+                        <span className="font-mono text-indigo-300 font-bold">
+                          {device.syncDelayMs ?? 12}ms
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300">
+                    <button
+                      onClick={() => setIsBatteryExpanded((prev) => !prev)}
+                      className="flex items-center space-x-1.5 hover:text-amber-300 transition-all cursor-pointer group text-left active:scale-95"
+                      title="Clique no ícone da bateria para expandir/recolher telemetria detalhada"
+                    >
+                      <Battery className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform animate-pulse" />
+                      <span className="font-bold text-amber-300">{device.batteryLevel ?? 98}%</span>
+                    </button>
+                    <div className="flex items-center space-x-1.5">
+                      <Zap className="w-3.5 h-3.5 text-orange-400" />
+                      <span>Zero-Touch</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Sem Limites</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                    <span>Último Heartbeat: {new Date(device.lastSync).toLocaleTimeString('pt-BR')}</span>
+                    
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleAutoRepair(device.deviceId)}
+                        disabled={isRepairing}
+                        className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition-all cursor-pointer flex items-center space-x-1"
+                        title="Auto-Repair Background Listener"
+                      >
+                        <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
+                        <span className="text-[10px]">Auto-Repair</span>
+                      </button>
+
+                      <button
+                        onClick={onSimulateEvent}
+                        className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all cursor-pointer"
+                        title="Testar Envio de Evento do Celular"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => onRemoveDevice(device.deviceId)}
+                        className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer"
+                        title="Desconectar Dispositivo"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* Historical Battery Usage & Drain Monitor */}
-      <BatteryUsageMonitor devices={devices} />
+      {/* Historical Battery Usage & Drain Monitor (Collapsible) */}
+      <BatteryUsageMonitor
+        devices={devices}
+        isExpanded={isBatteryExpanded}
+        onToggleExpand={() => setIsBatteryExpanded((prev) => !prev)}
+      />
 
       {/* QR Code Pair Modal */}
       {showPairModal && (

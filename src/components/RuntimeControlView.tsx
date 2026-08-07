@@ -13,9 +13,17 @@ import {
   Radio,
   Clock,
   Terminal,
-  Smartphone
+  Smartphone,
+  Tv,
+  Monitor,
+  Download,
+  Send,
+  Sparkles
 } from 'lucide-react';
 import { globalRuntime, RuntimeEnvelope, ActionItem } from '../engine/runtimeEngine';
+import { getPlatform, isTauri, sendDesktopNotification } from '../lib/platform';
+import { useTVMode } from '../hooks/useTVMode';
+import { dispatchAPNsNotification } from '../services/apns';
 
 export const RuntimeControlView: React.FC = () => {
   const [runtimeState, setRuntimeState] = useState(globalRuntime.state);
@@ -25,6 +33,31 @@ export const RuntimeControlView: React.FC = () => {
   const [capabilities, setCapabilities] = useState(globalRuntime.capabilitiesGraph);
   const [pipelineQueue, setPipelineQueue] = useState<ActionItem[]>(globalRuntime.actionPipeline.getQueue());
   const [repairedCount, setRepairedCount] = useState<number | null>(null);
+
+  // Multi-Platform Runtime states
+  const { isTV, toggleTVMode } = useTVMode();
+  const [detectedPlatform, setDetectedPlatform] = useState(getPlatform());
+  const [apnsStatus, setApnsStatus] = useState<string | null>(null);
+  const [tauriBuildStatus, setTauriBuildStatus] = useState<string | null>(null);
+
+  const handleTestAPNs = async () => {
+    setApnsStatus('Enviando...');
+    const result = await dispatchAPNsNotification('sample-ios-device-token-12345', {
+      title: 'Notificação iOS APNs',
+      body: 'Notificação Push enviada com sucesso via gateway APNs!',
+      topic: 'com.vitronis.cos',
+      badge: 1
+    });
+    setApnsStatus(result.success ? `Enviado (ID: ${result.messageId.substring(0, 10)})` : 'Falhou');
+    setTimeout(() => setApnsStatus(null), 4000);
+  };
+
+  const handleTestTauriNotification = async () => {
+    setTauriBuildStatus('Enviando Notificação...');
+    const sent = await sendDesktopNotification('Vitronis COS Desktop', 'Notificação de teste no ecossistema Tauri/Desktop.');
+    setTauriBuildStatus(sent ? 'Notificação Entregue' : 'Notificação Simulada');
+    setTimeout(() => setTauriBuildStatus(null), 3000);
+  };
 
   // Subscribe to runtime events and sync UI state
   useEffect(() => {
@@ -170,6 +203,95 @@ export const RuntimeControlView: React.FC = () => {
             <span className="text-lg font-black text-cyan-300 font-mono">{globalRuntime.plugins.size} Plugins</span>
           </div>
           <span className="text-[10px] text-slate-500 block">Interface Única Registada</span>
+        </div>
+      </div>
+
+      {/* Multi-Platform Operational Control Card (Fase 4) */}
+      <div className="bg-slate-900/90 p-5 rounded-2xl border border-amber-500/30 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center space-x-2.5">
+            <span className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <Monitor className="w-5 h-5" />
+            </span>
+            <div>
+              <h3 className="text-sm font-black text-slate-100 flex items-center space-x-2">
+                <span>Runtime Multi-Plataforma (Fase 4)</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold uppercase">
+                  {detectedPlatform}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Execução unificada em 8 ecossistemas: Windows, macOS, Linux (Tauri 3MB), iOS APNs, Android Node & Smart TV.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] text-slate-400 font-mono bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+              Modo TV: <strong className={isTV ? 'text-amber-400' : 'text-slate-400'}>{isTV ? 'ATIVO' : 'INATIVO'}</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* Operational Control Buttons */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <button
+            onClick={() => setDetectedPlatform(getPlatform())}
+            className="p-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-left transition-all cursor-pointer group active:scale-95 space-y-1"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-200 group-hover:text-amber-300 transition-colors">
+                Detetar Plataforma
+              </span>
+              <Activity className="w-3.5 h-3.5 text-indigo-400" />
+            </div>
+            <p className="text-[10px] text-slate-400">Ambiente atual: <strong className="text-amber-400 uppercase">{detectedPlatform}</strong></p>
+          </button>
+
+          <button
+            onClick={handleTestTauriNotification}
+            className="p-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-left transition-all cursor-pointer group active:scale-95 space-y-1"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-200 group-hover:text-emerald-300 transition-colors">
+                Tauri Desktop API
+              </span>
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+            </div>
+            <p className="text-[10px] text-slate-400">{tauriBuildStatus || 'Testar Notificação Tauri'}</p>
+          </button>
+
+          <button
+            onClick={handleTestAPNs}
+            className="p-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-left transition-all cursor-pointer group active:scale-95 space-y-1"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-200 group-hover:text-purple-300 transition-colors">
+                iOS APNs Gateway
+              </span>
+              <Send className="w-3.5 h-3.5 text-purple-400" />
+            </div>
+            <p className="text-[10px] text-slate-400">{apnsStatus || 'Disparar Push iOS'}</p>
+          </button>
+
+          <button
+            onClick={toggleTVMode}
+            className={`p-3 rounded-xl border text-left transition-all cursor-pointer group active:scale-95 space-y-1 ${
+              isTV
+                ? 'bg-amber-500/20 border-amber-500/50 text-amber-200'
+                : 'bg-slate-950 hover:bg-slate-800 border-slate-800 hover:border-slate-700'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-200 group-hover:text-amber-300 transition-colors">
+                Modo Smart TV
+              </span>
+              <Tv className="w-3.5 h-3.5 text-amber-400" />
+            </div>
+            <p className="text-[10px] text-slate-400">
+              {isTV ? 'Navegação Setas ATIVA' : 'Alternar UI para Ecrã Grande'}
+            </p>
+          </button>
         </div>
       </div>
 

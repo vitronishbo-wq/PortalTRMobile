@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Battery,
   BatteryCharging,
@@ -13,7 +14,9 @@ import {
   Sliders,
   CheckCircle2,
   Activity,
-  ArrowDownRight
+  ArrowDownRight,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -33,12 +36,21 @@ import { Device } from '../types';
 interface BatteryUsageMonitorProps {
   devices: Device[];
   onUpdateDeviceBattery?: (deviceId: string, newLevel: number) => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 export const BatteryUsageMonitor: React.FC<BatteryUsageMonitorProps> = ({
   devices,
-  onUpdateDeviceBattery
+  onUpdateDeviceBattery,
+  isExpanded: controlledIsExpanded,
+  onToggleExpand: controlledOnToggleExpand
 }) => {
+  const [internalIsExpanded, setInternalIsExpanded] = useState<boolean>(false);
+  
+  const isExpanded = controlledIsExpanded !== undefined ? controlledIsExpanded : internalIsExpanded;
+  const handleToggleExpand = controlledOnToggleExpand || (() => setInternalIsExpanded((prev) => !prev));
+
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('all');
   const [timeHorizonHours, setTimeHorizonHours] = useState<number>(24);
   const [simulatingEvent, setSimulatingEvent] = useState<boolean>(false);
@@ -196,76 +208,147 @@ export const BatteryUsageMonitor: React.FC<BatteryUsageMonitorProps> = ({
   const chartColors = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4'];
 
   return (
-    <div className="space-y-6 font-sans select-none">
-      {/* Header Banner */}
-      <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2">
-            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-              <BatteryCharging className="w-5 h-5" />
-            </div>
-            <h2 className="text-lg font-bold text-slate-100">
-              Monitor de Consumo de Bateria Zero-Touch
-            </h2>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
-              Telemetria 24/7
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Análise histórica de descarga de bateria, otimizações OEM e previsibilidade de autonomia.
-          </p>
-        </div>
-
-        {/* Filter Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Device Filter */}
-          <div className="flex items-center space-x-1.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
-            <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
-            <select
-              value={selectedDeviceId}
-              onChange={(e) => setSelectedDeviceId(e.target.value)}
-              className="bg-transparent text-slate-200 font-medium focus:outline-none cursor-pointer"
+    <div className="space-y-4 font-sans select-none">
+      {!isExpanded ? (
+        /* Discreet Collapsed Bar */
+        <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800/90 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-3.5">
+            <button
+              onClick={handleToggleExpand}
+              className="p-2.5 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 shadow-lg shadow-amber-500/10 transition-all cursor-pointer group active:scale-95"
+              title="Clique no ícone de bateria para expandir detalhes de telemetria"
             >
-              <option value="all" className="bg-slate-900 text-slate-200">
-                Todos os Dispositivos ({activeDevices.length})
-              </option>
-              {activeDevices.map((dev) => (
-                <option key={dev.deviceId} value={dev.deviceId} className="bg-slate-900 text-slate-200">
-                  {dev.name} ({dev.batteryLevel ?? '?'}%)
-                </option>
+              <Battery className="w-5 h-5 animate-pulse group-hover:scale-110 transition-transform" />
+            </button>
+
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-sm font-black text-slate-100 tracking-tight">
+                  Monitor de Consumo de Bateria
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-mono">
+                  Recolhido
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Clique no ícone da bateria para expandir a telemetria e o histórico
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 shrink-0">
+            <div className="hidden md:flex items-center space-x-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+              {activeDevices.slice(0, 3).map((dev) => (
+                <span key={dev.deviceId} className="flex items-center space-x-1 text-[11px] text-slate-300 font-mono">
+                  <Battery className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{dev.name.split(' ')[0]}:</span>
+                  <strong className="text-amber-400">{dev.batteryLevel ?? '?'}%</strong>
+                </span>
               ))}
-            </select>
-          </div>
+            </div>
 
-          {/* Time Horizon Selector */}
-          <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-            {[6, 12, 24, 48].map((h) => (
-              <button
-                key={h}
-                onClick={() => setTimeHorizonHours(h)}
-                className={`px-2.5 py-1 rounded-lg font-mono font-bold text-[11px] transition-all cursor-pointer ${
-                  timeHorizonHours === h
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {h}h
-              </button>
-            ))}
+            <button
+              onClick={handleToggleExpand}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-extrabold flex items-center space-x-2 cursor-pointer transition-all active:scale-95 shadow-md"
+            >
+              <Battery className="w-4 h-4 text-amber-400" />
+              <span>Expandir Telemetria</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
           </div>
-
-          {/* Simulation trigger */}
-          <button
-            onClick={handleSimulateBatteryDrain}
-            disabled={simulatingEvent}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-bold text-xs transition-all flex items-center space-x-1 cursor-pointer"
-            title="Simular descargas de bateria"
-          >
-            <TrendingDown className={`w-3.5 h-3.5 ${simulatingEvent ? 'animate-bounce' : ''}`} />
-            <span>Simular Descarga</span>
-          </button>
         </div>
-      </div>
+      ) : (
+        /* Full Expanded Telemetry View */
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.25 }}
+          className="space-y-6"
+        >
+          {/* Header Banner */}
+          <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleToggleExpand}
+                  className="p-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 cursor-pointer transition-all active:scale-95"
+                  title="Clique no ícone de bateria para recolher"
+                >
+                  <BatteryCharging className="w-5 h-5" />
+                </button>
+                <h2 className="text-lg font-bold text-slate-100">
+                  Monitor de Consumo de Bateria Zero-Touch
+                </h2>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                  Telemetria 24/7
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Análise histórica de descarga de bateria, otimizações OEM e previsibilidade de autonomia.
+              </p>
+            </div>
+
+            {/* Filter Controls & Collapse Button */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Device Filter */}
+              <div className="flex items-center space-x-1.5 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+                <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
+                <select
+                  value={selectedDeviceId}
+                  onChange={(e) => setSelectedDeviceId(e.target.value)}
+                  className="bg-transparent text-slate-200 font-medium focus:outline-none cursor-pointer"
+                >
+                  <option value="all" className="bg-slate-900 text-slate-200">
+                    Todos os Dispositivos ({activeDevices.length})
+                  </option>
+                  {activeDevices.map((dev) => (
+                    <option key={dev.deviceId} value={dev.deviceId} className="bg-slate-900 text-slate-200">
+                      {dev.name} ({dev.batteryLevel ?? '?'}%)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Time Horizon Selector */}
+              <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                {[6, 12, 24, 48].map((h) => (
+                  <button
+                    key={h}
+                    onClick={() => setTimeHorizonHours(h)}
+                    className={`px-2.5 py-1 rounded-lg font-mono font-bold text-[11px] transition-all cursor-pointer ${
+                      timeHorizonHours === h
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {h}h
+                  </button>
+                ))}
+              </div>
+
+              {/* Simulation trigger */}
+              <button
+                onClick={handleSimulateBatteryDrain}
+                disabled={simulatingEvent}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-bold text-xs transition-all flex items-center space-x-1 cursor-pointer"
+                title="Simular descargas de bateria"
+              >
+                <TrendingDown className={`w-3.5 h-3.5 ${simulatingEvent ? 'animate-bounce' : ''}`} />
+                <span>Simular Descarga</span>
+              </button>
+
+              {/* Collapse Button */}
+              <button
+                onClick={handleToggleExpand}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs transition-all flex items-center space-x-1 cursor-pointer"
+                title="Recolher painel de bateria"
+              >
+                <ChevronUp className="w-4 h-4 text-slate-400" />
+                <span>Recolher</span>
+              </button>
+            </div>
+          </div>
 
       {/* Metric Diagnostic Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -491,6 +574,8 @@ export const BatteryUsageMonitor: React.FC<BatteryUsageMonitorProps> = ({
           </div>
         </div>
       </div>
+        </motion.div>
+      )}
     </div>
   );
 };

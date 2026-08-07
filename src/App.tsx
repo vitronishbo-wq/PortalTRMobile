@@ -73,7 +73,8 @@ const initialDevices: Device[] = [
     lastSync: Date.now() - 2 * 60 * 1000,
     online: true,
     batteryLevel: 88,
-    pairedAt: Date.now() - 7 * 24 * 3600 * 1000
+    pairedAt: Date.now() - 7 * 24 * 3600 * 1000,
+    oemProfile: 'pixel'
   },
   {
     deviceId: 'dev-samsung-s23',
@@ -85,7 +86,8 @@ const initialDevices: Device[] = [
     lastSync: Date.now() - 45 * 60 * 1000,
     online: true,
     batteryLevel: 62,
-    pairedAt: Date.now() - 14 * 24 * 3600 * 1000
+    pairedAt: Date.now() - 14 * 24 * 3600 * 1000,
+    oemProfile: 'samsung'
   }
 ];
 
