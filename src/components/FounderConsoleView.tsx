@@ -57,6 +57,10 @@ import { IdentityEngine, useIdentity } from '../engine/identityEngine';
 import { UserProfile, UserRole, resolveRootLevel, getDefaultPermissionsForRole } from '../types/User';
 import { FirestoreService } from '../services/firestore';
 import { TrialEngine } from '../services/trialEngine';
+import { AppyPayGatewayConsole } from './AppyPayGatewayConsole';
+import { IntegrationsConsole } from './IntegrationsConsole';
+import { InfrastructureConsole } from './InfrastructureConsole';
+import { AnalyticsView } from './AnalyticsView';
 import { RootConsoleView } from './workspaces/RootConsoleView';
 import { OperationalOverviewConsole } from './workspaces/OperationalOverviewConsole';
 
@@ -596,40 +600,9 @@ const FounderConsoleContent: React.FC<FounderConsoleContentProps> = ({ sessionPr
         </div>
       )}
 
-      {/* 3. 📊 MONITORING */}
+      {/* 3. 📊 MONITORING & ANALYTICS */}
       {activeTab === 'monitoring' && (
-        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-emerald-400 flex items-center space-x-2 border-b border-slate-800 pb-3">
-            <Activity className="w-4 h-4" />
-            <span>Métricas e Telemetria em Tempo Real</span>
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-              <span className="text-[10px] text-slate-400 font-mono">LATÊNCIA SSE</span>
-              <div className="text-lg font-mono font-bold text-emerald-400">24 ms</div>
-              <span className="text-[10px] text-slate-500">Fluxo em Direct Stream</span>
-            </div>
-
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-              <span className="text-[10px] text-slate-400 font-mono">USO MEMÓRIA</span>
-              <div className="text-lg font-mono font-bold text-indigo-400">128 MB / 512 MB</div>
-              <span className="text-[10px] text-slate-500">Cloud Run Container</span>
-            </div>
-
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-              <span className="text-[10px] text-slate-400 font-mono">TAXA SUCESSO</span>
-              <div className="text-lg font-mono font-bold text-emerald-400">100%</div>
-              <span className="text-[10px] text-slate-500">0 falhas nas últimas 24h</span>
-            </div>
-
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-              <span className="text-[10px] text-slate-400 font-mono">EVENTOS / MINUTO</span>
-              <div className="text-lg font-mono font-bold text-amber-400">42 ev/min</div>
-              <span className="text-[10px] text-slate-500">Sincronização Ativa</span>
-            </div>
-          </div>
-        </div>
+        <AnalyticsView stats={null} />
       )}
 
       {/* 4. 🏠 DASHBOARD */}
@@ -736,138 +709,17 @@ const FounderConsoleContent: React.FC<FounderConsoleContentProps> = ({ sessionPr
 
       {/* 7. 💳 BILLING */}
       {activeTab === 'billing' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-            <h3 className="text-sm font-bold text-amber-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
-              <CreditCard className="w-4 h-4" />
-              <span>Testador Sandbox AppyPay (Multicaixa Express AOA)</span>
-            </h3>
-
-            <form onSubmit={handleTestAppyPayCharge} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-bold text-slate-300 mb-1">Montante (AOA Kwanza)</label>
-                <input
-                  type="number"
-                  value={chargeAmount}
-                  onChange={(e) => setChargeAmount(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-300 mb-1">Descrição</label>
-                <input
-                  type="text"
-                  value={chargeDescription}
-                  onChange={(e) => setChargeDescription(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isCharging}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl cursor-pointer"
-              >
-                {isCharging ? 'Processando...' : 'Criar Cobrança AppyPay'}
-              </button>
-            </form>
-          </div>
-
-          <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-            <h3 className="text-sm font-bold text-slate-100 border-b border-slate-800 pb-3">Retorno Gateway</h3>
-            {lastCharge ? (
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs font-mono space-y-2">
-                <div className="text-emerald-400 font-bold">Cobrança Gerada #{lastCharge.chargeId}</div>
-                <div>Referência: <span className="text-amber-400 font-bold">{lastCharge.referenceCode}</span></div>
-                <div>Montante: {lastCharge.amount} AOA</div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500 font-mono">Gere uma cobrança para visualizar o retorno.</p>
-            )}
-          </div>
-        </div>
+        <AppyPayGatewayConsole />
       )}
 
       {/* 8. 🔌 INTEGRATIONS */}
       {activeTab === 'integrations' && (
-        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-purple-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
-            <Plug className="w-4 h-4" />
-            <span>Webhooks e Integrações de API</span>
-          </h3>
-
-          <div className="space-y-3 text-xs">
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-              <div>
-                <h4 className="font-bold text-slate-200">Firebase Cloud Messaging (FCM)</h4>
-                <p className="text-[10px] text-slate-400 font-mono">Notificações Push para Agentes Android</p>
-              </div>
-              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 font-mono text-[10px] rounded border border-emerald-500/30">ATIVO</span>
-            </div>
-
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-              <div>
-                <h4 className="font-bold text-slate-200">AppyPay REST API Gateway</h4>
-                <p className="text-[10px] text-slate-400 font-mono">Processamento de Pagamentos AOA</p>
-              </div>
-              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 font-mono text-[10px] rounded border border-emerald-500/30">ATIVO</span>
-            </div>
-          </div>
-        </div>
+        <IntegrationsConsole />
       )}
 
       {/* 8. ☁ INFRASTRUCTURE & STORAGE */}
       {activeTab === 'infrastructure' && (
-        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-cyan-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
-            <Cloud className="w-4 h-4" />
-            <span>Infraestrutura Cloud Run, Servidores & Coleções Firestore</span>
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-              <span className="text-[10px] text-slate-400 font-mono block">CLOUD RUN CONTAINER</span>
-              <div className="font-bold text-emerald-400">Port 3000 (Proxy Reverse NGINX)</div>
-              <span className="text-[10px] text-slate-500 block">Host 0.0.0.0</span>
-            </div>
-
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-              <span className="text-[10px] text-slate-400 font-mono block">FIREBASE HOSTING & FIRESTORE</span>
-              <div className="font-bold text-amber-400">Frontend PWA & Realtime DB</div>
-              <span className="text-[10px] text-slate-500 block">CDN Global & IndexedDB Offline</span>
-            </div>
-
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-              <span className="text-[10px] text-slate-400 font-mono block">RENDER BACKEND</span>
-              <div className="font-bold text-cyan-400">Stateless Microservices</div>
-              <span className="text-[10px] text-slate-500 block">Conexão Segura SSL</span>
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <h4 className="text-xs font-bold text-slate-300 mb-2 font-mono">Coleções Principais do Firestore Engine:</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                <span className="text-slate-400 text-[10px] block">COLEÇÃO</span>
-                <span className="font-bold text-amber-400">users</span>
-                <span className="text-[10px] text-slate-500 block mt-1">Perfis de Acesso & RBAC</span>
-              </div>
-
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                <span className="text-slate-400 text-[10px] block">COLEÇÃO</span>
-                <span className="font-bold text-emerald-400">devices</span>
-                <span className="text-[10px] text-slate-500 block mt-1">Agentes Android Pareados</span>
-              </div>
-
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                <span className="text-slate-400 text-[10px] block">COLEÇÃO</span>
-                <span className="font-bold text-indigo-400">events</span>
-                <span className="text-[10px] text-slate-500 block mt-1">Eventos & Registos SMS/Chamadas</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <InfrastructureConsole />
       )}
 
       {/* 9. 🚀 RELEASES */}

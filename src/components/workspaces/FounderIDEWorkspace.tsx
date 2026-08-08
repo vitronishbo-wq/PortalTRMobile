@@ -50,6 +50,11 @@ import { UserProfile, UserRole } from '../../types/User';
 import { IdentityEngine } from '../../engine/identityEngine';
 import { RootConsoleView } from './RootConsoleView';
 import { OperationalOverviewConsole } from './OperationalOverviewConsole';
+import { DevicesView } from '../DevicesView';
+import { AppyPayGatewayConsole } from '../AppyPayGatewayConsole';
+import { IntegrationsConsole } from '../IntegrationsConsole';
+import { InfrastructureConsole } from '../InfrastructureConsole';
+import { AnalyticsView } from '../AnalyticsView';
 import { CommandPalette } from './CommandPalette';
 import { AutomationEngine, AutomationRule, AutomationExecutionLog } from '../../services/automationEngine';
 import { HealthEngine, DeviceHealthMetric, OperationalDiagnostic, DeviceTimelineEvent } from '../../services/healthEngine';
@@ -204,12 +209,13 @@ export const FounderIDEWorkspace: React.FC = () => {
     { id: 'devices', label: '2. Devices & Agent Mesh Fleet', icon: Smartphone },
     { id: 'cpaas_dispatcher', label: '3. CPaaS, Command & Retry Queue', icon: Shield },
     { id: 'automation', label: '4. Automation Engine', icon: Zap },
-    { id: 'health', label: '5. Telemetry, Realtime SSE & Health', icon: Activity },
+    { id: 'health', label: '5. Analytics Executive (Utilização, Crescimento, Conversão, Receita, Consumo, Perf)', icon: BarChart3 },
     { id: 'users', label: '6. Identity & User Licenses', icon: Users, badge: users.length },
     { id: 'payments', label: '7. Billing & AppyPay Gateway', icon: CreditCard },
-    { id: 'flags', label: '8. Feature Flags', icon: Sliders },
-    { id: 'infrastructure', label: '9. Infrastructure & Storage', icon: Cloud },
-    { id: 'audit', label: '10. Audit Logs & System DLQ', icon: ScrollText }
+    { id: 'integrations', label: '8. Integrations, APIs & Webhooks', icon: Plug },
+    { id: 'flags', label: '9. Feature Flags', icon: Sliders },
+    { id: 'infrastructure', label: '10. Infrastructure & Storage', icon: Cloud },
+    { id: 'audit', label: '11. Audit Logs & System DLQ', icon: ScrollText }
   ];
 
   // Open or focus tab
@@ -545,72 +551,7 @@ export const FounderIDEWorkspace: React.FC = () => {
             ) : activeActivity === 'root_authority' || activeTabObj?.type === 'root_authority' ? (
               <RootConsoleView />
             ) : activeActivity === 'devices' || activeTabObj?.type === 'device' ? (
-              /* MULTI-DEVICE MESH & FLEET MANAGER */
-              <div className="space-y-6 font-mono text-slate-100">
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <span className="p-3 bg-indigo-500/20 text-indigo-400 rounded-2xl border border-indigo-500/30">
-                      <Smartphone className="w-6 h-6" />
-                    </span>
-                    <div>
-                      <h2 className="text-lg font-black text-slate-100">MULTI-DEVICE MESH & FLEET ENGINE</h2>
-                      <p className="text-xs text-slate-400">Orquestração em Nuvem do Ecossistema Mobile, PWA e Desktop</p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setTerminalLogs((prev) => [
-                        ...prev,
-                        `[PAIRING ENGINE] Token QR gerado com sucesso. Expiração: 300s.`
-                      ]);
-                      setBottomPanelOpen(true);
-                    }}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-lg shadow-amber-500/20 flex items-center space-x-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Gerar QR Code de Pareamento (Zero-Touch)</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-indigo-400">Agente Android Samsung S22</span>
-                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] rounded font-bold">ONLINE</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">SIM Físico Ativo • Interceptador SMS & Chamadas (&lt;5ms)</p>
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-500">
-                      <span>Node ID: agent-samsung-s22</span>
-                      <span className="text-amber-400 font-bold">Capacidade: 100%</span>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sky-400">PWA Master Workstation (Chrome/macOS)</span>
-                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] rounded font-bold">ACTIVE</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">Sessão Handover Pronta • Chave E2EE Verificada</p>
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-500">
-                      <span>Node ID: pwa-workstation-001</span>
-                      <span className="text-sky-400 font-bold">Clipboard Sync: OK</span>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-purple-400">Agente Itel A100 (Dispositivo Bónus)</span>
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] rounded font-bold">STANDBY</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">Auto-Discovery Registrado • Rota de Failover Pronta</p>
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-500">
-                      <span>Node ID: node-itel-a100</span>
-                      <span className="text-emerald-400 font-bold">Score: 98%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <DevicesView />
             ) : activeActivity === 'cpaas_dispatcher' ? (
               /* CPaaS SECURITY, DISPATCHER ENGINE, API KEYS & VIRTUAL NUMBERS */
               <div className="space-y-6 font-sans">
@@ -624,17 +565,14 @@ export const FounderIDEWorkspace: React.FC = () => {
               /* AUTOMATION ENGINE VIEW */
               <AutomationRulesManager />
             ) : activeActivity === 'health' ? (
-              /* TELEMETRY, REALTIME SSE & HEALTH VIEW */
+              /* TELEMETRY, ANALYTICS EXECUTIVE & HEALTH VIEW */
               <div className="space-y-6 font-sans text-slate-100">
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <span className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl border border-emerald-500/30">
-                      <Activity className="w-6 h-6" />
-                    </span>
-                    <div>
-                      <h2 className="text-lg font-black text-slate-100">TELEMETRY, REALTIME SSE & HEALTH ENGINE</h2>
-                      <p className="text-xs text-slate-400 font-mono">Monitorização em Tempo Real, Diagnósticos & Transmissão SSE (&lt;5ms)</p>
-                    </div>
+                <AnalyticsView stats={null} />
+
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between font-mono text-xs">
+                  <div>
+                    <h3 className="font-black text-slate-100 text-sm">TELEMETRIA & SAÚDE DOS AGENTES ANDROID</h3>
+                    <p className="text-slate-400 text-[11px]">Diagnósticos automáticos e repair workflows em lote</p>
                   </div>
 
                   <button
@@ -785,40 +723,10 @@ export const FounderIDEWorkspace: React.FC = () => {
               </div>
             ) : activeActivity === 'payments' ? (
               /* PAYMENTS & APPYPAY GATEWAY VIEW */
-              <div className="space-y-6 font-mono text-slate-100 text-xs">
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <h3 className="text-sm font-bold text-emerald-400 flex items-center space-x-2">
-                      <CreditCard className="w-4 h-4" />
-                      <span>AppyPay Payment Provider Module (Angola Kwanza - AOA)</span>
-                    </h3>
-                    <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 font-bold text-xs">
-                      ✓ SANDBOX ATIVO
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-300">
-                    Processamento seguro de cobranças com suporte a pagamentos por referência Multicaixa Express e AppyPay.
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                      <span className="text-slate-500 block text-[10px]">MOEDA</span>
-                      <span className="text-emerald-400 font-bold text-sm">AOA (Kwanza)</span>
-                    </div>
-                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                      <span className="text-slate-500 block text-[10px]">GATEWAY STATUS</span>
-                      <span className="text-amber-400 font-bold text-sm">18ms Ping</span>
-                    </div>
-                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                      <span className="text-slate-500 block text-[10px]">WEBHOOK URL</span>
-                      <span className="text-indigo-400 font-bold text-sm">/api/appypay</span>
-                    </div>
-                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                      <span className="text-slate-500 block text-[10px]">TAXA SUCESSO</span>
-                      <span className="text-emerald-400 font-bold text-sm">99.8%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <AppyPayGatewayConsole />
+            ) : activeActivity === 'integrations' ? (
+              /* INTEGRATIONS, APIS & WEBHOOKS VIEW */
+              <IntegrationsConsole />
             ) : activeActivity === 'flags' ? (
               /* FEATURE FLAGS VIEW */
               <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4 font-mono text-xs">
@@ -850,39 +758,7 @@ export const FounderIDEWorkspace: React.FC = () => {
               </div>
             ) : activeActivity === 'infrastructure' ? (
               /* CONSOLIDATED INFRASTRUCTURE & STORAGE VIEW */
-              <div className="space-y-6 font-mono text-slate-100 text-xs">
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-black text-slate-100">INFRASTRUCTURE & STORAGE ENGINE</h2>
-                    <p className="text-xs text-slate-400">Node.js Express (Port 3000), Memory Batching, Firestore & IndexedDB</p>
-                  </div>
-                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg border border-emerald-500/40 font-bold">
-                    Port 3000 Bound & IndexedDB Ready
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
-                    <span className="text-slate-500 text-[10px]">MEMORY BUFFER</span>
-                    <span className="text-amber-400 font-bold block text-base">{queueMetrics.bufferedCount} Eventos</span>
-                  </div>
-                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
-                    <span className="text-slate-500 text-[10px]">TOTAL FLUSHED</span>
-                    <span className="text-indigo-400 font-bold block text-base">{queueMetrics.totalFlushed} Gravações</span>
-                  </div>
-                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
-                    <span className="text-slate-500 text-[10px]">ECONOMIA FIRESTORE</span>
-                    <span className="text-emerald-400 font-bold block text-base">-{queueMetrics.savedFirestoreWritesPercentage}% Custos</span>
-                  </div>
-                </div>
-                <div className="p-5 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
-                  <h3 className="text-sm font-bold text-sky-400 border-b border-slate-800 pb-2">
-                    Persistência & Cache Offline (IndexedDB / Firestore Engine)
-                  </h3>
-                  <p className="text-slate-300 text-xs">
-                    Sincronização bidirecional em segundo plano e otimização de custo via memória com redução de 92% de operações de escrita.
-                  </p>
-                </div>
-              </div>
+              <InfrastructureConsole />
             ) : activeActivity === 'audit' ? (
               /* AUDIT & DEAD LETTER QUEUE LOGS VIEW */
               <div className="space-y-6 font-mono text-slate-100 text-xs">

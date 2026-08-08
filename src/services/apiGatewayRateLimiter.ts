@@ -133,4 +133,12 @@ export class ApiGatewayRateLimiter {
   static getAllApiKeys(): ApiKeyRecord[] {
     return Array.from(ApiGatewayRateLimiter.apiKeys.values());
   }
+
+  static toggleActiveKey(apiKey: string): ApiKeyRecord | undefined {
+    const record = ApiGatewayRateLimiter.apiKeys.get(apiKey);
+    if (record) {
+      record.active = !record.active;
+    }
+    return record;
+  }
 }

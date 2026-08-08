@@ -31,29 +31,135 @@ import { ZeroTouchIdentity } from '../engine/provisioningEngine';
 import { BatteryUsageMonitor } from './BatteryUsageMonitor';
 
 interface DevicesViewProps {
-  devices: Device[];
-  onAddDevice: (device: Partial<Device>) => void;
-  onRemoveDevice: (id: string) => void;
-  onSimulateEvent: () => void;
+  devices?: Device[];
+  onAddDevice?: (device: Partial<Device>) => void;
+  onRemoveDevice?: (id: string) => void;
+  onSimulateEvent?: () => void;
 }
 
+const DEFAULT_FLEET_DEVICES: Device[] = [
+  {
+    deviceId: 'dev-android-samsung-s22',
+    nodeId: 'node-android-master-01',
+    name: 'Samsung Galaxy S22 Native',
+    model: 'SM-S901B (Android 14)',
+    platform: 'android',
+    osVersion: 'Android 14.0',
+    pairedAt: '2026-01-15T10:30:00.000Z',
+    online: true,
+    batteryLevel: 94,
+    batteryOptimizationStatus: 'unrestricted',
+    oemProfile: 'samsung',
+    permissionScore: 100,
+    syncDelayMs: 4,
+    lastSync: Date.now() - 3000,
+    notificationListenerStatus: 'active',
+    capabilities: { sms: true, calls: true, biometrics: true, accessibility: true }
+  },
+  {
+    deviceId: 'dev-iphone-15-pro',
+    nodeId: 'node-iphone-ios-02',
+    name: 'iPhone 15 Pro iOS Agent',
+    model: 'iPhone16,1 (iOS 17.5)',
+    platform: 'iphone',
+    osVersion: 'iOS 17.5',
+    pairedAt: '2026-01-20T14:15:00.000Z',
+    online: true,
+    batteryLevel: 88,
+    batteryOptimizationStatus: 'unrestricted',
+    oemProfile: 'apple',
+    permissionScore: 98,
+    syncDelayMs: 6,
+    lastSync: Date.now() - 5000,
+    notificationListenerStatus: 'active',
+    capabilities: { sms: false, calls: true, biometrics: true, accessibility: false }
+  },
+  {
+    deviceId: 'dev-ipad-air-tablet',
+    nodeId: 'node-ipad-tablet-03',
+    name: 'iPad Air 5th Gen (Tablet)',
+    model: 'iPad13,16 (iPadOS 17.4)',
+    platform: 'tablet',
+    osVersion: 'iPadOS 17.4',
+    pairedAt: '2026-02-01T09:00:00.000Z',
+    online: true,
+    batteryLevel: 92,
+    batteryOptimizationStatus: 'unrestricted',
+    oemProfile: 'apple',
+    permissionScore: 96,
+    syncDelayMs: 8,
+    lastSync: Date.now() - 12000,
+    notificationListenerStatus: 'active',
+    capabilities: { sms: false, calls: false, biometrics: true, accessibility: true }
+  },
+  {
+    deviceId: 'dev-web-pwa-chrome',
+    nodeId: 'node-web-workstation-04',
+    name: 'PortalTRMobile PWA Web Client',
+    model: 'Chrome 127 (PWA / WebSockets)',
+    platform: 'web',
+    osVersion: 'Web / PWA 1.0',
+    pairedAt: '2026-02-10T11:45:00.000Z',
+    online: true,
+    batteryLevel: 100,
+    batteryOptimizationStatus: 'unrestricted',
+    oemProfile: 'generic',
+    permissionScore: 100,
+    syncDelayMs: 2,
+    lastSync: Date.now() - 1000,
+    notificationListenerStatus: 'active',
+    capabilities: { sms: false, calls: false, biometrics: true, accessibility: false }
+  },
+  {
+    deviceId: 'dev-desktop-macos-m2',
+    nodeId: 'node-desktop-macbook-05',
+    name: 'MacBook Pro M2 Desktop Workstation',
+    model: 'macOS Sonoma 14.5 (Electron Native)',
+    platform: 'macos',
+    osVersion: 'macOS 14.5',
+    pairedAt: '2026-02-12T16:20:00.000Z',
+    online: true,
+    batteryLevel: 99,
+    batteryOptimizationStatus: 'unrestricted',
+    oemProfile: 'apple',
+    permissionScore: 100,
+    syncDelayMs: 3,
+    lastSync: Date.now() - 2000,
+    notificationListenerStatus: 'active',
+    capabilities: { sms: true, calls: true, biometrics: true, accessibility: true }
+  }
+];
+
 export const DevicesView: React.FC<DevicesViewProps> = ({
-  devices,
+  devices: initialDevices,
   onAddDevice,
   onRemoveDevice,
   onSimulateEvent
 }) => {
+  const [internalDevices, setInternalDevices] = useState<Device[]>(
+    initialDevices && initialDevices.length > 0 ? initialDevices : DEFAULT_FLEET_DEVICES
+  );
+
+  useEffect(() => {
+    if (initialDevices && initialDevices.length > 0) {
+      setInternalDevices(initialDevices);
+    }
+  }, [initialDevices]);
+
+  const activeFleet = internalDevices.length > 0 ? internalDevices : DEFAULT_FLEET_DEVICES;
+
   const [showPairModal, setShowPairModal] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [pairingToken, setPairingToken] = useState<string>('');
   const [newDeviceName, setNewDeviceName] = useState('');
   const [newDeviceModel, setNewDeviceModel] = useState('');
+  const [newDevicePlatform, setNewDevicePlatform] = useState<'android' | 'iphone' | 'web' | 'desktop' | 'tablet'>('android');
   const [repairingMap, setRepairingMap] = useState<Record<string, boolean>>({});
   const [isBatteryExpanded, setIsBatteryExpanded] = useState<boolean>(false);
   const [expandedDeviceMap, setExpandedDeviceMap] = useState<Record<string, boolean>>({});
 
-  // Sub-tabs & Search state for 6. Dispositivos (Android, iPhone, Tablet, Windows, macOS, Linux, Web)
-  const [platformFilter, setPlatformFilter] = useState<'todos' | 'android' | 'iphone' | 'tablet' | 'windows' | 'macos' | 'linux' | 'web'>('todos');
+  // Platform filters matching exact request: todos, android, iphone, web, desktop, tablet
+  const [platformFilter, setPlatformFilter] = useState<'todos' | 'android' | 'iphone' | 'web' | 'desktop' | 'tablet'>('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
@@ -72,14 +178,29 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
       .catch((err) => console.error('QR code generation error:', err));
   }, [showPairModal]);
 
+  // Manual Add Handler
   const handleManualPair = () => {
     if (!newDeviceName.trim()) return;
     const zeroTouchDev = ZeroTouchIdentity.createIdentity('generic');
-    onAddDevice({
+    const newDev: Device = {
       ...zeroTouchDev,
+      deviceId: zeroTouchDev.deviceId || `dev-${Date.now()}`,
       name: newDeviceName,
-      model: newDeviceModel || 'Android Phone'
-    });
+      model: newDeviceModel || 'Generic Device',
+      platform: newDevicePlatform,
+      osVersion: '1.0',
+      pairedAt: new Date().toISOString(),
+      online: true,
+      batteryLevel: 98,
+      syncDelayMs: 3,
+      permissionScore: 100,
+      lastSync: Date.now(),
+      notificationListenerStatus: 'active'
+    };
+    
+    setInternalDevices((prev) => [newDev, ...prev]);
+    if (onAddDevice) onAddDevice(newDev);
+
     setNewDeviceName('');
     setNewDeviceModel('');
     setShowPairModal(false);
@@ -97,15 +218,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     setExpandedDeviceMap((prev) => ({ ...prev, [deviceId]: !prev[deviceId] }));
   };
 
-  const getDevicePlatform = (device: Device): 'android' | 'iphone' | 'tablet' | 'windows' | 'macos' | 'linux' | 'web' => {
-    if (device.platform) return device.platform;
+  const getDeviceCategory = (device: Device): 'android' | 'iphone' | 'web' | 'desktop' | 'tablet' => {
+    const platform = (device.platform || '').toLowerCase();
     const str = `${device.name || ''} ${device.model || ''} ${device.osVersion || ''}`.toLowerCase();
-    if (str.includes('ipad') || str.includes('tablet') || str.includes('tab s')) return 'tablet';
-    if (str.includes('iphone') || str.includes('ios')) return 'iphone';
-    if (str.includes('mac') || str.includes('macos')) return 'macos';
-    if (str.includes('win') || str.includes('windows')) return 'windows';
-    if (str.includes('ubuntu') || str.includes('linux') || str.includes('debian') || str.includes('fedora')) return 'linux';
-    if (str.includes('web') || str.includes('chrome') || str.includes('pwa') || str.includes('firefox')) return 'web';
+    
+    if (platform === 'tablet' || str.includes('ipad') || str.includes('tablet') || str.includes('tab s')) return 'tablet';
+    if (platform === 'iphone' || str.includes('iphone') || str.includes('ios')) return 'iphone';
+    if (platform === 'web' || str.includes('chrome') || str.includes('pwa') || str.includes('firefox')) return 'web';
+    if (platform === 'macos' || platform === 'windows' || platform === 'linux' || platform === 'desktop' || str.includes('mac') || str.includes('win') || str.includes('electron') || str.includes('linux')) return 'desktop';
+    if (platform === 'android' || str.includes('android') || str.includes('samsung') || str.includes('pixel') || str.includes('xiaomi') || str.includes('itel')) return 'android';
+    
     return 'android';
   };
 
@@ -122,20 +244,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     return 'generic';
   };
 
-  const renderPlatformIcon = (platform: string) => {
-    switch (platform) {
+  const renderPlatformIcon = (category: string) => {
+    switch (category) {
       case 'android':
         return <Smartphone className="w-5 h-5 text-emerald-400" />;
       case 'iphone':
         return <Apple className="w-5 h-5 text-indigo-400" />;
       case 'tablet':
         return <Tablet className="w-5 h-5 text-cyan-400" />;
-      case 'windows':
-        return <Monitor className="w-5 h-5 text-blue-400" />;
-      case 'macos':
+      case 'desktop':
         return <Laptop className="w-5 h-5 text-purple-400" />;
-      case 'linux':
-        return <Terminal className="w-5 h-5 text-amber-400" />;
       case 'web':
         return <Globe className="w-5 h-5 text-teal-400" />;
       default:
@@ -143,10 +261,15 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     }
   };
 
+  const handleRemove = (deviceId: string) => {
+    setInternalDevices((prev) => prev.filter((d) => d.deviceId !== deviceId));
+    if (onRemoveDevice) onRemoveDevice(deviceId);
+  };
+
   // Filtered devices list
-  const filteredDevices = devices.filter((device) => {
-    const devPlatform = getDevicePlatform(device);
-    if (platformFilter !== 'todos' && devPlatform !== platformFilter) {
+  const filteredDevices = activeFleet.filter((device) => {
+    const devCategory = getDeviceCategory(device);
+    if (platformFilter !== 'todos' && devCategory !== platformFilter) {
       return false;
     }
 
@@ -161,10 +284,19 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     return true;
   });
 
+  // Calculate fleet stats for the 4 core dimensions
+  const onlineCount = activeFleet.filter((d) => d.online).length;
+  const avgHealth = Math.round(
+    activeFleet.reduce((acc, d) => acc + (d.permissionScore ?? 95), 0) / (activeFleet.length || 1)
+  );
+  const avgSyncDelay = Math.round(
+    activeFleet.reduce((acc, d) => acc + (d.syncDelayMs ?? 5), 0) / (activeFleet.length || 1)
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       
-      {/* Header Banner */}
+      {/* Top Header Banner */}
       <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center space-x-2.5">
@@ -173,15 +305,15 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             </div>
             <div className="flex items-center space-x-2">
               <h2 className="text-base font-black text-slate-100 tracking-tight">
-                Gestão Multiplataforma de Dispositivos
+                Gestão Multiplataforma de Dispositivos (Device Mesh Fleet)
               </h2>
               <span className="px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-mono font-black text-[10px] tracking-wider uppercase">
-                {devices.length} {devices.length === 1 ? 'NÓ' : 'NÓS'}
+                {activeFleet.length} {activeFleet.length === 1 ? 'NÓ' : 'NÓS'}
               </span>
             </div>
           </div>
           <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest pl-11 font-medium opacity-75">
-            ORQUESTRAÇÃO UNIFICADA • ANDROID • IOS • DESKTOP • WEB
+            ORQUESTRAÇÃO UNIFICADA • ANDROID • IPHONE/IPAD • WEB • DESKTOP • TABLET
           </p>
         </div>
 
@@ -190,8 +322,87 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           className="flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20 transition-all cursor-pointer shrink-0 active:scale-95 border border-indigo-400/30"
         >
           <QrCode className="w-4 h-4" />
-          <span>Emparelhar Dispositivo</span>
+          <span>Emparelhar Dispositivo (QR Code)</span>
         </button>
+      </div>
+
+      {/* 4 STRATEGIC OPERATIONAL DIMENSIONS (Estado, Pairing, Health, Sincronização) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* 1. Estado */}
+        <div className="p-3.5 bg-slate-900/80 rounded-2xl border border-slate-800/80 space-y-1.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>1. ESTADO</span>
+            </span>
+            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold">
+              {onlineCount}/{activeFleet.length} ONLINE
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="text-lg font-black text-slate-100 tracking-tight font-mono">
+              {onlineCount === activeFleet.length ? 'Totalmente Operativo' : 'Em Sincronia'}
+            </span>
+            <span className="text-[10px] text-slate-500 font-mono">Heartbeat &lt;10s</span>
+          </div>
+        </div>
+
+        {/* 2. Pairing */}
+        <div className="p-3.5 bg-slate-900/80 rounded-2xl border border-slate-800/80 space-y-1.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+              <QrCode className="w-3.5 h-3.5 text-indigo-400" />
+              <span>2. PAIRING</span>
+            </span>
+            <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[10px] font-mono font-bold">
+              ZERO-TOUCH
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="text-lg font-black text-slate-100 tracking-tight font-mono">
+              Emparelhamento
+            </span>
+            <span className="text-[10px] text-indigo-400 font-mono">Chave E2EE OK</span>
+          </div>
+        </div>
+
+        {/* 3. Health */}
+        <div className="p-3.5 bg-slate-900/80 rounded-2xl border border-slate-800/80 space-y-1.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+              <Activity className="w-3.5 h-3.5 text-amber-400" />
+              <span>3. HEALTH</span>
+            </span>
+            <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-mono font-bold">
+              {avgHealth}% SCORE
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="text-lg font-black text-slate-100 tracking-tight font-mono">
+              Saúde da Frota
+            </span>
+            <span className="text-[10px] text-amber-400 font-mono">Auto-Repair Ativo</span>
+          </div>
+        </div>
+
+        {/* 4. Sincronização */}
+        <div className="p-3.5 bg-slate-900/80 rounded-2xl border border-slate-800/80 space-y-1.5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+              <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin-slow" />
+              <span>4. SINCRONIZAÇÃO</span>
+            </span>
+            <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono font-bold">
+              {avgSyncDelay}ms LATÊNCIA
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="text-lg font-black text-slate-100 tracking-tight font-mono">
+              Realtime SSE
+            </span>
+            <span className="text-[10px] text-cyan-400 font-mono">Incremental Sync</span>
+          </div>
+        </div>
       </div>
 
       {/* Filter Bar & Sub-Tabs */}
@@ -217,103 +428,79 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           )}
         </div>
 
-        {/* Platform Sub-Tabs (Todos, Android, iPhone, Tablet, Windows, macOS, Linux, Web) */}
+        {/* Platform Sub-Tabs requested: Android, iPhone/iPad, Web, Desktop, Tablet */}
         <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none">
           
           <button
             onClick={() => setPlatformFilter('todos')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
               platformFilter === 'todos'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
-            <span>Todos ({devices.length})</span>
+            <span>Todos os Dispositivos ({activeFleet.length})</span>
           </button>
 
           <button
             onClick={() => setPlatformFilter('android')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
               platformFilter === 'android'
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-black'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
             }`}
           >
             <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Android ({devices.filter(d => getDevicePlatform(d) === 'android').length})</span>
+            <span>Android ({activeFleet.filter(d => getDeviceCategory(d) === 'android').length})</span>
           </button>
 
           <button
             onClick={() => setPlatformFilter('iphone')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
               platformFilter === 'iphone'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
             }`}
           >
             <Apple className="w-3.5 h-3.5 text-indigo-400" />
-            <span>iPhone ({devices.filter(d => getDevicePlatform(d) === 'iphone').length})</span>
-          </button>
-
-          <button
-            onClick={() => setPlatformFilter('tablet')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-              platformFilter === 'tablet'
-                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/20 font-black'
-                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Tablet className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Tablet ({devices.filter(d => getDevicePlatform(d) === 'tablet').length})</span>
-          </button>
-
-          <button
-            onClick={() => setPlatformFilter('windows')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-              platformFilter === 'windows'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20 font-black'
-                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Monitor className="w-3.5 h-3.5 text-blue-400" />
-            <span>Windows ({devices.filter(d => getDevicePlatform(d) === 'windows').length})</span>
-          </button>
-
-          <button
-            onClick={() => setPlatformFilter('macos')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-              platformFilter === 'macos'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20 font-black'
-                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Laptop className="w-3.5 h-3.5 text-purple-400" />
-            <span>macOS ({devices.filter(d => getDevicePlatform(d) === 'macos').length})</span>
-          </button>
-
-          <button
-            onClick={() => setPlatformFilter('linux')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-              platformFilter === 'linux'
-                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20 font-black'
-                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Terminal className="w-3.5 h-3.5 text-amber-400" />
-            <span>Linux ({devices.filter(d => getDevicePlatform(d) === 'linux').length})</span>
+            <span>iPhone / iOS ({activeFleet.filter(d => getDeviceCategory(d) === 'iphone').length})</span>
           </button>
 
           <button
             onClick={() => setPlatformFilter('web')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
               platformFilter === 'web'
                 ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20 font-black'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
             }`}
           >
             <Globe className="w-3.5 h-3.5 text-teal-400" />
-            <span>Web ({devices.filter(d => getDevicePlatform(d) === 'web').length})</span>
+            <span>Web Client / PWA ({activeFleet.filter(d => getDeviceCategory(d) === 'web').length})</span>
+          </button>
+
+          <button
+            onClick={() => setPlatformFilter('desktop')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
+              platformFilter === 'desktop'
+                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20 font-black'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Laptop className="w-3.5 h-3.5 text-purple-400" />
+            <span>Desktop ({activeFleet.filter(d => getDeviceCategory(d) === 'desktop').length})</span>
+          </button>
+
+          <button
+            onClick={() => setPlatformFilter('tablet')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
+              platformFilter === 'tablet'
+                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/20 font-black'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Tablet className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Tablet ({activeFleet.filter(d => getDeviceCategory(d) === 'tablet').length})</span>
           </button>
 
         </div>
@@ -327,7 +514,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             const isRepairing = repairingMap[device.deviceId];
             const healthScore = device.permissionScore ?? 98;
             const notificationStatus = device.notificationListenerStatus || 'active';
-            const platform = getDevicePlatform(device);
+            const platform = getDeviceCategory(device);
             const isExpanded = !!expandedDeviceMap[device.deviceId];
 
             return (
@@ -422,7 +609,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                     </button>
 
                     <button
-                      onClick={() => onRemoveDevice(device.deviceId)}
+                      onClick={() => handleRemove(device.deviceId)}
                       className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all cursor-pointer active:scale-95"
                       title="Desconectar"
                     >
@@ -510,7 +697,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
       {/* Historical Battery Usage & Drain Monitor (Collapsible) */}
       <BatteryUsageMonitor
-        devices={devices}
+        devices={activeFleet}
         isExpanded={isBatteryExpanded}
         onToggleExpand={() => setIsBatteryExpanded((prev) => !prev)}
       />
@@ -555,21 +742,37 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             {/* Manual Add Form */}
             <div className="pt-3 border-t border-slate-800 space-y-3">
               <span className="text-xs font-semibold text-slate-300 block">Ou Adicionar Manualmente para Teste:</span>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  placeholder="Nome do Dispositivo"
-                  value={newDeviceName}
-                  onChange={(e) => setNewDeviceName(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                />
-                <input
-                  type="text"
-                  placeholder="Modelo (ex: Galaxy S24 / MacBook)"
-                  value={newDeviceModel}
-                  onChange={(e) => setNewDeviceModel(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                />
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nome do Dispositivo"
+                    value={newDeviceName}
+                    onChange={(e) => setNewDeviceName(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Modelo (ex: Galaxy S24 / MacBook)"
+                    value={newDeviceModel}
+                    onChange={(e) => setNewDeviceModel(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-slate-400 mb-1 font-mono uppercase">Plataforma do Dispositivo:</label>
+                  <select
+                    value={newDevicePlatform}
+                    onChange={(e: any) => setNewDevicePlatform(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="android">📱 Android Native</option>
+                    <option value="iphone">🍎 iPhone / iOS</option>
+                    <option value="web">🌐 Web Client / PWA</option>
+                    <option value="desktop">💻 Desktop Workstation</option>
+                    <option value="tablet">📱 Tablet (iPad / Android)</option>
+                  </select>
+                </div>
               </div>
               <button
                 onClick={handleManualPair}

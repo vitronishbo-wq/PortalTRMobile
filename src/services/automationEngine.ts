@@ -11,6 +11,50 @@ export interface RuleAction {
   webhookUrl?: string; // e.g. 'https://minhaempresa.co.ao/api/pagamentos'
 }
 
+export interface WorkflowStep {
+  stepIndex: number;
+  name: string;
+  type: 'TRIGGER' | 'AI_CLASSIFY' | 'WEBHOOK_DISPATCH' | 'FOUNDER_ALERT' | 'DEVICE_SYNC';
+  status: 'IDLE' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  output?: string;
+  durationMs?: number;
+}
+
+export interface WorkflowPipeline {
+  id: string;
+  name: string;
+  description: string;
+  triggerSource: string;
+  active: boolean;
+  steps: WorkflowStep[];
+  lastExecuted?: number;
+  totalExecutions: number;
+}
+
+export interface AutoHealingRoutine {
+  id: string;
+  target: 'ANDROID_BATTERY' | 'SOCKET_MESH' | 'SMS_QUEUE' | 'PERMISSION_GUARD' | 'MEMORY_FLUSH';
+  name: string;
+  description: string;
+  triggerCondition: string;
+  actionTaken: string;
+  status: 'HEALTHY' | 'HEALED' | 'MONITORING';
+  autoHealingCount: number;
+  lastHealed?: number;
+}
+
+export interface ScheduledCronJob {
+  id: string;
+  name: string;
+  cronExpression: string; // e.g. "0 */1 * * *"
+  scheduleLabel: string; // e.g. "A cada 1 hora"
+  targetModule: 'LOG_PURGE' | 'FLEET_HEARTBEAT' | 'FIRESTORE_SYNC' | 'RETRY_QUEUE_FLUSH';
+  active: boolean;
+  lastRun?: number;
+  nextRun?: number;
+  executionCount: number;
+}
+
 export interface AutomationRule {
   id: string;
   name: string;
@@ -374,5 +418,115 @@ export class AutomationEngine {
 
   static getExecutionLogs(): AutomationExecutionLog[] {
     return [...AutomationEngine.executionLogs];
+  }
+
+  static getWorkflows(): WorkflowPipeline[] {
+    return [
+      {
+        id: 'wf-banco-bai-erp',
+        name: 'Workflow 1: SMS Bancário BAI -> Classificação IA -> Webhook ERP',
+        description: 'Receção e processamento ponta-a-ponta de pagamentos recebidos no Banco BAI',
+        triggerSource: 'SMS Interceptor Native',
+        active: true,
+        lastExecuted: Date.now() - 3600000 * 2,
+        totalExecutions: 142,
+        steps: [
+          { stepIndex: 1, name: 'Captura do Evento SMS BAI', type: 'TRIGGER', status: 'COMPLETED', output: 'SMS "BAI Directo" capturado pelo Agente Android', durationMs: 4 },
+          { stepIndex: 2, name: 'Análise Heurística & Gemini AI', type: 'AI_CLASSIFY', status: 'COMPLETED', output: 'Categoria = BANCO_PAGAMENTO, Confiança = 99%', durationMs: 18 },
+          { stepIndex: 3, name: 'Webhook Dispatcher para ERP Empresarial', type: 'WEBHOOK_DISPATCH', status: 'COMPLETED', output: 'HTTP 200 enviado para https://minhaempresa.co.ao/api/pagamentos', durationMs: 22 },
+          { stepIndex: 4, name: 'Alerta Imediato Founder Console PWA', type: 'FOUNDER_ALERT', status: 'COMPLETED', output: 'Push Notification entregue ao Founder (SILA JANEIRO)', durationMs: 6 }
+        ]
+      },
+      {
+        id: 'wf-device-failover-mesh',
+        name: 'Workflow 2: Falha de Dispositivo Principal -> Auto-Failover Mesh Agente',
+        description: 'Redirecionamento automático do tráfego SMS quando o nó primário fica offline',
+        triggerSource: 'Heartbeat Monitor (&gt;5m silent)',
+        active: true,
+        lastExecuted: Date.now() - 86400000,
+        totalExecutions: 19,
+        steps: [
+          { stepIndex: 1, name: 'Deteção de Queda de Heartbeat (Samsung S22)', type: 'TRIGGER', status: 'COMPLETED', output: 'Dispositivo em standby/offline por &gt;300s', durationMs: 10 },
+          { stepIndex: 2, name: 'Ativação do Agente de Reserva (Itel A100)', type: 'DEVICE_SYNC', status: 'COMPLETED', output: 'Promovido para Nó Secundário Ativo', durationMs: 15 },
+          { stepIndex: 3, name: 'Notificar Founder Authority', type: 'FOUNDER_ALERT', status: 'COMPLETED', output: 'Alerta crítico: Failover ativado com sucesso', durationMs: 5 }
+        ]
+      }
+    ];
+  }
+
+  static getAutoHealingRoutines(): AutoHealingRoutine[] {
+    return [
+      {
+        id: 'heal-01',
+        target: 'ANDROID_BATTERY',
+        name: 'OEM Battery Optimization Bypass (Samsung/Itel Doze)',
+        description: 'Impede o encerramento do serviço de escuta de notificações pelo sistema operativo',
+        triggerCondition: 'Serviço de Escuta Pausado pelo Sistema Android',
+        actionTaken: 'Ativação de WakeLock de Alta Prioridade + Foreground Service Refresh',
+        status: 'HEALED',
+        autoHealingCount: 38,
+        lastHealed: Date.now() - 1800000
+      },
+      {
+        id: 'heal-02',
+        target: 'SOCKET_MESH',
+        name: 'Realtime WebSocket Auto-Reconnect & Heartbeat Reset',
+        description: 'Restaura a ligação SSE/WebSocket instantaneamente em caso de oscilação de rede mobile',
+        triggerCondition: 'Queda de Ligação WebSocket &gt; 3 segundos',
+        actionTaken: 'Exponential Backoff Retry + Re-autenticação JWT E2EE',
+        status: 'HEALTHY',
+        autoHealingCount: 124,
+        lastHealed: Date.now() - 4200000
+      },
+      {
+        id: 'heal-03',
+        target: 'SMS_QUEUE',
+        name: 'Limpeza e Desbloqueio da Fila de Retransmissão (Retry Queue)',
+        description: 'Evita a acumulação de SMS não entregues devido a timeout de servidor externo',
+        triggerCondition: 'Jobs com Falha em Fila &gt; 5 itens',
+        actionTaken: 'Purga de itens caducos + Reenvio com compressão gzip',
+        status: 'MONITORING',
+        autoHealingCount: 17,
+        lastHealed: Date.now() - 86400000
+      }
+    ];
+  }
+
+  static getScheduledCronJobs(): ScheduledCronJob[] {
+    return [
+      {
+        id: 'cron-01',
+        name: 'Purga Automática de Logs Antigos & Telemetria',
+        cronExpression: '0 */2 * * *',
+        scheduleLabel: 'A cada 2 horas',
+        targetModule: 'LOG_PURGE',
+        active: true,
+        lastRun: Date.now() - 3600000,
+        nextRun: Date.now() + 3600000,
+        executionCount: 248
+      },
+      {
+        id: 'cron-02',
+        name: 'Monitorização Ativa de Saúde da Frota de Agentes (Fleet Heartbeat)',
+        cronExpression: '*/5 * * * *',
+        scheduleLabel: 'A cada 5 minutos',
+        targetModule: 'FLEET_HEARTBEAT',
+        active: true,
+        lastRun: Date.now() - 180000,
+        nextRun: Date.now() + 120000,
+        executionCount: 1840
+      },
+      {
+        id: 'cron-03',
+        name: 'Sincronização Incremental Firestore & Backup Cloud',
+        cronExpression: '0 0 * * *',
+        scheduleLabel: 'Diariamente às 00:00',
+        targetModule: 'FIRESTORE_SYNC',
+        active: true,
+        lastRun: Date.now() - 86400000,
+        nextRun: Date.now() + 43200000,
+        executionCount: 42
+      }
+    ];
   }
 }

@@ -174,9 +174,24 @@ export class BatchQueueEngine {
 
   public static onMetrics(callback: (metrics: BatchQueueMetrics) => void) {
     this.metricsListeners.push(callback);
+    callback(this.currentMetrics);
     return () => {
       this.metricsListeners = this.metricsListeners.filter((cb) => cb !== callback);
     };
+  }
+
+  public static pushLocalEvent(event: COSEvent) {
+    this.currentMetrics.bufferedCount++;
+    this.currentMetrics.totalEventsReceived++;
+    this.notifyMetricsListeners(this.currentMetrics);
+    this.notifyEventListeners(event);
+  }
+
+  public static flushQueue() {
+    this.currentMetrics.totalFlushed += this.currentMetrics.bufferedCount;
+    this.currentMetrics.bufferedCount = 0;
+    this.currentMetrics.lastFlushTime = Date.now();
+    this.notifyMetricsListeners(this.currentMetrics);
   }
 
   private static notifyEventListeners(event: COSEvent) {
