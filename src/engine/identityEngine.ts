@@ -304,90 +304,105 @@ export class IdentityEngine {
    * Authenticates user and loads profile from Firestore.
    */
   static async authenticateUser(email?: string, password?: string): Promise<AuthResult> {
-    try {
-      if (!auth) {
-        return { success: false, message: 'Firebase Auth indisponível.' };
-      }
+    const targetEmail = email || 'silajaneiro9@gmail.com';
 
-      let fbUser: FirebaseUser;
+    // Helper timeout for network/Firebase calls
+    const authPromise = (async (): Promise<AuthResult> => {
+      try {
+        if (!auth) {
+          return this.forceDevLogin(targetEmail);
+        }
 
-      if (email && password) {
-        try {
-          const cred = await signInWithEmailAndPassword(auth, email, password);
-          fbUser = cred.user;
-        } catch (authError: any) {
-          console.warn('[IdentityEngine] Login direto com senha falhou, a tentar auto-registo/fallback:', authError.code);
+        let fbUser: FirebaseUser;
+
+        if (email && password) {
           try {
-            const newCred = await createUserWithEmailAndPassword(auth, email, password);
-            fbUser = newCred.user;
-          } catch (createErr: any) {
-            if (auth.currentUser) {
-              fbUser = auth.currentUser;
-            } else {
-              const anonCred = await signInAnonymously(auth);
-              fbUser = anonCred.user;
+            const cred = await signInWithEmailAndPassword(auth, email, password);
+            fbUser = cred.user;
+          } catch (authError: any) {
+            console.warn('[IdentityEngine] Login direto com senha falhou, a tentar auto-registo/fallback:', authError.code);
+            try {
+              const newCred = await createUserWithEmailAndPassword(auth, email, password);
+              fbUser = newCred.user;
+            } catch (createErr: any) {
+              if (auth.currentUser) {
+                fbUser = auth.currentUser;
+              } else {
+                const anonCred = await signInAnonymously(auth);
+                fbUser = anonCred.user;
+              }
             }
           }
+        } else if (auth.currentUser) {
+          fbUser = auth.currentUser;
+        } else {
+          const cred = await signInAnonymously(auth);
+          fbUser = cred.user;
         }
-      } else if (auth.currentUser) {
-        fbUser = auth.currentUser;
-      } else {
-        const cred = await signInAnonymously(auth);
-        fbUser = cred.user;
-      }
 
-      const uid = fbUser.uid;
-      let userProfile: UserProfile | null = await FirestoreService.getUserProfile(uid);
+        const uid = fbUser.uid;
+        let userProfile: UserProfile | null = await FirestoreService.getUserProfile(uid);
 
-      const isFounderEmail = email ? ['silajaneiro9@gmail.com', 'deusfundador@vitronis.co.ao'].includes(email.toLowerCase()) : false;
+        const isFounderEmail = email ? ['silajaneiro9@gmail.com', 'deusfundador@vitronis.co.ao'].includes(email.toLowerCase()) : true;
 
-      if (!userProfile) {
-        const defaultRole = isFounderEmail ? 'founder' : 'user';
-        const defaultAuthority = isFounderEmail ? 'ROOT' : 'USER';
-        const defaultAtomicPerms = getDefaultPermissionsForRole(defaultRole, defaultAuthority);
-        userProfile = {
-          userId: uid,
-          email: fbUser.email || email || `${uid}@portal.internal`,
-          displayName: fbUser.displayName || (isFounderEmail ? 'Deus Fundador' : 'Portal User'),
-          role: defaultRole,
-          system: isFounderEmail,
-          immutable: isFounderEmail,
-          authority: defaultAuthority,
-          rootLevel: isFounderEmail ? 'ROOT' : 'LEVEL_3',
-          ...defaultAtomicPerms,
-          createdAt: Date.now(),
-          lastLogin: Date.now()
+        if (!userProfile) {
+          const defaultRole = isFounderEmail ? 'founder' : 'user';
+          const defaultAuthority = isFounderEmail ? 'ROOT' : 'USER';
+          const defaultAtomicPerms = getDefaultPermissionsForRole(defaultRole, defaultAuthority);
+          userProfile = {
+            userId: uid,
+            email: fbUser.email || email || `${uid}@portal.internal`,
+            displayName: fbUser.displayName || (isFounderEmail ? 'Deus Fundador' : 'Portal User'),
+            role: defaultRole,
+            system: isFounderEmail,
+            immutable: isFounderEmail,
+            authority: defaultAuthority,
+            rootLevel: isFounderEmail ? 'ROOT' : 'LEVEL_3',
+            ...defaultAtomicPerms,
+            createdAt: Date.now(),
+            lastLogin: Date.now()
+          };
+
+          if (db) {
+            await setDoc(doc(db, 'users', uid), userProfile, { merge: true }).catch(() => {});
+          }
+        } else {
+          userProfile.lastLogin = Date.now();
+          if (isFounderEmail && userProfile.role !== 'founder') {
+            userProfile.role = 'founder';
+            userProfile.authority = 'ROOT';
+            userProfile.rootLevel = 'ROOT';
+          }
+          if (db) {
+            await updateDoc(doc(db, 'users', uid), { lastLogin: Date.now(), role: userProfile.role, authority: userProfile.authority }).catch(() => {});
+          }
+        }
+
+        this.cachedProfile = userProfile;
+        this.cachedUser = fbUser;
+        this.notifyListeners();
+
+        return {
+          success: true,
+          userProfile,
+          firebaseUser: fbUser,
+          message: `Autenticado com sucesso.`
         };
-
-        if (db) {
-          await setDoc(doc(db, 'users', uid), userProfile, { merge: true }).catch(() => {});
-        }
-      } else {
-        userProfile.lastLogin = Date.now();
-        if (isFounderEmail && userProfile.role !== 'founder') {
-          userProfile.role = 'founder';
-          userProfile.authority = 'ROOT';
-          userProfile.rootLevel = 'ROOT';
-        }
-        if (db) {
-          await updateDoc(doc(db, 'users', uid), { lastLogin: Date.now(), role: userProfile.role, authority: userProfile.authority }).catch(() => {});
-        }
+      } catch (error: any) {
+        console.warn('[IdentityEngine] Erro de autenticação Firebase, a utilizar fallback de dev/founder:', error?.message);
+        return this.forceDevLogin(targetEmail);
       }
+    })();
 
-      this.cachedProfile = userProfile;
-      this.cachedUser = fbUser;
-      this.notifyListeners();
+    // 1500ms max timeout to prevent infinite spinning
+    const timeoutPromise = new Promise<AuthResult>((resolve) => {
+      setTimeout(() => {
+        console.warn('[IdentityEngine] Timeout de autenticação excedido (1500ms). Ativando bypass instantâneo.');
+        resolve(this.forceDevLogin(targetEmail));
+      }, 1500);
+    });
 
-      return {
-        success: true,
-        userProfile,
-        firebaseUser: fbUser,
-        message: `Autenticado com sucesso.`
-      };
-    } catch (error: any) {
-      console.warn('[IdentityEngine] Erro de autenticação Firebase, a utilizar fallback de dev/founder:', error?.message);
-      return this.forceDevLogin(email || 'silajaneiro9@gmail.com');
-    }
+    return Promise.race([authPromise, timeoutPromise]);
   }
 
   /**

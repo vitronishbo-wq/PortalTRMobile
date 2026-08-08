@@ -33,7 +33,8 @@ export interface Device {
   health?: DeviceHealth;
 
   // Zero-Touch Health Diagnostics
-  oemProfile?: 'samsung' | 'xiaomi' | 'pixel' | 'oppo' | 'generic';
+  platform?: 'android' | 'iphone' | 'tablet' | 'windows' | 'macos' | 'linux' | 'web';
+  oemProfile?: 'samsung' | 'xiaomi' | 'pixel' | 'oppo' | 'apple' | 'generic';
   permissionScore?: number; // 0-100
   notificationListenerStatus?: 'active' | 'degraded' | 'disabled';
   batteryOptimizationStatus?: 'unrestricted' | 'optimized' | 'restricted';

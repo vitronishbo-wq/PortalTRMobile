@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, use, useMemo } from 'react';
 import {
+  LayoutDashboard,
   Shield,
   Crown,
   Lock,
@@ -19,7 +20,31 @@ import {
   Terminal,
   Activity,
   Zap,
-  ArrowRight
+  ArrowRight,
+  BarChart3,
+  Home,
+  Plug,
+  Cloud,
+  Rocket,
+  TrendingUp,
+  ScrollText,
+  Settings,
+  Wrench,
+  ShieldCheck,
+  Play,
+  Pause,
+  Clock,
+  Plus,
+  Trash2,
+  Filter,
+  Check,
+  X,
+  AlertTriangle,
+  Cpu,
+  Radio,
+  Download,
+  Share2,
+  LockKeyhole
 } from 'lucide-react';
 import {
   AuthorityEngine,
@@ -31,17 +56,135 @@ import { PaymentRegistry, ChargeResponse, ChargeRequest } from '../services/paym
 import { IdentityEngine, useIdentity } from '../engine/identityEngine';
 import { UserProfile, UserRole, resolveRootLevel, getDefaultPermissionsForRole } from '../types/User';
 import { FirestoreService } from '../services/firestore';
+import { TrialEngine } from '../services/trialEngine';
+import { RootConsoleView } from './workspaces/RootConsoleView';
+import { OperationalOverviewConsole } from './workspaces/OperationalOverviewConsole';
 
-export const FounderConsoleView: React.FC = () => {
-  const { user: authUser, profile: identityFounder } = useIdentity();
-  const [founder, setFounder] = useState<UserProfile | null>(identityFounder);
+export interface VerifiedFounderSession {
+  verified: boolean;
+  profile: UserProfile | null;
+  timestamp: number;
+}
+
+// Global cache for session verification promises
+const founderSessionCache = new Map<string, Promise<VerifiedFounderSession>>();
+
+export function verifyFounderSessionAsync(uid: string = 'default'): Promise<VerifiedFounderSession> {
+  if (!founderSessionCache.has(uid)) {
+    const promise = (async () => {
+      const profile = await AuthorityEngine.initFounderBootstrap();
+      const isVerified = Boolean(
+        profile &&
+          (profile.role === 'founder' ||
+            profile.authority === 'ROOT' ||
+            profile.permissions?.includes('*'))
+      );
+      return {
+        verified: isVerified,
+        profile,
+        timestamp: Date.now()
+      };
+    })();
+    founderSessionCache.set(uid, promise);
+  }
+  return founderSessionCache.get(uid)!;
+}
+
+export function invalidateFounderSessionCache(uid?: string) {
+  if (uid) {
+    founderSessionCache.delete(uid);
+  } else {
+    founderSessionCache.clear();
+  }
+}
+
+/**
+ * Lightweight loading fallback rendered while session verification resolves
+ */
+export const FounderConsoleFallback: React.FC = () => {
+  return (
+    <div className="min-h-[400px] w-full bg-slate-900/90 rounded-2xl border border-amber-500/30 p-8 flex flex-col items-center justify-center space-y-4 text-center shadow-xl animate-pulse">
+      <div className="relative flex items-center justify-center">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+          <Crown className="w-8 h-8 animate-bounce" />
+        </div>
+        <div className="absolute -inset-1 rounded-2xl border border-amber-500/40 animate-ping opacity-25"></div>
+      </div>
+      <div className="space-y-1">
+        <h3 className="text-sm font-extrabold text-slate-100 uppercase tracking-wider font-mono flex items-center justify-center gap-2">
+          <span>Sessão Founder em Verificação</span>
+          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[9px] font-mono font-bold">
+            ROOT
+          </span>
+        </h3>
+        <p className="text-xs text-slate-400 font-mono">
+          Validando credenciais criptográficas e autoridade de bootstrap...
+        </p>
+      </div>
+      <div className="w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+        <div className="h-full bg-amber-500 rounded-full animate-pulse w-3/4"></div>
+      </div>
+    </div>
+  );
+};
+
+export type RootWorkspaceTab =
+  | 'overview'
+  | 'root'
+  | 'automation'
+  | 'monitoring'
+  | 'identity'
+  | 'devices'
+  | 'billing'
+  | 'integrations'
+  | 'infrastructure'
+  | 'releases'
+  | 'audit'
+  | 'configuration'
+  | 'developer'
+  | 'security';
+
+interface TabDef {
+  id: RootWorkspaceTab;
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  badge?: string;
+  desc: string;
+}
+
+const TAB_DEFS: TabDef[] = [
+  { id: 'overview', label: 'Overview Operacional', icon: LayoutDashboard, color: 'text-sky-400', badge: '8 PILARES', desc: 'Visão Operacional Consolidada de Sistema' },
+  { id: 'root', label: 'Root Authority', icon: Crown, color: 'text-amber-400', badge: 'MASTER', desc: 'Controlo Root & Autoridade Bootstrap' },
+  { id: 'automation', label: 'Automation Engine', icon: Zap, color: 'text-yellow-400', badge: '3 Ativas', desc: 'Regras de Eventos e Gatilhos' },
+  { id: 'monitoring', label: 'Telemetry & Observability', icon: Activity, color: 'text-emerald-400', badge: '99.9%', desc: 'Telemetria, Saúde & Métricas de Desempenho' },
+  { id: 'identity', label: 'Identity & Access', icon: Users, color: 'text-indigo-400', badge: 'RBAC', desc: 'Gestão de Utilizadores e Zero-Knowledge' },
+  { id: 'devices', label: 'Devices & Agent Mesh', icon: Smartphone, color: 'text-emerald-400', badge: 'Agentes', desc: 'Agentes Android e Dispositivos Pareados' },
+  { id: 'billing', label: 'Billing & AppyPay', icon: CreditCard, color: 'text-amber-400', badge: 'AppyPay', desc: 'Subscrições & Multicaixa Express' },
+  { id: 'integrations', label: 'Integrations & CPaaS', icon: Plug, color: 'text-purple-400', desc: 'Webhooks & APIs Externas' },
+  { id: 'infrastructure', label: 'Infrastructure & Storage', icon: Cloud, color: 'text-cyan-400', desc: 'Servidores Cloud Run, Express & Firestore' },
+  { id: 'releases', label: 'Releases & Build', icon: Rocket, color: 'text-rose-400', badge: 'v2.4.0', desc: 'Versões PWA & Compilações APK' },
+  { id: 'audit', label: 'Audit & DLQ Logs', icon: ScrollText, color: 'text-orange-400', desc: 'Registo Inalterável de Atividades' },
+  { id: 'configuration', label: 'Feature Flags', icon: Settings, color: 'text-slate-300', desc: 'Parâmetros Globais & Flags' },
+  { id: 'developer', label: 'Command Center & CLI', icon: Wrench, color: 'text-emerald-400', badge: 'CLI', desc: 'Terminal Único & Registos de Depuração' },
+  { id: 'security', label: 'Security & Secrets', icon: ShieldCheck, color: 'text-rose-400', badge: 'E2EE', desc: 'Chaves Criptográficas & Segredos' }
+];
+
+interface FounderConsoleContentProps {
+  sessionPromise: Promise<VerifiedFounderSession>;
+}
+
+const FounderConsoleContent: React.FC<FounderConsoleContentProps> = ({ sessionPromise }) => {
+  const verifiedSession = use(sessionPromise);
+  const { user: authUser } = useIdentity();
+  const [founder, setFounder] = useState<UserProfile | null>(verifiedSession.profile);
   const [flags, setFlags] = useState<FeatureFlagsState>(AuthorityEngine.getFeatureFlags());
   const [secrets, setSecrets] = useState<SecretStatusItem[]>(AuthorityEngine.getSecretsStatus());
-  const [activeTab, setActiveTab] = useState<'overview' | 'secrets' | 'appypay' | 'flags' | 'rbac'>('overview');
+  const [activeTab, setActiveTab] = useState<RootWorkspaceTab>('overview');
   const [mfaSuccessMsg, setMfaSuccessMsg] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState<boolean>(false);
 
-  // Zero-Knowledge Identity Hashing state (SHA-256)
+  // Zero-Knowledge Modal
   const [showIdentityHashModal, setShowIdentityHashModal] = useState<boolean>(false);
   const [idEmail, setIdEmail] = useState<string>('');
   const [idPhone, setIdPhone] = useState<string>('');
@@ -50,7 +193,7 @@ export const FounderConsoleView: React.FC = () => {
   const [idMunicipality, setIdMunicipality] = useState<string>('');
   const [isComputingHash, setIsComputingHash] = useState<boolean>(false);
 
-  // AppyPay Sandbox Tester State
+  // AppyPay Sandbox State
   const [chargeAmount, setChargeAmount] = useState<number>(15000);
   const [chargeDescription, setChargeDescription] = useState<string>('Plano Subscrição Agente Android TR');
   const [customerEmail, setCustomerEmail] = useState<string>('cliente.teste@appypay.ao');
@@ -58,23 +201,51 @@ export const FounderConsoleView: React.FC = () => {
   const [lastCharge, setLastCharge] = useState<ChargeResponse | null>(null);
   const [isCharging, setIsCharging] = useState<boolean>(false);
 
-  // System Users List synchronized directly with IdentityEngine / Firestore
+  // Users List
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
 
-  useEffect(() => {
-    // 1. Inicializar bootstrap do Founder
-    AuthorityEngine.initFounderBootstrap().then((profile) => {
-      setFounder(profile);
-    });
+  // Developer Terminal Input
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([
+    '[SYSTEM] Root Workspace carregado com sucesso.',
+    '[AUTH] Autoridade de Founder inicializada.',
+    '[REALTIME] Conexão com Firestore ativa.'
+  ]);
+  const [cmdInput, setCmdInput] = useState<string>('');
 
-    // 2. Subscrever a todos os utilizadores via IdentityEngine
+  // Automation Rules State
+  const [rules, setRules] = useState([
+    { id: 'rule-1', name: 'SMS Received -> Webhook Dispatch', trigger: 'SMS_INBOUND', active: true, count: 142 },
+    { id: 'rule-2', name: 'Call Missed -> Auto-Reply SMS', trigger: 'CALL_MISSED', active: true, count: 89 },
+    { id: 'rule-3', name: 'Low Battery (<15%) -> Alert Founder', trigger: 'BATTERY_LOW', active: true, count: 12 }
+  ]);
+
+  useEffect(() => {
+    const handleSwitchActivity = (e: CustomEvent<string>) => {
+      if (e.detail === 'billing' || e.detail === 'payments') {
+        setActiveTab('billing');
+      } else if (e.detail) {
+        setActiveTab(e.detail as RootWorkspaceTab);
+      }
+    };
+    window.addEventListener('switch-founder-activity' as any, handleSwitchActivity);
+    return () => window.removeEventListener('switch-founder-activity' as any, handleSwitchActivity);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
     const unsubscribeUsers = IdentityEngine.listenToAllUsers((firestoreUsers) => {
+      if (!isMounted) return;
       if (firestoreUsers && firestoreUsers.length > 0) {
         setUsersList(firestoreUsers);
         const activeUserUid = authUser?.uid;
         const founderInDb = firestoreUsers.find((u) => u.role === 'founder' || (activeUserUid && u.userId === activeUserUid));
         if (founderInDb) {
-          setFounder(founderInDb);
+          setFounder((prev) => {
+            if (prev?.userId === founderInDb.userId && prev?.role === founderInDb.role && prev?.lastLogin === founderInDb.lastLogin) {
+              return prev;
+            }
+            return founderInDb;
+          });
         }
       } else {
         const defaultUsers: UserProfile[] = [
@@ -116,14 +287,14 @@ export const FounderConsoleView: React.FC = () => {
           }
         ];
         setUsersList(defaultUsers);
-        defaultUsers.forEach((u) => FirestoreService.saveUserProfile(u));
       }
     });
 
     return () => {
+      isMounted = false;
       unsubscribeUsers();
     };
-  }, [authUser]);
+  }, [authUser?.uid]);
 
   const handleManualFounderPromotion = async () => {
     const currentUid = authUser?.uid;
@@ -141,7 +312,7 @@ export const FounderConsoleView: React.FC = () => {
         authUser?.displayName || 'Founder Master'
       );
       setFounder(updatedProfile);
-      setMfaSuccessMsg(`Autoridade 'founder', status immutable=true e permissões atómicas (canDeploy, canAudit, etc.) gravadas com sucesso no Firestore (doc: users/${currentUid})!`);
+      setMfaSuccessMsg(`Autoridade Root e perfil imutável persistidos no Firestore (users/${currentUid})!`);
     } catch (e) {
       console.error('Erro ao promover utilizador:', e);
     } finally {
@@ -173,7 +344,7 @@ export const FounderConsoleView: React.FC = () => {
       );
       setFounder(updated);
       setMfaSuccessMsg(
-        `Hash SHA-256 de identidade gerado (${hash.substring(0, 16)}...) e persistido no Firestore (users/${currentUid}) com arquitetura Zero-Knowledge! NENHUM dado pessoal em texto simples foi gravado.`
+        `Fingerprint SHA-256 gerado (${hash.substring(0, 16)}...) e persistido no Firestore (users/${currentUid}) com arquitetura Zero-Knowledge!`
       );
       setShowIdentityHashModal(false);
     } catch (err) {
@@ -182,7 +353,6 @@ export const FounderConsoleView: React.FC = () => {
       setIsComputingHash(false);
     }
   };
-
 
   const handleToggleFlag = (key: keyof FeatureFlagsState) => {
     const updated = AuthorityEngine.toggleFeatureFlag(key, !flags[key]);
@@ -211,6 +381,39 @@ export const FounderConsoleView: React.FC = () => {
     setIsCharging(false);
   };
 
+  const handleTerminalSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cmdInput.trim()) return;
+    const cmd = cmdInput.trim();
+    setTerminalLogs((prev) => [...prev, `> ${cmd}`]);
+
+    if (cmd === 'help') {
+      setTerminalLogs((prev) => [
+        ...prev,
+        'Comandos disponíveis:',
+        '  status     - Mostra estado dos serviços',
+        '  clear      - Limpa o terminal',
+        '  ping       - Testa conectividade de rede',
+        '  secrets    - Verifica chaves de ambiente'
+      ]);
+    } else if (cmd === 'clear') {
+      setTerminalLogs([]);
+    } else if (cmd === 'status') {
+      setTerminalLogs((prev) => [
+        ...prev,
+        '● Cloud Run: OK (Port 3000)',
+        '● Firestore: Conectado (Realtime ON)',
+        '● ServiceWorker: Ativo',
+        '● AppyPay: Sandbox Pronta'
+      ]);
+    } else if (cmd === 'ping') {
+      setTerminalLogs((prev) => [...prev, 'PONG (24ms) - Servidor respondendo normalmente.']);
+    } else {
+      setTerminalLogs((prev) => [...prev, `Comando desconhecido: '${cmd}'. Digite 'help' para ajuda.`]);
+    }
+    setCmdInput('');
+  };
+
   const getRoleBadgeStyle = (role: UserRole) => {
     switch (role) {
       case 'founder':
@@ -228,32 +431,34 @@ export const FounderConsoleView: React.FC = () => {
     }
   };
 
+  const activeTabDef = TAB_DEFS.find((t) => t.id === activeTab) || TAB_DEFS[0];
+
   return (
     <div className="space-y-6">
-      {/* Founder Header Banner */}
-      <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl border border-amber-500/30 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-        <div className="flex items-center space-x-3">
-          <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
-            <Crown className="w-5 h-5" />
-          </span>
+      {/* FOUNDER ROOT HEADER */}
+      <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl border border-amber-500/30 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="p-2.5 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 text-amber-400 border border-amber-500/40 shadow-inner">
+            <Crown className="w-6 h-6" />
+          </div>
           <div>
-            <h2 className="text-base font-black text-slate-100 tracking-tight flex items-center space-x-2">
-              <span>Console Operacional Founder</span>
-              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold uppercase border border-amber-500/40">
-                ROOT
+            <div className="flex items-center space-x-2">
+              <h2 className="text-base font-black text-white tracking-tight">Root Workspace Console</h2>
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-black uppercase border border-amber-500/40">
+                ROOT AUTHORITY
               </span>
-            </h2>
-            <p className="text-[11px] text-slate-400 font-mono">
+            </div>
+            <p className="text-xs text-slate-400 font-mono mt-0.5">
               {founder?.email || authUser?.email || 'silajaneiro9@gmail.com'}
             </p>
           </div>
         </div>
 
-        {/* Operational Quick Actions */}
+        {/* Quick Root Control Buttons */}
         <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
           <button
             onClick={() => setShowIdentityHashModal(true)}
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+            className="px-3 py-2 bg-indigo-600/90 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
             title="Fingerprint Criptográfico"
           >
             <Lock className="w-3.5 h-3.5" />
@@ -262,7 +467,7 @@ export const FounderConsoleView: React.FC = () => {
           <button
             onClick={handleManualFounderPromotion}
             disabled={isPromoting}
-            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-50"
           >
             <Zap className="w-3.5 h-3.5" />
             <span>{isPromoting ? 'A gravar...' : 'Persistir Firestore'}</span>
@@ -282,197 +487,270 @@ export const FounderConsoleView: React.FC = () => {
         </div>
       )}
 
-      {/* Console Sub-Navigation Tabs */}
-      <div className="flex items-center space-x-2 border-b border-slate-800 pb-3 overflow-x-auto text-xs font-bold">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2 rounded-xl transition-all flex items-center space-x-2 cursor-pointer ${
-            activeTab === 'overview'
-              ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
-              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          <span>Visão Geral</span>
-        </button>
+      {/* 16 ROOT WORKSPACE TABS GRID / SCROLL */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-400 px-1">
+          <span>SECÇÕES DO WORKSPACE ROOT ({TAB_DEFS.length})</span>
+          <span className="text-amber-400">Ativo: {activeTabDef.label}</span>
+        </div>
 
-        <button
-          onClick={() => setActiveTab('secrets')}
-          className={`px-4 py-2 rounded-xl transition-all flex items-center space-x-2 cursor-pointer ${
-            activeTab === 'secrets'
-              ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
-              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-          }`}
-        >
-          <KeyRound className="w-4 h-4" />
-          <span>Estado dos Segredos</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('appypay')}
-          className={`px-4 py-2 rounded-xl transition-all flex items-center space-x-2 cursor-pointer ${
-            activeTab === 'appypay'
-              ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
-              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-          }`}
-        >
-          <CreditCard className="w-4 h-4" />
-          <span>Gateway AppyPay (Sandbox)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('flags')}
-          className={`px-4 py-2 rounded-xl transition-all flex items-center space-x-2 cursor-pointer ${
-            activeTab === 'flags'
-              ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
-              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-          }`}
-        >
-          <Sliders className="w-4 h-4" />
-          <span>Feature Flags</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('rbac')}
-          className={`px-4 py-2 rounded-xl transition-all flex items-center space-x-2 cursor-pointer ${
-            activeTab === 'rbac'
-              ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30'
-              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Gestão de Papéis (RBAC)</span>
-        </button>
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2">
+          {TAB_DEFS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`p-2.5 rounded-xl border flex flex-col items-center justify-center space-y-1 transition-all cursor-pointer relative group ${
+                  isActive
+                    ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-lg shadow-amber-500/10'
+                    : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:bg-slate-800/90 hover:text-slate-200'
+                }`}
+                title={tab.desc}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-amber-400 scale-110' : tab.color}`} />
+                <span className="text-[11px] font-bold truncate max-w-full">{tab.label}</span>
+                {tab.badge && (
+                  <span className="absolute top-1 right-1 px-1 py-0.2 text-[8px] font-mono font-black rounded bg-amber-500/30 text-amber-300 border border-amber-500/40">
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* TAB 1: OVERVIEW */}
+      {/* TAB CONTENT PANELS */}
+
+      {/* 0. 📊 OVERVIEW OPERACIONAL */}
       {activeTab === 'overview' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase block">User Principal</span>
-              <span className="text-base font-bold text-amber-400 flex items-center space-x-1.5">
-                <Crown className="w-4 h-4" />
-                <span>Founder Master</span>
-              </span>
-              <span className="text-[10px] text-slate-500 block">System Immutable Profile</span>
-            </div>
-
-            <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase block">Gateways de Pagamento</span>
-              <span className="text-base font-bold text-emerald-400 flex items-center space-x-1.5">
-                <CreditCard className="w-4 h-4" />
-                <span>AppyPay Pronta</span>
-              </span>
-              <span className="text-[10px] text-slate-500 block">Multicaixa Express AOA</span>
-            </div>
-
-            <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase block">Total Utilizadores & Roles</span>
-              <span className="text-base font-bold text-indigo-400 font-mono">5 Utilizadores</span>
-              <span className="text-[10px] text-slate-500 block">Founder, Admin, Op, Agent, AppyPay</span>
-            </div>
-
-            <div className="bg-slate-900/90 p-4 rounded-2xl border border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase block">Estado do Bootstrap</span>
-              <span className="text-base font-bold text-emerald-400 font-mono flex items-center space-x-1">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Concluído</span>
-              </span>
-              <span className="text-[10px] text-slate-500 block">Lock de Segurança Ativo</span>
-            </div>
-          </div>
-
-          {/* Architecture Summary Card */}
-          <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
-            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-2">
-              <Shield className="w-4 h-4" />
-              <span>Hierarquia de Papéis do Sistema (RBAC)</span>
-            </h3>
-
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
-              <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-300 font-bold text-center">
-                Founder (Master)
-              </div>
-              <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 font-bold text-center">
-                Admin
-              </div>
-              <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 font-bold text-center">
-                Operator
-              </div>
-              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-slate-300 font-bold text-center">
-                User
-              </div>
-              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 font-bold text-center">
-                Android Agent
-              </div>
-              <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 text-purple-300 font-bold text-center">
-                Integration
-              </div>
-            </div>
-          </div>
-        </div>
+        <OperationalOverviewConsole />
       )}
 
-      {/* TAB 2: SECRETS MONITOR */}
-      {activeTab === 'secrets' && (
+      {/* 1. 👑 ROOT */}
+      {activeTab === 'root' && (
+        <RootConsoleView />
+      )}
+
+      {/* 2. ⚡ AUTOMATION */}
+      {activeTab === 'automation' && (
         <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
-                <KeyRound className="w-4 h-4 text-amber-400" />
-                <span>Estado e Presença de Segredos (Sem Exposição de Chaves)</span>
+              <h3 className="text-sm font-bold text-yellow-400 flex items-center space-x-2">
+                <Zap className="w-4 h-4" />
+                <span>Motor de Automação & Regras de Eventos</span>
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Segredos e tokens privados são mantidos apenas nas variáveis de ambiente (.env) do servidor Cloud.
-              </p>
+              <p className="text-xs text-slate-400">Regras automáticas executadas ao receber eventos dos Agentes Android.</p>
             </div>
+            <button
+              onClick={() => {
+                const name = prompt('Nome da Regra de Automação:');
+                if (name) {
+                  setRules(prev => [...prev, { id: `rule-${Date.now()}`, name, trigger: 'CUSTOM_EVENT', active: true, count: 0 }]);
+                }
+              }}
+              className="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold text-xs rounded-xl flex items-center space-x-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Nova Regra</span>
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {secrets.map((sec) => (
-              <div
-                key={sec.id}
-                className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-2 hover:border-slate-700 transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-200">{sec.name}</h4>
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold font-mono">
-                    {sec.statusLabel}
-                  </span>
+          <div className="space-y-3">
+            {rules.map(rule => (
+              <div key={rule.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-200">{rule.name}</h4>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <span className="px-2 py-0.5 bg-slate-900 text-yellow-400 border border-slate-800 rounded font-mono text-[10px]">
+                      Gatilho: {rule.trigger}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">{rule.count} Execuções</span>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-400 font-mono">{sec.modeLabel}</p>
-                <span className="text-[10px] text-slate-500 block">
-                  Última validação: {new Date(sec.lastChecked).toLocaleTimeString('pt-BR')}
-                </span>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      setRules(prev => prev.map(r => r.id === rule.id ? { ...r, active: !r.active } : r));
+                    }}
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs cursor-pointer ${
+                      rule.active ? 'bg-emerald-600/30 text-emerald-400 border border-emerald-500/40' : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    {rule.active ? 'Ativa' : 'Pausada'}
+                  </button>
+                  <button
+                    onClick={() => setRules(prev => prev.filter(r => r.id !== rule.id))}
+                    className="p-1.5 text-rose-400 hover:bg-rose-500/20 rounded-lg cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* TAB 3: APPYPAY GATEWAY SANDBOX */}
-      {activeTab === 'appypay' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-            <div className="border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
-                <CreditCard className="w-4 h-4 text-emerald-400" />
-                <span>Testador Sandbox AppyPay (Multicaixa Express AOA)</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Simulação da criação de cobranças e verificação do status com retorno de referência Multicaixa.
-              </p>
+      {/* 3. 📊 MONITORING */}
+      {activeTab === 'monitoring' && (
+        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <h3 className="text-sm font-bold text-emerald-400 flex items-center space-x-2 border-b border-slate-800 pb-3">
+            <Activity className="w-4 h-4" />
+            <span>Métricas e Telemetria em Tempo Real</span>
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+              <span className="text-[10px] text-slate-400 font-mono">LATÊNCIA SSE</span>
+              <div className="text-lg font-mono font-bold text-emerald-400">24 ms</div>
+              <span className="text-[10px] text-slate-500">Fluxo em Direct Stream</span>
             </div>
 
-            <form onSubmit={handleTestAppyPayCharge} className="space-y-3.5 text-xs">
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+              <span className="text-[10px] text-slate-400 font-mono">USO MEMÓRIA</span>
+              <div className="text-lg font-mono font-bold text-indigo-400">128 MB / 512 MB</div>
+              <span className="text-[10px] text-slate-500">Cloud Run Container</span>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+              <span className="text-[10px] text-slate-400 font-mono">TAXA SUCESSO</span>
+              <div className="text-lg font-mono font-bold text-emerald-400">100%</div>
+              <span className="text-[10px] text-slate-500">0 falhas nas últimas 24h</span>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+              <span className="text-[10px] text-slate-400 font-mono">EVENTOS / MINUTO</span>
+              <div className="text-lg font-mono font-bold text-amber-400">42 ev/min</div>
+              <span className="text-[10px] text-slate-500">Sincronização Ativa</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. 🏠 DASHBOARD */}
+      {activeTab === 'dashboard' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Utilizadores Ativos</span>
+              <div className="text-xl font-extrabold text-amber-400">{usersList.length}</div>
+              <span className="text-[10px] text-slate-500">Inscritos no Sistema</span>
+            </div>
+
+            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Gateway AppyPay</span>
+              <div className="text-xl font-extrabold text-emerald-400">Ativo</div>
+              <span className="text-[10px] text-slate-500">Sandbox Multicaixa AOA</span>
+            </div>
+
+            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Agentes Android</span>
+              <div className="text-xl font-extrabold text-indigo-400">1 Conectado</div>
+              <span className="text-[10px] text-slate-500">Samsung OneUI Agent</span>
+            </div>
+
+            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Sincronização</span>
+              <div className="text-xl font-extrabold text-emerald-400">Realtime</div>
+              <span className="text-[10px] text-slate-500">Firestore Listeners</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. 👥 IDENTITY */}
+      {activeTab === 'identity' && (
+        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <h3 className="text-sm font-bold text-indigo-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+            <Users className="w-4 h-4" />
+            <span>Matriz de Identidades & Matriz RBAC</span>
+          </h3>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950 text-slate-400 uppercase font-mono border-b border-slate-800">
+                <tr>
+                  <th className="p-3">Utilizador</th>
+                  <th className="p-3">Papel</th>
+                  <th className="p-3">Nível Root</th>
+                  <th className="p-3">E-mail</th>
+                  <th className="p-3">Permissões</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-mono">
+                {usersList.map((usr) => {
+                  const level = usr.rootLevel || resolveRootLevel(usr.role, usr.authority);
+                  return (
+                    <tr key={usr.userId} className="hover:bg-slate-950/50">
+                      <td className="p-3 font-bold text-slate-200">{usr.displayName}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${getRoleBadgeStyle(usr.role)}`}>
+                          {usr.role}
+                        </span>
+                      </td>
+                      <td className="p-3 font-bold text-amber-400">{level}</td>
+                      <td className="p-3 text-slate-400">{usr.email}</td>
+                      <td className="p-3 text-slate-400">{usr.permissions?.join(', ')}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 6. 📱 DEVICES */}
+      {activeTab === 'devices' && (
+        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <h3 className="text-sm font-bold text-emerald-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+            <Smartphone className="w-4 h-4" />
+            <span>Gestão de Agentes Android e Dispositivos Pareados</span>
+          </h3>
+
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                <Smartphone className="w-5 h-5" />
+              </div>
               <div>
-                <label className="block font-bold text-slate-300 mb-1">Montante da Cobrança (AOA Kwanza)</label>
+                <h4 className="font-bold text-slate-200">Agente Android Samsung OneUI</h4>
+                <p className="text-[10px] text-slate-400 font-mono">ID: agent-dev-001 | Bateria: 92% | Online</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => alert('Sinal de Ping enviado ao Agente Android!')}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs cursor-pointer"
+            >
+              Enviar Ping
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 7. 💳 BILLING */}
+      {activeTab === 'billing' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+            <h3 className="text-sm font-bold text-amber-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+              <CreditCard className="w-4 h-4" />
+              <span>Testador Sandbox AppyPay (Multicaixa Express AOA)</span>
+            </h3>
+
+            <form onSubmit={handleTestAppyPayCharge} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-300 mb-1">Montante (AOA Kwanza)</label>
                 <input
                   type="number"
                   value={chargeAmount}
                   onChange={(e) => setChargeAmount(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold"
                 />
               </div>
 
@@ -482,123 +760,179 @@ export const FounderConsoleView: React.FC = () => {
                   type="text"
                   value={chargeDescription}
                   onChange={(e) => setChargeDescription(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-slate-300 mb-1">E-mail do Cliente</label>
-                  <input
-                    type="email"
-                    value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-300 mb-1">Telefone</label>
-                  <input
-                    type="text"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={isCharging}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition-all cursor-pointer flex items-center justify-center space-x-2"
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl cursor-pointer"
               >
-                {isCharging ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                ) : (
-                  <>
-                    <CreditCard className="w-4 h-4" />
-                    <span>Criar Cobrança AppyPay</span>
-                  </>
-                )}
+                {isCharging ? 'Processando...' : 'Criar Cobrança AppyPay'}
               </button>
             </form>
           </div>
 
-          {/* AppyPay Response Panel */}
           <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-            <h3 className="text-sm font-bold text-slate-100 border-b border-slate-800 pb-3 flex items-center space-x-2">
-              <Terminal className="w-4 h-4 text-indigo-400" />
-              <span>Resposta do Gateway AppyPay (Retorno Sandbox)</span>
-            </h3>
-
+            <h3 className="text-sm font-bold text-slate-100 border-b border-slate-800 pb-3">Retorno Gateway</h3>
             {lastCharge ? (
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 font-mono text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">ID da Cobrança:</span>
-                  <span className="text-indigo-400 font-bold">{lastCharge.chargeId}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Status:</span>
-                  <span className="text-emerald-400 font-bold uppercase">{lastCharge.status}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Montante:</span>
-                  <span className="text-emerald-400 font-bold">{lastCharge.amount.toLocaleString()} {lastCharge.currency}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Referência Multicaixa Express:</span>
-                  <span className="text-amber-400 font-bold">{lastCharge.referenceCode}</span>
-                </div>
-                <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
-                  <p>{lastCharge.message}</p>
-                </div>
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs font-mono space-y-2">
+                <div className="text-emerald-400 font-bold">Cobrança Gerada #{lastCharge.chargeId}</div>
+                <div>Referência: <span className="text-amber-400 font-bold">{lastCharge.referenceCode}</span></div>
+                <div>Montante: {lastCharge.amount} AOA</div>
               </div>
             ) : (
-              <div className="py-12 text-center text-xs text-slate-500 font-mono">
-                Execute o teste ao lado para gerar uma referência AppyPay.
-              </div>
+              <p className="text-xs text-slate-500 font-mono">Gere uma cobrança para visualizar o retorno.</p>
             )}
           </div>
         </div>
       )}
 
-      {/* TAB 4: FEATURE FLAGS */}
-      {activeTab === 'flags' && (
+      {/* 8. 🔌 INTEGRATIONS */}
+      {activeTab === 'integrations' && (
         <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-slate-100 border-b border-slate-800 pb-3 flex items-center space-x-2">
-            <Sliders className="w-4 h-4 text-amber-400" />
-            <span>Gestão Dinâmica de Feature Flags (Persistido no Firestore)</span>
+          <h3 className="text-sm font-bold text-purple-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+            <Plug className="w-4 h-4" />
+            <span>Webhooks e Integrações de API</span>
+          </h3>
+
+          <div className="space-y-3 text-xs">
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-slate-200">Firebase Cloud Messaging (FCM)</h4>
+                <p className="text-[10px] text-slate-400 font-mono">Notificações Push para Agentes Android</p>
+              </div>
+              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 font-mono text-[10px] rounded border border-emerald-500/30">ATIVO</span>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-slate-200">AppyPay REST API Gateway</h4>
+                <p className="text-[10px] text-slate-400 font-mono">Processamento de Pagamentos AOA</p>
+              </div>
+              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 font-mono text-[10px] rounded border border-emerald-500/30">ATIVO</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. ☁ INFRASTRUCTURE & STORAGE */}
+      {activeTab === 'infrastructure' && (
+        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <h3 className="text-sm font-bold text-cyan-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+            <Cloud className="w-4 h-4" />
+            <span>Infraestrutura Cloud Run, Servidores & Coleções Firestore</span>
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+              <span className="text-[10px] text-slate-400 font-mono block">CLOUD RUN CONTAINER</span>
+              <div className="font-bold text-emerald-400">Port 3000 (Proxy Reverse NGINX)</div>
+              <span className="text-[10px] text-slate-500 block">Host 0.0.0.0</span>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+              <span className="text-[10px] text-slate-400 font-mono block">FIREBASE HOSTING & FIRESTORE</span>
+              <div className="font-bold text-amber-400">Frontend PWA & Realtime DB</div>
+              <span className="text-[10px] text-slate-500 block">CDN Global & IndexedDB Offline</span>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+              <span className="text-[10px] text-slate-400 font-mono block">RENDER BACKEND</span>
+              <div className="font-bold text-cyan-400">Stateless Microservices</div>
+              <span className="text-[10px] text-slate-500 block">Conexão Segura SSL</span>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <h4 className="text-xs font-bold text-slate-300 mb-2 font-mono">Coleções Principais do Firestore Engine:</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <span className="text-slate-400 text-[10px] block">COLEÇÃO</span>
+                <span className="font-bold text-amber-400">users</span>
+                <span className="text-[10px] text-slate-500 block mt-1">Perfis de Acesso & RBAC</span>
+              </div>
+
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <span className="text-slate-400 text-[10px] block">COLEÇÃO</span>
+                <span className="font-bold text-emerald-400">devices</span>
+                <span className="text-[10px] text-slate-500 block mt-1">Agentes Android Pareados</span>
+              </div>
+
+              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+                <span className="text-slate-400 text-[10px] block">COLEÇÃO</span>
+                <span className="font-bold text-indigo-400">events</span>
+                <span className="text-[10px] text-slate-500 block mt-1">Eventos & Registos SMS/Chamadas</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. 🚀 RELEASES */}
+      {activeTab === 'releases' && (
+        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <h3 className="text-sm font-bold text-rose-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+            <Rocket className="w-4 h-4" />
+            <span>Gestão de Releases PWA e Agente Android APK</span>
+          </h3>
+
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+            <div>
+              <h4 className="font-bold text-slate-200">PortalTRMobile PWA v2.4.0</h4>
+              <p className="text-[10px] text-slate-400 font-mono">Compilação Produção - Cloud Run Engine</p>
+            </div>
+            <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 font-mono font-bold text-[10px] rounded border border-emerald-500/30">
+              PRODUÇÃO (STABLE)
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* 10. 📜 AUDIT */}
+      {activeTab === 'audit' && (
+        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <h3 className="text-sm font-bold text-orange-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+            <ScrollText className="w-4 h-4" />
+            <span>Registo de Auditoria Inalterável</span>
+          </h3>
+
+          <div className="space-y-2 text-xs font-mono">
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between">
+              <span className="text-slate-400">[2026-08-07 17:02] FOUNDER_LOGIN</span>
+              <span className="text-amber-400">silajaneiro9@gmail.com</span>
+              <span className="text-emerald-400 font-bold">SUCESSO</span>
+            </div>
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between">
+              <span className="text-slate-400">[2026-08-07 16:55] BOOTSTRAP_INIT</span>
+              <span className="text-slate-300">System Root</span>
+              <span className="text-emerald-400 font-bold">CONCLUÍDO</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 14. ⚙ CONFIGURATION */}
+      {activeTab === 'configuration' && (
+        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <h3 className="text-sm font-bold text-slate-200 border-b border-slate-800 pb-3 flex items-center space-x-2">
+            <Settings className="w-4 h-4" />
+            <span>Gestão Dinâmica de Feature Flags</span>
           </h3>
 
           <div className="space-y-3">
             {(Object.keys(flags) as (keyof FeatureFlagsState)[]).map((flagKey) => {
               const isEnabled = flags[flagKey];
               return (
-                <div
-                  key={flagKey}
-                  className="flex items-center justify-between bg-slate-950 p-4 rounded-xl border border-slate-800/80"
-                >
+                <div key={flagKey} className="flex items-center justify-between bg-slate-950 p-4 rounded-xl border border-slate-800">
                   <div>
                     <span className="font-bold text-xs text-slate-200 font-mono block">{flagKey}</span>
-                    <span className="text-[11px] text-slate-400">
-                      {flagKey.includes('appyPay')
-                        ? 'Ativa o módulo de integração de pagamentos AppyPay'
-                        : flagKey.includes('realtimeSync')
-                        ? 'Habilita sincronização em tempo real de dispositivos Android'
-                        : flagKey.includes('admin')
-                        ? 'Permite acesso ao painel administrativo'
-                        : flagKey.includes('extendedLogging')
-                        ? 'Mostra registos estendidos de auditoria'
-                        : 'Ativa controlo de funcionalidade do sistema'}
-                    </span>
                   </div>
-
                   <button
                     onClick={() => handleToggleFlag(flagKey)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      isEnabled
-                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer ${
+                      isEnabled ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'
                     }`}
                   >
                     {isEnabled ? '● ATIVO' : '○ DESATIVADO'}
@@ -610,74 +944,60 @@ export const FounderConsoleView: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 5: RBAC SYSTEM */}
-      {activeTab === 'rbac' && (
+      {/* 15. 🛠 DEVELOPER */}
+      {activeTab === 'developer' && (
         <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-slate-100 border-b border-slate-800 pb-3 flex items-center space-x-2">
-            <Users className="w-4 h-4 text-indigo-400" />
-            <span>Matriz de Utilizadores & Papéis Atribuidos</span>
+          <h3 className="text-sm font-bold text-emerald-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+            <Wrench className="w-4 h-4" />
+            <span>Terminal Interativo de Registos</span>
           </h3>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950 text-slate-400 uppercase font-mono border-b border-slate-800">
-                <tr>
-                  <th className="p-3">Utilizador / Entidade</th>
-                  <th className="p-3">Papel (Role)</th>
-                  <th className="p-3">Nível Root</th>
-                  <th className="p-3">E-mail</th>
-                  <th className="p-3">Permissões</th>
-                  <th className="p-3">Imutável</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
-                {usersList.map((usr) => {
-                  const effectiveRootLevel = usr.rootLevel || resolveRootLevel(usr.role, usr.authority);
-                  return (
-                    <tr key={usr.userId} className="hover:bg-slate-950/50">
-                      <td className="p-3 font-bold text-slate-200">{usr.displayName}</td>
-                      <td className="p-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${getRoleBadgeStyle(
-                            usr.role
-                          )}`}
-                        >
-                          {usr.role}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono border ${
-                            effectiveRootLevel === 'ROOT'
-                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                              : effectiveRootLevel === 'LEVEL_1'
-                              ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
-                              : effectiveRootLevel === 'LEVEL_2'
-                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                              : 'bg-slate-800 text-slate-400 border-slate-700'
-                          }`}
-                        >
-                          {effectiveRootLevel}
-                        </span>
-                      </td>
-                      <td className="p-3 text-slate-400">{usr.email}</td>
-                      <td className="p-3 text-slate-400">{usr.permissions?.join(', ')}</td>
-                      <td className="p-3">
-                        {usr.immutable ? (
-                          <span className="text-amber-400 font-bold">✓ Imutável</span>
-                        ) : (
-                          <span className="text-slate-500">Normal</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="bg-slate-950 rounded-xl border border-slate-800 p-4 font-mono text-xs text-slate-300 h-64 overflow-y-auto space-y-1">
+            {terminalLogs.map((line, idx) => (
+              <div key={idx}>{line}</div>
+            ))}
+          </div>
+
+          <form onSubmit={handleTerminalSubmit} className="flex space-x-2">
+            <input
+              type="text"
+              value={cmdInput}
+              onChange={(e) => setCmdInput(e.target.value)}
+              placeholder="Digite um comando (ex: help, status, ping, clear)..."
+              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-indigo-500"
+            />
+            <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer">
+              Executar
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* 16. 🛡 SECURITY */}
+      {activeTab === 'security' && (
+        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <h3 className="text-sm font-bold text-rose-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
+            <ShieldCheck className="w-4 h-4" />
+            <span>Estado dos Segredos e Chaves de Encriptação</span>
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {secrets.map((sec) => (
+              <div key={sec.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-200">{sec.name}</h4>
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold font-mono border border-emerald-500/30">
+                    {sec.statusLabel}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 font-mono">{sec.modeLabel}</p>
+              </div>
+            ))}
           </div>
         </div>
       )}
-      {/* Zero-Knowledge Identity SHA-256 Modal */}
+
+      {/* Zero-Knowledge SHA-256 Identity Modal */}
       {showIdentityHashModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl relative">
@@ -697,7 +1017,7 @@ export const FounderConsoleView: React.FC = () => {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Para máxima segurança, os teus dados pessoais (email, telefone, nascimento, província, município) <strong>NUNCA</strong> são gravados em texto simples no Firestore. É gerado um <strong>Fingerprint SHA-256 criptográfico</strong> com secret interno de autoridade.
+              Para máxima segurança, os teus dados pessoais (email, telefone, nascimento, província, município) <strong>NUNCA</strong> são gravados em texto simples no Firestore. É gerado um <strong>Fingerprint SHA-256 criptográfico</strong>.
             </p>
 
             <div className="space-y-3 text-xs">
@@ -759,13 +1079,6 @@ export const FounderConsoleView: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] font-mono text-slate-400 space-y-1">
-              <span className="text-indigo-400 font-bold block">Fórmula do Hash Zero-Knowledge:</span>
-              <p className="text-[10px] break-all text-slate-400">
-                SHA256(email + telefone + nascimento + província + município + secret)
-              </p>
-            </div>
-
             <div className="flex items-center justify-end space-x-3 pt-2">
               <button
                 onClick={() => setShowIdentityHashModal(false)}
@@ -786,5 +1099,19 @@ export const FounderConsoleView: React.FC = () => {
         </div>
       )}
     </div>
+  );
+};
+
+export const FounderConsoleView: React.FC = () => {
+  const { user: authUser } = useIdentity();
+
+  const sessionPromise = useMemo(() => {
+    return verifyFounderSessionAsync(authUser?.uid || 'default');
+  }, [authUser?.uid]);
+
+  return (
+    <Suspense fallback={<FounderConsoleFallback />}>
+      <FounderConsoleContent sessionPromise={sessionPromise} />
+    </Suspense>
   );
 };

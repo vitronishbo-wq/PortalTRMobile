@@ -43,6 +43,7 @@ import {
   useOnlineStatus
 } from './lib/offlineCache';
 import { OfflineBanner } from './components/OfflineBanner';
+import { ExpiredSubscriptionBanner } from './components/ExpiredSubscriptionBanner';
 
 interface ToastItem {
   id: string;
@@ -211,6 +212,28 @@ export default function App() {
     localStorage.setItem('portal_camouflage_hide_btn', String(val));
   };
 
+  // Listen for custom camouflage events triggered by SettingsView or Navbar
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setSecretPin(localStorage.getItem('portal_camouflage_pin') || '12345');
+      setCalcTitle(localStorage.getItem('portal_camouflage_title') || 'Calculadora Padrão');
+      setStartCamouflaged(localStorage.getItem('portal_camouflage_start') === 'true');
+      setHideUnlockBtn(localStorage.getItem('portal_camouflage_hide_btn') === 'true');
+    };
+
+    const handleLock = () => {
+      appStateMachine.lockApp();
+    };
+
+    window.addEventListener('portal_camouflage_settings_updated', handleSettingsUpdate);
+    window.addEventListener('portal_lock_camouflage', handleLock);
+
+    return () => {
+      window.removeEventListener('portal_camouflage_settings_updated', handleSettingsUpdate);
+      window.removeEventListener('portal_lock_camouflage', handleLock);
+    };
+  }, [appStateMachine]);
+
   const { isOnline, lastCacheTime } = useOnlineStatus();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -265,6 +288,13 @@ export default function App() {
 
   const triggerTabSwitch = (tab: string) => {
     window.dispatchEvent(new CustomEvent('switch-public-tab', { detail: tab }));
+  };
+
+  const handleNavigateToBilling = () => {
+    setWorkspaceMode('founder');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('switch-founder-activity', { detail: 'billing' }));
+    }, 50);
   };
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -606,7 +636,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white relative w-full max-w-[100vw] overflow-x-hidden">
       
       {/* Toast Notifications Floating Stack */}
-      <div className="fixed top-5 right-5 z-50 space-y-2.5 max-w-sm w-full px-4 sm:px-0 pointer-events-none">
+      <div className="fixed top-16 right-4 sm:right-6 z-50 space-y-2.5 max-w-sm w-full px-4 sm:px-0 pointer-events-none">
         {toasts.map((toast) => {
           const evt = toast.event;
           const isHigh = evt.priority === 'high' || evt.priority === 'critical';
@@ -659,6 +689,9 @@ export default function App() {
           );
         })}
       </div>
+
+      {/* Global Expired Subscription Banner */}
+      <ExpiredSubscriptionBanner onNavigateToBilling={handleNavigateToBilling} />
 
       {/* Top Navbar */}
       <Navbar

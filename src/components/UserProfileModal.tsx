@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, ShieldCheck, Camera, Check, X, Sparkles, CreditCard, RefreshCw, Zap, Gauge, WifiOff } from 'lucide-react';
+import { User, Phone, Mail, ShieldCheck, Camera, Check, X, Sparkles, CreditCard, RefreshCw, Zap, Gauge, WifiOff, AlertTriangle } from 'lucide-react';
 import { useIdentity } from '../engine/identityEngine';
+import { TrialEngine } from '../services/trialEngine';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -92,6 +93,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
   };
 
   if (!isOpen) return null;
+
+  const userId = authUser?.uid || 'usr-public-001';
+  const license = TrialEngine.getLicense(userId, email);
+  const evalState = TrialEngine.evaluateState(license);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,21 +290,70 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               </p>
             </div>
 
-            {/* Conta / Plano */}
+            {/* Estado Global da Subscrição da Conta */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
-                <CreditCard className="w-3.5 h-3.5 text-sky-400" />
-                <span>Conta & Permissões</span>
+              <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                <span className="flex items-center space-x-1.5">
+                  <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Estado Global da Subscrição</span>
+                </span>
+                {!evalState.active ? (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500 text-white font-black uppercase animate-pulse">
+                    Subscrição Expirada
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold uppercase">
+                    {license.lifetime ? 'Vitalícia' : `${evalState.daysRemaining}d Restantes`}
+                  </span>
+                )}
               </label>
-              <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-bold text-amber-400 block">{accountPlan}</span>
-                  <span className="text-[10px] text-slate-500 block">Perfil: {role === 'dev_client' ? 'Cliente Dev (Acesso Total Tempo Real)' : role.toUpperCase()}</span>
+
+              {!evalState.active ? (
+                <div className="bg-rose-950/60 border border-rose-500/80 rounded-2xl p-3.5 space-y-2.5">
+                  <div className="flex items-start space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h5 className="text-xs font-black text-white">Subscrição expirada</h5>
+                      <p className="text-[10px] text-rose-200 leading-tight">
+                        A sua licença expirou. Renove sua subscrição para reativar o acesso total.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      TrialEngine.modifyLicense(userId, '+30d', 'Renovação Efetuada no Perfil');
+                      setAccountPlan('Premium (Ativo - 30 Dias Restantes)');
+                      window.location.reload();
+                    }}
+                    className="w-full py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-md uppercase tracking-wider flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Renove sua subscrição</span>
+                  </button>
                 </div>
-                <div className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
-                  <ShieldCheck className="w-4 h-4" />
+              ) : (
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-amber-400 block uppercase">{license.plan || 'Premium'}</span>
+                    <span className="text-[10px] text-slate-400 block font-mono">
+                      {license.lifetime ? 'Licença Vitalícia' : `Ativo (${evalState.daysRemaining} dias restantes)`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      TrialEngine.modifyLicense(userId, '+30d', 'Renovação +30d');
+                      setAccountPlan('Premium (Ativo - 30 Dias Restantes)');
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-mono font-bold flex items-center space-x-1 cursor-pointer transition-all"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Renovar</span>
+                  </button>
                 </div>
-              </div>
+              )}
+            </div>
 
               {/* Quick Dev Client Switcher */}
               <div className="bg-gradient-to-r from-amber-500/10 to-indigo-500/10 border border-amber-500/30 rounded-xl p-3 space-y-2">
@@ -330,7 +384,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                   Ativa o acesso instantâneo a eventos, comandos outbound, E2EE e barra de stream SSE em tempo real.
                 </p>
               </div>
-            </div>
 
             <div className="pt-2">
               <button

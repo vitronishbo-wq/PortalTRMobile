@@ -17,6 +17,14 @@ export function normalizeMsisdn(msisdn: string): string {
   return msisdn.replace(/[^\w@.-]/g, '_').toLowerCase();
 }
 
+// Helper for non-blocking timeout
+function withTimeout<T>(promise: Promise<T>, ms: number = 1000, fallbackErrorMsg = 'Firestore timeout'): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(fallbackErrorMsg)), ms))
+  ]);
+}
+
 /**
  * Obtém ou cria um IdentityGraph para um MSISDN
  */
@@ -27,7 +35,7 @@ export async function getOrCreateIdentity(msisdnRaw: string, workspaceId: string
   if (db) {
     try {
       const docRef = doc(db, IDENTITIES_COLLECTION, msisdn);
-      const docSnap = await getDoc(docRef);
+      const docSnap = await withTimeout(getDoc(docRef), 1000);
 
       if (docSnap.exists()) {
         const data = docSnap.data() as IdentityGraph;
@@ -41,12 +49,12 @@ export async function getOrCreateIdentity(msisdnRaw: string, workspaceId: string
           updatedAt: Date.now(),
           devices: [],
         };
-        await setDoc(docRef, newIdentity);
+        await withTimeout(setDoc(docRef, newIdentity), 1000);
         localIdentitiesStore.set(msisdn, newIdentity);
         return newIdentity;
       }
     } catch (err) {
-      console.warn('[IdentityService] Firestore inacessível, a usar fallback local:', err);
+      console.warn('[IdentityService] Firestore inacessível ou timeout, a usar fallback local:', err);
     }
   }
 

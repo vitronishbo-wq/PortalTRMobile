@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  LayoutDashboard,
   Home,
   Users,
   Smartphone,
@@ -48,6 +49,7 @@ import { TrialEngine, LicenseRecord } from '../../services/trialEngine';
 import { UserProfile, UserRole } from '../../types/User';
 import { IdentityEngine } from '../../engine/identityEngine';
 import { RootConsoleView } from './RootConsoleView';
+import { OperationalOverviewConsole } from './OperationalOverviewConsole';
 import { CommandPalette } from './CommandPalette';
 import { AutomationEngine, AutomationRule, AutomationExecutionLog } from '../../services/automationEngine';
 import { HealthEngine, DeviceHealthMetric, OperationalDiagnostic, DeviceTimelineEvent } from '../../services/healthEngine';
@@ -56,7 +58,7 @@ import { BatchQueueEngine, BatchQueueMetrics } from '../../services/batchQueueEn
 export interface IDETab {
   id: string;
   title: string;
-  type: 'user' | 'appypay' | 'flags' | 'runtime' | 'firestore' | 'device' | 'audit' | 'rules' | 'root_authority' | 'automation' | 'health';
+  type: 'overview' | 'user' | 'appypay' | 'flags' | 'runtime' | 'firestore' | 'device' | 'audit' | 'rules' | 'root_authority' | 'automation' | 'health';
   data?: any;
 }
 
@@ -66,7 +68,7 @@ export const FounderIDEWorkspace: React.FC = () => {
   const [paletteCommandLog, setPaletteCommandLog] = useState<string | null>(null);
 
   // Navigation & Layout States
-  const [activeActivity, setActiveActivity] = useState<string>('root_authority');
+  const [activeActivity, setActiveActivity] = useState<string>('overview');
   const [sidePanelOpen, setSidePanelOpen] = useState<boolean>(true);
   const [bottomPanelOpen, setBottomPanelOpen] = useState<boolean>(true);
   const [bottomPanelTab, setBottomPanelTab] = useState<'terminal' | 'logs' | 'queue' | 'errors'>('terminal');
@@ -103,6 +105,18 @@ export const FounderIDEWorkspace: React.FC = () => {
       unsubMetrics();
       unsubEvents();
     };
+  }, []);
+
+  useEffect(() => {
+    const handleSwitchActivity = (e: CustomEvent<string>) => {
+      if (e.detail === 'billing' || e.detail === 'payments') {
+        setActiveActivity('payments');
+      } else if (e.detail) {
+        setActiveActivity(e.detail);
+      }
+    };
+    window.addEventListener('switch-founder-activity' as any, handleSwitchActivity);
+    return () => window.removeEventListener('switch-founder-activity' as any, handleSwitchActivity);
   }, []);
 
   // Workbench Tabs
@@ -183,21 +197,19 @@ export const FounderIDEWorkspace: React.FC = () => {
     return () => unsub();
   }, []);
 
-  // Activity Bar Navigation Definition (13 Core System Modules)
+  // Activity Bar Navigation Definition (Clean Founder IDE Architecture)
   const activityItems = [
+    { id: 'overview', label: '0. Overview Operacional (8 Pilares)', icon: LayoutDashboard },
     { id: 'root_authority', label: '1. Root Authority & Identity Core', icon: Crown },
-    { id: 'devices', label: '2. Multi-Device Mesh & Fleet', icon: Smartphone },
+    { id: 'devices', label: '2. Devices & Agent Mesh Fleet', icon: Smartphone },
     { id: 'cpaas_dispatcher', label: '3. CPaaS, Command & Retry Queue', icon: Shield },
-    { id: 'automation', label: '4. Automation Engine & AI (Gemini)', icon: Zap },
-    { id: 'realtime_dev', label: '5. Realtime Dev Stream (<5ms SSE)', icon: Radio },
-    { id: 'health', label: '6. Operations Assistant & Device Health', icon: Activity },
-    { id: 'users', label: '7. Identity & User Licenses (Trial Engine)', icon: Users, badge: users.length },
-    { id: 'payments', label: '8. Billing & AppyPay Gateway (AOA)', icon: CreditCard },
-    { id: 'flags', label: '9. Feature Flags (Firestore Realtime)', icon: Sliders },
-    { id: 'audit', label: '10. Audit, DLQ & Webhook Logs', icon: ScrollText },
-    { id: 'cloud', label: '11. Cloud Runtime & Memory Batching', icon: Cloud },
-    { id: 'firestore', label: '12. Firestore & Offline Storage (IndexedDB)', icon: Database },
-    { id: 'analytics', label: '13. Revenue & Batch Savings (-92%)', icon: BarChart3 }
+    { id: 'automation', label: '4. Automation Engine', icon: Zap },
+    { id: 'health', label: '5. Telemetry, Realtime SSE & Health', icon: Activity },
+    { id: 'users', label: '6. Identity & User Licenses', icon: Users, badge: users.length },
+    { id: 'payments', label: '7. Billing & AppyPay Gateway', icon: CreditCard },
+    { id: 'flags', label: '8. Feature Flags', icon: Sliders },
+    { id: 'infrastructure', label: '9. Infrastructure & Storage', icon: Cloud },
+    { id: 'audit', label: '10. Audit Logs & System DLQ', icon: ScrollText }
   ];
 
   // Open or focus tab
@@ -528,7 +540,9 @@ export const FounderIDEWorkspace: React.FC = () => {
 
           {/* Workbench Center Viewport */}
           <div className="flex-1 overflow-y-auto p-6">
-            {activeActivity === 'root_authority' || activeTabObj?.type === 'root_authority' ? (
+            {activeActivity === 'overview' || activeTabObj?.type === 'overview' ? (
+              <OperationalOverviewConsole />
+            ) : activeActivity === 'root_authority' || activeTabObj?.type === 'root_authority' ? (
               <RootConsoleView />
             ) : activeActivity === 'devices' || activeTabObj?.type === 'device' ? (
               /* MULTI-DEVICE MESH & FLEET MANAGER */
@@ -607,12 +621,10 @@ export const FounderIDEWorkspace: React.FC = () => {
                 </div>
               </div>
             ) : activeActivity === 'automation' ? (
-              /* AUTOMATION ENGINE & AI DECISION ENGINE VIEW */
+              /* AUTOMATION ENGINE VIEW */
               <AutomationRulesManager />
-            ) : activeActivity === 'realtime_dev' ? (
-              <RealtimeDevStreamConsole />
             ) : activeActivity === 'health' ? (
-              /* HEALTH & OPERATIONS ASSISTANT VIEW */
+              /* TELEMETRY, REALTIME SSE & HEALTH VIEW */
               <div className="space-y-6 font-sans text-slate-100">
                 <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
                   <div className="flex items-center space-x-3">
@@ -620,8 +632,8 @@ export const FounderIDEWorkspace: React.FC = () => {
                       <Activity className="w-6 h-6" />
                     </span>
                     <div>
-                      <h2 className="text-lg font-black text-slate-100">OPERATIONS ASSISTANT & HEALTH ENGINE</h2>
-                      <p className="text-xs text-slate-400 font-mono">Monitorização de Dispositivos e Recomendações Proativas de Diagnóstico</p>
+                      <h2 className="text-lg font-black text-slate-100">TELEMETRY, REALTIME SSE & HEALTH ENGINE</h2>
+                      <p className="text-xs text-slate-400 font-mono">Monitorização em Tempo Real, Diagnósticos & Transmissão SSE (&lt;5ms)</p>
                     </div>
                   </div>
 
@@ -670,6 +682,9 @@ export const FounderIDEWorkspace: React.FC = () => {
                     ))}
                   </div>
                 </div>
+
+                {/* Realtime SSE Dev Stream */}
+                <RealtimeDevStreamConsole />
 
                 {/* Device Health Score Cards */}
                 <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3 font-mono text-xs">
@@ -833,6 +848,41 @@ export const FounderIDEWorkspace: React.FC = () => {
                   ))}
                 </div>
               </div>
+            ) : activeActivity === 'infrastructure' ? (
+              /* CONSOLIDATED INFRASTRUCTURE & STORAGE VIEW */
+              <div className="space-y-6 font-mono text-slate-100 text-xs">
+                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-black text-slate-100">INFRASTRUCTURE & STORAGE ENGINE</h2>
+                    <p className="text-xs text-slate-400">Node.js Express (Port 3000), Memory Batching, Firestore & IndexedDB</p>
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg border border-emerald-500/40 font-bold">
+                    Port 3000 Bound & IndexedDB Ready
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-slate-500 text-[10px]">MEMORY BUFFER</span>
+                    <span className="text-amber-400 font-bold block text-base">{queueMetrics.bufferedCount} Eventos</span>
+                  </div>
+                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-slate-500 text-[10px]">TOTAL FLUSHED</span>
+                    <span className="text-indigo-400 font-bold block text-base">{queueMetrics.totalFlushed} Gravações</span>
+                  </div>
+                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
+                    <span className="text-slate-500 text-[10px]">ECONOMIA FIRESTORE</span>
+                    <span className="text-emerald-400 font-bold block text-base">-{queueMetrics.savedFirestoreWritesPercentage}% Custos</span>
+                  </div>
+                </div>
+                <div className="p-5 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
+                  <h3 className="text-sm font-bold text-sky-400 border-b border-slate-800 pb-2">
+                    Persistência & Cache Offline (IndexedDB / Firestore Engine)
+                  </h3>
+                  <p className="text-slate-300 text-xs">
+                    Sincronização bidirecional em segundo plano e otimização de custo via memória com redução de 92% de operações de escrita.
+                  </p>
+                </div>
+              </div>
             ) : activeActivity === 'audit' ? (
               /* AUDIT & DEAD LETTER QUEUE LOGS VIEW */
               <div className="space-y-6 font-mono text-slate-100 text-xs">
@@ -847,59 +897,6 @@ export const FounderIDEWorkspace: React.FC = () => {
                 </div>
                 <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-2">
                   <p className="text-slate-300">Nenhum evento falhado crítico no momento. Toda a fila de retentativas foi processada com sucesso!</p>
-                </div>
-              </div>
-            ) : activeActivity === 'cloud' ? (
-              /* CLOUD RUNTIME VIEW */
-              <div className="space-y-6 font-mono text-slate-100 text-xs">
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-black text-slate-100">CLOUD RUNTIME & MEMORY BATCHING ENGINE</h2>
-                    <p className="text-xs text-slate-400">Instância Node.js Express em Port 3000 com Suporte a SSE Broadcast</p>
-                  </div>
-                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg border border-emerald-500/40 font-bold">
-                    Port 3000 Bound
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
-                    <span className="text-slate-500 text-[10px]">MEMORY BUFFER</span>
-                    <span className="text-amber-400 font-bold block text-base">{queueMetrics.bufferedCount} Eventos</span>
-                  </div>
-                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
-                    <span className="text-slate-500 text-[10px]">TOTAL FLUSHED</span>
-                    <span className="text-indigo-400 font-bold block text-base">{queueMetrics.totalFlushed} Gravações</span>
-                  </div>
-                  <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1">
-                    <span className="text-slate-500 text-[10px]">ECONOMIA FIRESTORE</span>
-                    <span className="text-emerald-400 font-bold block text-base">-{queueMetrics.savedFirestoreWritesPercentage}% Custos</span>
-                  </div>
-                </div>
-              </div>
-            ) : activeActivity === 'firestore' ? (
-              /* FIRESTORE & OFFLINE STORAGE VIEW */
-              <div className="space-y-6 font-mono text-slate-100 text-xs">
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-black text-slate-100">FIRESTORE & INDEXEDDB OFFLINE STORAGE</h2>
-                    <p className="text-xs text-slate-400">Sincronização Bidirecional e Cache Agressiva para Operação Offline</p>
-                  </div>
-                  <span className="px-3 py-1 bg-sky-500/20 text-sky-300 rounded-lg border border-sky-500/40 font-bold">
-                    IndexedDB Ready
-                  </span>
-                </div>
-              </div>
-            ) : activeActivity === 'analytics' ? (
-              /* ANALYTICS & REVENUE VIEW */
-              <div className="space-y-6 font-mono text-slate-100 text-xs">
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-black text-slate-100">ANALYTICS & ECONOMICAL ROI ENGINE</h2>
-                    <p className="text-xs text-slate-400">Métricas de Redução de Custos Cloud e Performance Operacional</p>
-                  </div>
-                  <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/40 font-bold">
-                    ROI Optimised
-                  </span>
                 </div>
               </div>
             ) : (

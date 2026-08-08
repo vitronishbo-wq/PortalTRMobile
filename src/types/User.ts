@@ -40,6 +40,7 @@ export interface UserProfile extends UserPermissions {
   lastLogin: number | string;
   permissions?: string[];
   authority?: 'ROOT' | 'ADMIN' | 'OPERATOR' | 'USER';
+  accountState?: 'active' | 'inactive' | 'suspended';
   rootLevel?: RootLevel;
   identityHash?: string;
   canDeploy?: boolean;

@@ -2,6 +2,7 @@ import { db } from '../firebase/firebase';
 import {
   collection,
   doc,
+  getDoc,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -197,6 +198,23 @@ export class FirestoreService {
     } catch (error) {
       console.error('[FirestoreService] Erro ao eliminar dispositivo:', error);
     }
+  }
+
+  /**
+   * Obtém as configurações do utilizador no Firestore
+   */
+  static async getUserSettings(userId: string): Promise<UserSettings | null> {
+    if (!db) return null;
+    try {
+      const settingsRef = doc(db, 'settings', userId);
+      const snap = await getDoc(settingsRef);
+      if (snap.exists()) {
+        return snap.data() as UserSettings;
+      }
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao obter configurações:', error);
+    }
+    return null;
   }
 
   /**

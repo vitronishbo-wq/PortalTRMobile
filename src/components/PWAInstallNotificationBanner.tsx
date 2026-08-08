@@ -10,7 +10,12 @@ import {
   Download,
   CheckCircle2,
   X,
-  HelpCircle
+  HelpCircle,
+  ArrowRight,
+  Check,
+  Zap,
+  Globe,
+  Layers
 } from 'lucide-react';
 import { CapabilityEngine } from '../engine/CapabilityEngine';
 
@@ -44,8 +49,8 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
       document.referrer.includes('android-app://');
     setIsStandalone(standalone);
 
-    // If already running in standalone mode, do not auto-open center notification
-    if (standalone) {
+    // If running in standalone mode and customIsOpen is not set, don't auto-open center banner
+    if (standalone && customIsOpen === undefined) {
       setIsOpen(false);
     }
 
@@ -83,7 +88,7 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, []);
+  }, [customIsOpen]);
 
   const modalActive = customIsOpen !== undefined ? customIsOpen : isOpen;
 
@@ -103,7 +108,7 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
         const { outcome } = await promptEvent.userChoice;
         if (outcome === 'accepted') {
           setInstallSuccess(true);
-          handleCloseModal();
+          setTimeout(() => handleCloseModal(), 1500);
         }
         setDeferredPrompt(null);
         CapabilityEngine.clearDeferredPrompt();
@@ -112,133 +117,39 @@ export const PWAInstallNotificationBanner: React.FC<PWAInstallNotificationBanner
         setShowGuide(true);
       }
     } else {
-      // If no native prompt event available, show guide or full installer
-      if (onOpenFullInstaller) {
-        onOpenFullInstaller();
-        handleCloseModal();
-      } else {
-        setShowGuide(true);
-      }
+      setShowGuide(true);
     }
   };
-
-  // If app is already standalone, don't show prompt
-  if (isStandalone) {
-    return null;
-  }
 
   if (!modalActive) {
     return null;
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-sans text-slate-100 animate-in fade-in duration-200">
-      <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 border border-indigo-500/40 w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-5 relative">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-slate-800/80 pb-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/20 shrink-0">
-              <Download className="w-6 h-6 text-white animate-bounce" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[10px] font-extrabold uppercase rounded-md font-mono border border-amber-500/30">
-                  Notificação de Instalação
-                </span>
-              </div>
-              <h3 className="text-base font-extrabold text-white tracking-tight mt-0.5">
-                Instalar Portal TR Mobile no Dispositivo
-              </h3>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 font-sans text-slate-100 animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-amber-500/30 w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3 text-center relative">
+        
+        {/* Simplified Action Options Only */}
+        <div className="space-y-2.5 pt-1">
+          <button
+            onClick={handleInstallClick}
+            className="w-full py-3.5 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm rounded-2xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center space-x-2 cursor-pointer transform active:scale-95"
+          >
+            <Sparkles className="w-4 h-4 text-slate-950" />
+            <span>1- Instalar PWA Agora</span>
+          </button>
+
           <button
             onClick={handleCloseModal}
-            className="text-slate-400 hover:text-white p-1.5 bg-slate-800/80 hover:bg-slate-700 rounded-xl transition-all"
-            title="Fechar Notificação"
+            className="w-full py-3.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm rounded-2xl transition-all cursor-pointer text-center flex items-center justify-center space-x-2 border border-slate-700/80 active:scale-95"
           >
-            <X className="w-5 h-5" />
+            <Globe className="w-4 h-4 text-cyan-400" />
+            <span>2- Continuar no browser</span>
           </button>
         </div>
 
-        {/* Body Content */}
-        {installSuccess ? (
-          <div className="bg-amber-950/80 border border-amber-500/50 p-4 rounded-2xl text-center space-y-2">
-            <CheckCircle2 className="w-10 h-10 text-amber-400 mx-auto" />
-            <h4 className="font-extrabold text-amber-300">Aplicação Instalada com Sucesso!</h4>
-            <p className="text-xs text-amber-200">
-              Aceda ao ecrã principal do seu dispositivo para abrir a aplicação oficial.
-            </p>
-            <button
-              onClick={handleCloseModal}
-              className="mt-2 px-5 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl shadow cursor-pointer"
-            >
-              Concluir
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4 text-xs">
-            <p className="text-slate-300 leading-relaxed text-xs">
-              Instale a aplicação no seu dispositivo para acesso direto e otimizado ao portal.
-            </p>
-
-            {showGuide && (
-              <div className="space-y-3">
-                {deviceType === 'android' && (
-                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2 text-[11px]">
-                    <span className="font-bold text-amber-400 block">📱 Passo a Passo Android (Chrome/Edge):</span>
-                    <ol className="list-decimal list-inside space-y-1.5 text-slate-300">
-                      <li>Toque no menu <strong>(⋮)</strong> do navegador no canto superior.</li>
-                      <li>Clique em <strong>"Adicionar ao ecrã principal"</strong> ou <strong>"Instalar aplicação"</strong>.</li>
-                      <li>Confirme a adição ao seu telemóvel.</li>
-                    </ol>
-                  </div>
-                )}
-
-                {deviceType === 'ios' && (
-                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2 text-[11px]">
-                    <span className="font-bold text-indigo-300 block">🍎 Passo a Passo iPhone (Safari):</span>
-                    <div className="space-y-2 text-slate-300">
-                      <div className="flex items-center space-x-2">
-                        <Share className="w-4 h-4 text-indigo-400 shrink-0" />
-                        <span>1. Toque no ícone <strong>Partilhar</strong> na barra do Safari.</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <PlusSquare className="w-4 h-4 text-indigo-400 shrink-0" />
-                        <span>2. Selecione <strong>"Adicionar ao Ecrã Principal"</strong>.</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {deviceType === 'desktop' && (
-                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2 text-[11px] text-slate-300">
-                    <span className="font-bold text-white block">💻 Passo a Passo Desktop:</span>
-                    <p>Clique no ícone de instalação ⊕ no canto superior direito da barra de endereço do navegador.</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
-              <button
-                onClick={handleInstallClick}
-                className="flex-1 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-orange-500 text-slate-950 font-black text-xs rounded-2xl shadow-lg shadow-amber-600/30 transition-all flex items-center justify-center space-x-2 cursor-pointer transform active:scale-95"
-              >
-                <Sparkles className="w-4 h-4 text-white animate-spin" />
-                <span>Instalar Agora</span>
-              </button>
-
-              <button
-                onClick={handleCloseModal}
-                className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-2xl transition-all cursor-pointer text-center"
-              >
-                Continuar no Navegador
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
 };
+

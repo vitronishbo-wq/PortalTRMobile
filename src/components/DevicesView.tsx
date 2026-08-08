@@ -1,5 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, QrCode, Battery, Wifi, ShieldCheck, Plus, Trash2, Send, RefreshCw, CheckCircle2, Activity, Cpu, Wrench, Zap, ChevronDown, ChevronUp } from 'lucide-react';
+import { 
+  Smartphone, 
+  QrCode, 
+  Battery, 
+  Wifi, 
+  ShieldCheck, 
+  Plus, 
+  Trash2, 
+  Send, 
+  RefreshCw, 
+  CheckCircle2, 
+  Activity, 
+  Cpu, 
+  Wrench, 
+  Zap, 
+  ChevronDown, 
+  ChevronUp,
+  Globe,
+  Tablet,
+  Laptop,
+  Monitor,
+  Terminal,
+  Apple,
+  Search,
+  X
+} from 'lucide-react';
 import QRCode from 'qrcode';
 import { Device } from '../types';
 import { ZeroTouchIdentity } from '../engine/provisioningEngine';
@@ -26,6 +51,10 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [repairingMap, setRepairingMap] = useState<Record<string, boolean>>({});
   const [isBatteryExpanded, setIsBatteryExpanded] = useState<boolean>(false);
   const [expandedDeviceMap, setExpandedDeviceMap] = useState<Record<string, boolean>>({});
+
+  // Sub-tabs & Search state for 6. Dispositivos (Android, iPhone, Tablet, Windows, macOS, Linux, Web)
+  const [platformFilter, setPlatformFilter] = useState<'todos' | 'android' | 'iphone' | 'tablet' | 'windows' | 'macos' | 'linux' | 'web'>('todos');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
     // Generate pairing token & QR Code
@@ -68,6 +97,18 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     setExpandedDeviceMap((prev) => ({ ...prev, [deviceId]: !prev[deviceId] }));
   };
 
+  const getDevicePlatform = (device: Device): 'android' | 'iphone' | 'tablet' | 'windows' | 'macos' | 'linux' | 'web' => {
+    if (device.platform) return device.platform;
+    const str = `${device.name || ''} ${device.model || ''} ${device.osVersion || ''}`.toLowerCase();
+    if (str.includes('ipad') || str.includes('tablet') || str.includes('tab s')) return 'tablet';
+    if (str.includes('iphone') || str.includes('ios')) return 'iphone';
+    if (str.includes('mac') || str.includes('macos')) return 'macos';
+    if (str.includes('win') || str.includes('windows')) return 'windows';
+    if (str.includes('ubuntu') || str.includes('linux') || str.includes('debian') || str.includes('fedora')) return 'linux';
+    if (str.includes('web') || str.includes('chrome') || str.includes('pwa') || str.includes('firefox')) return 'web';
+    return 'android';
+  };
+
   const getDeviceOem = (device: Device): string => {
     if (device.oemProfile) return device.oemProfile;
     const fullName = `${device.name || ''} ${device.model || ''}`.toLowerCase();
@@ -81,224 +122,390 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     return 'generic';
   };
 
+  const renderPlatformIcon = (platform: string) => {
+    switch (platform) {
+      case 'android':
+        return <Smartphone className="w-5 h-5 text-emerald-400" />;
+      case 'iphone':
+        return <Apple className="w-5 h-5 text-indigo-400" />;
+      case 'tablet':
+        return <Tablet className="w-5 h-5 text-cyan-400" />;
+      case 'windows':
+        return <Monitor className="w-5 h-5 text-blue-400" />;
+      case 'macos':
+        return <Laptop className="w-5 h-5 text-purple-400" />;
+      case 'linux':
+        return <Terminal className="w-5 h-5 text-amber-400" />;
+      case 'web':
+        return <Globe className="w-5 h-5 text-teal-400" />;
+      default:
+        return <Smartphone className="w-5 h-5 text-indigo-400" />;
+    }
+  };
+
+  // Filtered devices list
+  const filteredDevices = devices.filter((device) => {
+    const devPlatform = getDevicePlatform(device);
+    if (platformFilter !== 'todos' && devPlatform !== platformFilter) {
+      return false;
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = device.name.toLowerCase().includes(q);
+      const matchModel = device.model.toLowerCase().includes(q);
+      const matchOs = (device.osVersion || '').toLowerCase().includes(q);
+      return matchName || matchModel || matchOs;
+    }
+
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       
       {/* Header Banner */}
-      <div className="bg-slate-900/90 rounded-2xl p-6 border border-slate-800 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <Smartphone className="w-6 h-6 text-indigo-400" />
-            <span>Dispositivos & DeviceHealth ({devices.length})</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Exibição simplificada de marca e modelo. Clique num dispositivo para ver a telemetria detalhada.
+      <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 shrink-0">
+              <Globe className="w-5 h-5" />
+            </div>
+            <div className="flex items-center space-x-2">
+              <h2 className="text-base font-black text-slate-100 tracking-tight">
+                Gestão Multiplataforma de Dispositivos
+              </h2>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-mono font-black text-[10px] tracking-wider uppercase">
+                {devices.length} {devices.length === 1 ? 'NÓ' : 'NÓS'}
+              </span>
+            </div>
+          </div>
+          <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest pl-11 font-medium opacity-75">
+            ORQUESTRAÇÃO UNIFICADA • ANDROID • IOS • DESKTOP • WEB
           </p>
         </div>
 
         <button
           onClick={() => setShowPairModal(true)}
-          className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-500/20 transition-all cursor-pointer shrink-0"
+          className="flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20 transition-all cursor-pointer shrink-0 active:scale-95 border border-indigo-400/30"
         >
           <QrCode className="w-4 h-4" />
-          <span>Emparelhar Novo Celular</span>
+          <span>Emparelhar Dispositivo</span>
         </button>
+      </div>
+
+      {/* Filter Bar & Sub-Tabs */}
+      <div className="space-y-3">
+        
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Pesquisar por nome do dispositivo, modelo ou sistema operativo..."
+            className="w-full pl-10 pr-9 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-0.5 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Platform Sub-Tabs (Todos, Android, iPhone, Tablet, Windows, macOS, Linux, Web) */}
+        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none">
+          
+          <button
+            onClick={() => setPlatformFilter('todos')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+              platformFilter === 'todos'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Todos ({devices.length})</span>
+          </button>
+
+          <button
+            onClick={() => setPlatformFilter('android')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+              platformFilter === 'android'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-black'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Android ({devices.filter(d => getDevicePlatform(d) === 'android').length})</span>
+          </button>
+
+          <button
+            onClick={() => setPlatformFilter('iphone')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+              platformFilter === 'iphone'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Apple className="w-3.5 h-3.5 text-indigo-400" />
+            <span>iPhone ({devices.filter(d => getDevicePlatform(d) === 'iphone').length})</span>
+          </button>
+
+          <button
+            onClick={() => setPlatformFilter('tablet')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+              platformFilter === 'tablet'
+                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/20 font-black'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Tablet className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Tablet ({devices.filter(d => getDevicePlatform(d) === 'tablet').length})</span>
+          </button>
+
+          <button
+            onClick={() => setPlatformFilter('windows')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+              platformFilter === 'windows'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20 font-black'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Monitor className="w-3.5 h-3.5 text-blue-400" />
+            <span>Windows ({devices.filter(d => getDevicePlatform(d) === 'windows').length})</span>
+          </button>
+
+          <button
+            onClick={() => setPlatformFilter('macos')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+              platformFilter === 'macos'
+                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20 font-black'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Laptop className="w-3.5 h-3.5 text-purple-400" />
+            <span>macOS ({devices.filter(d => getDevicePlatform(d) === 'macos').length})</span>
+          </button>
+
+          <button
+            onClick={() => setPlatformFilter('linux')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+              platformFilter === 'linux'
+                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20 font-black'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Terminal className="w-3.5 h-3.5 text-amber-400" />
+            <span>Linux ({devices.filter(d => getDevicePlatform(d) === 'linux').length})</span>
+          </button>
+
+          <button
+            onClick={() => setPlatformFilter('web')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+              platformFilter === 'web'
+                ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20 font-black'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-teal-400" />
+            <span>Web ({devices.filter(d => getDevicePlatform(d) === 'web').length})</span>
+          </button>
+
+        </div>
+
       </div>
 
       {/* Device Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {devices.map((device) => {
-          const isRepairing = repairingMap[device.deviceId];
-          const healthScore = device.permissionScore ?? 98;
-          const notificationStatus = device.notificationListenerStatus || 'active';
-          const oem = getDeviceOem(device);
-          const isExpanded = !!expandedDeviceMap[device.deviceId];
+        {filteredDevices.length > 0 ? (
+          filteredDevices.map((device) => {
+            const isRepairing = repairingMap[device.deviceId];
+            const healthScore = device.permissionScore ?? 98;
+            const notificationStatus = device.notificationListenerStatus || 'active';
+            const platform = getDevicePlatform(device);
+            const isExpanded = !!expandedDeviceMap[device.deviceId];
 
-          return (
-            <div
-              key={device.deviceId}
-              className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800 shadow-lg relative space-y-4 hover:border-slate-700 transition-all"
-            >
-              {/* Main Visible Bar: Brand, Model, Online Status & Expand Toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-                    <Smartphone className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h3 className="font-bold text-slate-100 text-sm">{device.name}</h3>
-                      <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/30 text-purple-300 text-[10px] uppercase font-mono font-semibold">
-                        {oem}
-                      </span>
+            return (
+              <div
+                key={device.deviceId}
+                className="bg-slate-900/90 rounded-2xl p-4 sm:p-5 border border-slate-800/80 hover:border-slate-700/80 shadow-md hover:shadow-xl transition-all space-y-3.5"
+              >
+                {/* Header Row: Icon, Title, Platform & Online/Offline Status */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/15 via-slate-800 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shrink-0 text-indigo-400">
+                      {renderPlatformIcon(platform)}
                     </div>
-                    <span className="text-xs text-slate-400 block">{device.model}</span>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <h3 className="font-bold text-slate-100 text-sm tracking-tight">{device.name}</h3>
+                        <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] uppercase font-mono font-bold">
+                          {platform}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-medium block">{device.model}</span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1 ${
-                    device.online ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-slate-800 text-slate-500'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${device.online ? 'bg-amber-400 animate-ping' : 'bg-slate-500'}`}></span>
-                    <span>{device.online ? 'ONLINE' : 'OFFLINE'}</span>
-                  </span>
-
-                  <button
-                    onClick={() => toggleDeviceExpanded(device.deviceId)}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold flex items-center space-x-1 cursor-pointer transition-all active:scale-95 shadow-md"
-                    title={isExpanded ? "Ocultar Detalhes" : "Clique para ver detalhes do smartphone"}
-                  >
-                    {isExpanded ? (
-                      <>
-                        <span className="hidden sm:inline">Ocultar</span>
-                        <ChevronUp className="w-4 h-4 text-amber-400" />
-                      </>
+                  {/* Online / Offline Status Badge with Subtle Gradient */}
+                  <div className="shrink-0">
+                    {device.online ? (
+                      <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-teal-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold flex items-center space-x-1.5 shadow-sm shadow-emerald-950/40">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>ONLINE</span>
+                      </span>
                     ) : (
-                      <>
-                        <span className="hidden sm:inline">Ver Detalhes</span>
-                        <ChevronDown className="w-4 h-4 text-amber-400" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* VOLUNTARY EXPANDED DETAILS PANEL */}
-              {isExpanded && (
-                <div className="space-y-4 pt-2 border-t border-slate-800/80 animate-fadeIn">
-                  {/* Zero-Touch & Digital Twin Diagnostics Panel */}
-                  <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800/90 space-y-2.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400 flex items-center space-x-1.5 font-mono">
-                        <Activity className="w-3.5 h-3.5 text-amber-400" />
-                        <span className="font-bold text-slate-300">Digital Twin Node:</span>
-                        <span className="text-amber-400 font-bold">{device.nodeId || `node-${device.deviceId.substring(0, 8)}`}</span>
+                      <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-slate-800 to-slate-900 text-slate-400 border border-slate-700/60 text-[10px] font-mono font-bold flex items-center space-x-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                        <span>OFFLINE</span>
                       </span>
-                      <span className="font-bold text-amber-400 font-mono">{healthScore}%</span>
-                    </div>
-
-                    {/* Digital Twin Capabilities & Health Matrix */}
-                    <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800/80 space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider font-mono">Capacidades Digital Twin:</span>
-                        <span className="text-emerald-400 font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20">
-                          {device.health?.network || 'AFRICELL_4G'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                          device.capabilities?.sms !== false
-                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                            : 'bg-slate-800 text-slate-500 border-slate-700'
-                        }`}>
-                          <span>SMS</span>
-                          <span>{device.capabilities?.sms !== false ? '✓' : '✕'}</span>
-                        </span>
-
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                          device.capabilities?.calls !== false
-                            ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
-                            : 'bg-slate-800 text-slate-500 border-slate-700'
-                        }`}>
-                          <span>CHAMADAS</span>
-                          <span>{device.capabilities?.calls !== false ? '✓' : '✕'}</span>
-                        </span>
-
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                          device.capabilities?.biometrics !== false
-                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                            : 'bg-slate-800 text-slate-500 border-slate-700'
-                        }`}>
-                          <span>BIOMETRIA</span>
-                          <span>{device.capabilities?.biometrics !== false ? '✓' : '✕'}</span>
-                        </span>
-
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                          device.capabilities?.accessibility
-                            ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
-                            : 'bg-slate-800/80 text-slate-400 border-slate-800'
-                        }`}>
-                          <span>ACESSIBILIDADE</span>
-                          <span>{device.capabilities?.accessibility ? '✓' : 'OFF'}</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                        <span className="text-slate-400">Listener:</span>
-                        <span className={`font-semibold capitalize ${
-                          notificationStatus === 'active' ? 'text-amber-400' : 'text-orange-400'
-                        }`}>
-                          {notificationStatus === 'active' ? '● Ativo' : '▲ Requer Reparo'}
-                        </span>
-                      </div>
-
-                      <div className="bg-slate-900/90 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                        <span className="text-slate-400">Latência Barramento:</span>
-                        <span className="font-mono text-indigo-300 font-bold">
-                          {device.syncDelayMs ?? 12}ms
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300">
-                    <button
-                      onClick={() => setIsBatteryExpanded((prev) => !prev)}
-                      className="flex items-center space-x-1.5 hover:text-amber-300 transition-all cursor-pointer group text-left active:scale-95"
-                      title="Clique no ícone da bateria para expandir/recolher telemetria detalhada"
-                    >
-                      <Battery className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform animate-pulse" />
-                      <span className="font-bold text-amber-300">{device.batteryLevel ?? 98}%</span>
-                    </button>
-                    <div className="flex items-center space-x-1.5">
-                      <Zap className="w-3.5 h-3.5 text-orange-400" />
-                      <span>Zero-Touch</span>
-                    </div>
-                    <div className="flex items-center space-x-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Sem Limites</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                    <span>Último Heartbeat: {new Date(device.lastSync).toLocaleTimeString('pt-BR')}</span>
-                    
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleAutoRepair(device.deviceId)}
-                        disabled={isRepairing}
-                        className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 transition-all cursor-pointer flex items-center space-x-1"
-                        title="Auto-Repair Background Listener"
-                      >
-                        <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
-                        <span className="text-[10px]">Auto-Repair</span>
-                      </button>
-
-                      <button
-                        onClick={onSimulateEvent}
-                        className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 transition-all cursor-pointer"
-                        title="Testar Envio de Evento do Celular"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => onRemoveDevice(device.deviceId)}
-                        className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-all cursor-pointer"
-                        title="Desconectar Dispositivo"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    )}
                   </div>
                 </div>
-              )}
+
+                {/* Status Badges Row: Simplified Status Labels */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                  <div className="flex items-center space-x-2">
+                    {/* Battery Pill */}
+                    <div className="bg-gradient-to-r from-amber-500/10 to-amber-600/5 text-amber-300 border border-amber-500/20 px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono flex items-center space-x-1.5">
+                      <Battery className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{device.batteryLevel ?? 98}%</span>
+                    </div>
+
+                    {/* Latency Pill */}
+                    <div className="bg-gradient-to-r from-indigo-500/10 to-indigo-600/5 text-indigo-300 border border-indigo-500/20 px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono flex items-center space-x-1.5">
+                      <Zap className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>{device.syncDelayMs ?? 12}ms</span>
+                    </div>
+
+                    {/* Listener Pill */}
+                    <div className={`px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono flex items-center space-x-1.5 border ${
+                      notificationStatus === 'active'
+                        ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-300 border-emerald-500/20'
+                        : 'bg-gradient-to-r from-orange-500/10 to-amber-500/5 text-orange-300 border-orange-500/20'
+                    }`}>
+                      <Activity className={`w-3.5 h-3.5 ${notificationStatus === 'active' ? 'text-emerald-400' : 'text-orange-400'}`} />
+                      <span>{notificationStatus === 'active' ? 'Ativo' : 'Atenção'}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions Toolbar */}
+                  <div className="flex items-center space-x-1.5 shrink-0">
+                    <button
+                      onClick={() => handleAutoRepair(device.deviceId)}
+                      disabled={isRepairing}
+                      className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all cursor-pointer flex items-center space-x-1 active:scale-95"
+                      title="Auto-Repair"
+                    >
+                      <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
+                    </button>
+
+                    <button
+                      onClick={onSimulateEvent}
+                      className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all cursor-pointer active:scale-95"
+                      title="Simular Evento"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={() => toggleDeviceExpanded(device.deviceId)}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all cursor-pointer active:scale-95 flex items-center space-x-1 text-[11px] font-bold"
+                      title={isExpanded ? "Recolher" : "Detalhes"}
+                    >
+                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-amber-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                    </button>
+
+                    <button
+                      onClick={() => onRemoveDevice(device.deviceId)}
+                      className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all cursor-pointer active:scale-95"
+                      title="Desconectar"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Collapsible Details Panel */}
+                {isExpanded && (
+                  <div className="space-y-3 pt-2.5 border-t border-slate-800/80 animate-fadeIn">
+                    {/* Capabilities Badges */}
+                    <div className="flex items-center flex-wrap gap-1.5">
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                        device.capabilities?.sms !== false
+                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-500 border-slate-700'
+                      }`}>
+                        <span>SMS</span>
+                        <span>{device.capabilities?.sms !== false ? '✓' : '✕'}</span>
+                      </span>
+
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                        device.capabilities?.calls !== false
+                          ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                          : 'bg-slate-800 text-slate-500 border-slate-700'
+                      }`}>
+                        <span>CHAMADAS</span>
+                        <span>{device.capabilities?.calls !== false ? '✓' : '✕'}</span>
+                      </span>
+
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                        device.capabilities?.biometrics !== false
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                          : 'bg-slate-800 text-slate-500 border-slate-700'
+                      }`}>
+                        <span>BIOMETRIA</span>
+                        <span>{device.capabilities?.biometrics !== false ? '✓' : '✕'}</span>
+                      </span>
+
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
+                        device.capabilities?.accessibility
+                          ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+                          : 'bg-slate-800/80 text-slate-400 border-slate-800'
+                      }`}>
+                        <span>ACESSIBILIDADE</span>
+                        <span>{device.capabilities?.accessibility ? '✓' : 'OFF'}</span>
+                      </span>
+                    </div>
+
+                    {/* Node Metadata & Heartbeat */}
+                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 bg-slate-950/80 p-2 rounded-xl border border-slate-800/60">
+                      <span>Nó: <strong className="text-slate-300">{device.nodeId || `node-${device.deviceId.substring(0, 8)}`}</strong></span>
+                      <span>Sincronia: <strong className="text-indigo-300">{typeof device.lastSync === 'number' ? new Date(device.lastSync).toLocaleTimeString('pt-BR') : device.lastSync}</strong></span>
+                      <span>Saúde: <strong className="text-emerald-400">{healthScore}%</strong></span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div className="col-span-full bg-slate-950 p-8 rounded-2xl border border-slate-800 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500">
+              <Globe className="w-6 h-6" />
             </div>
-          );
-        })}
+            <span className="block text-sm font-bold text-slate-300">Nenhum dispositivo encontrado</span>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Não existem dispositivos emparelhados na plataforma selecionada ({platformFilter}).
+            </p>
+            {(searchQuery || platformFilter !== 'todos') && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setPlatformFilter('todos');
+                }}
+                className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-indigo-400 rounded-xl text-xs font-bold border border-slate-800 transition-all cursor-pointer"
+              >
+                Limpar Filtros
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Historical Battery Usage & Drain Monitor (Collapsible) */}
@@ -315,7 +522,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="font-bold text-slate-100 text-sm flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-indigo-400" />
-                <span>Emparelhar App Android Zero-Touch</span>
+                <span>Emparelhar Novo Dispositivo Zero-Touch</span>
               </h3>
               <button
                 onClick={() => setShowPairModal(false)}
@@ -327,7 +534,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
             <div className="text-center space-y-3">
               <p className="text-xs text-slate-300">
-                Abra o aplicativo <strong>Portal Mobile</strong> no seu smartphone Android e escaneie o código QR abaixo para vincular:
+                Abra o aplicativo <strong>Portal Mobile</strong> ou aceda à consola web e escaneie o código QR abaixo para vincular:
               </p>
 
               {qrDataUrl ? (
@@ -351,14 +558,14 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
-                  placeholder="Nome do Celular"
+                  placeholder="Nome do Dispositivo"
                   value={newDeviceName}
                   onChange={(e) => setNewDeviceName(e.target.value)}
                   className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                 />
                 <input
                   type="text"
-                  placeholder="Modelo (ex: Galaxy S24)"
+                  placeholder="Modelo (ex: Galaxy S24 / MacBook)"
                   value={newDeviceModel}
                   onChange={(e) => setNewDeviceModel(e.target.value)}
                   className="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
