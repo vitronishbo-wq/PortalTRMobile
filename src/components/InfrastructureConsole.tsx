@@ -96,7 +96,7 @@ export const InfrastructureConsole: React.FC = () => {
             <div>
               <h2 className="text-lg font-black text-slate-100">PLATAFORMA DE INFRAESTRUTURA & STORAGE ENGINE</h2>
               <p className="text-xs text-slate-400 font-mono">
-                Cloud Run Container • Firebase Platform • Render CPaaS • In-Memory Queue • Runtime Env
+                Express Container • Firebase Platform • CPaaS Dispatcher • In-Memory Queue • Runtime Env
               </p>
             </div>
           </div>
@@ -124,7 +124,7 @@ export const InfrastructureConsole: React.FC = () => {
         {/* METRICS ROW */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
           <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
-            <span className="text-[10px] text-slate-500 uppercase block font-bold">Cloud Run Runtime</span>
+            <span className="text-[10px] text-slate-500 uppercase block font-bold">Container Express Runtime</span>
             <span className="text-base font-black text-emerald-400">Porta 3000 (0.0.0.0)</span>
           </div>
 
@@ -134,13 +134,13 @@ export const InfrastructureConsole: React.FC = () => {
           </div>
 
           <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
-            <span className="text-[10px] text-slate-500 uppercase block font-bold">Escritas Salvas no Firestore</span>
-            <span className="text-base font-black text-sky-400">-{metrics.savedFirestoreWritesPercentage}% Custos</span>
+            <span className="text-[10px] text-slate-500 uppercase block font-bold">Escritas Firestore (Batching)</span>
+            <span className="text-base font-black text-sky-400">{metrics.totalFlushed} Flushed</span>
           </div>
 
           <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
-            <span className="text-[10px] text-slate-500 uppercase block font-bold">Render Backend CPaaS</span>
-            <span className="text-base font-black text-purple-400">Stateless Active</span>
+            <span className="text-[10px] text-slate-500 uppercase block font-bold">Serviço CPaaS Dispatcher</span>
+            <span className="text-base font-black text-purple-400">CONFIGURED</span>
           </div>
         </div>
       </div>
@@ -156,7 +156,7 @@ export const InfrastructureConsole: React.FC = () => {
           }`}
         >
           <Layers className="w-4 h-4" />
-          <span>Topologia Global & Cloud Run</span>
+          <span>Topologia Global & Express Engine</span>
         </button>
 
         <button
@@ -232,7 +232,7 @@ export const InfrastructureConsole: React.FC = () => {
                 </h3>
               </div>
               <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded border border-emerald-500/30">
-                100% HEALTHY ARCHITECTURE
+                TOPOLOGIA OPERACIONAL
               </span>
             </div>
 
@@ -271,7 +271,7 @@ export const InfrastructureConsole: React.FC = () => {
                 </p>
                 <div className="pt-2 border-t border-slate-800/80 text-[10px] text-slate-500 space-y-1">
                   <div>• Firestore Region: <span className="text-slate-300">eur3 (Europe)</span></div>
-                  <div>• Listeners: <span className="text-slate-300">Ativos (&lt;10ms)</span></div>
+                  <div>• Listeners: <span className="text-slate-300">Realtime Event Stream</span></div>
                 </div>
               </div>
 

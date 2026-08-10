@@ -43,9 +43,9 @@ export const DEFAULT_CLEAN_CONFIG: HomeCustomizationConfig = {
   density: 'normal',
   showDeviceBadge: true,
   showStatusBar: true,
-  primaryShortcut: '',
-  visibleShortcuts: [],
-  pinnedWidgets: []
+  primaryShortcut: 'mensagens',
+  visibleShortcuts: ['mensagens', 'chamadas', 'notificacoes', 'dispositivos', 'contactos', 'atividade'],
+  pinnedWidgets: ['device_status', 'recent_messages']
 };
 
 export interface HomePersonalizationWidgetProps {

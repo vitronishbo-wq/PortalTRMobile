@@ -23,7 +23,7 @@ import {
   ChevronRight,
   Search,
   Filter,
-  FileSpreadsheet,
+  Download,
   X,
   Sparkles,
   Wifi,
@@ -52,6 +52,8 @@ import { SettingsView } from '../SettingsView';
 import { SystemArchitectureDiagram } from '../SystemArchitectureDiagram';
 import { MobileHomeView } from '../MobileHomeView';
 import { QRCodePairing } from '../QRCodePairing';
+import { InputEngine } from '../../engine/inputEngine';
+import { InteractionEngine, NavigationEngine, MultiDeviceMeshEngine } from '../../engine';
 import { Device } from '../../types';
 
 interface PublicWorkspaceProps {
@@ -199,9 +201,67 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
   const hasDevice = isAuthenticated ? activeDevices.length > 0 : false;
 
   const [activeTab, setActiveTab] = useState<PublicTabType>('inicio');
+
+  const normalizeTab = (tab: string): PublicTabType => {
+    if (!tab) return 'inicio';
+    const t = tab.toLowerCase();
+    if (t === 'timeline' || t === 'activity' || t === 'atividade') return 'atividade';
+    if (t === 'devices' || t === 'dispositivos') return 'dispositivos';
+    if (t === 'favorites' || t === 'favoritos') return 'favoritos';
+    if (t === 'search' || t === 'pesquisa') return 'pesquisa';
+    if (t === 'home' || t === 'inicio') return 'inicio';
+    if (t === 'chamadas' || t === 'phone' || t === 'calls') return 'chamadas';
+    if (t === 'mensagens' || t === 'messages') return 'mensagens';
+    if (t === 'notificacoes' || t === 'notifications') return 'notificacoes';
+    if (t === 'contactos' || t === 'contacts') return 'contactos';
+    if (t === 'definicoes' || t === 'settings') return 'definicoes';
+    if (t === 'meu_dispositivo') return 'meu_dispositivo';
+    if (t === 'conta' || t === 'subscricao') return 'conta';
+    if (t === 'seguranca') return 'seguranca';
+    if (t === 'privacidade') return 'privacidade';
+    if (t === 'sessoes') return 'sessoes';
+    if (t === 'aparencia') return 'aparencia';
+    if (t === 'arquitetura') return 'arquitetura';
+    return 'inicio';
+  };
+
+  // Multi-Device Unified Mesh & Interaction Engine Initialization
+  useEffect(() => {
+    MultiDeviceMeshEngine.registerNodeInMesh({
+      primaryPhoneNumber: userProfile?.phoneNumber || '+244923456789',
+      deviceName: 'PortalTRMobile Unified Node'
+    });
+
+    const unsubscribeNav = NavigationEngine.subscribe(() => {
+      const activeDomain = NavigationEngine.getActiveDomain();
+      if (activeDomain) {
+        setActiveTab(normalizeTab(activeDomain));
+      }
+    });
+
+    const handleSwitchPublicTab = (e: CustomEvent<string>) => {
+      if (e.detail) {
+        setActiveTab(normalizeTab(e.detail));
+      }
+    };
+
+    window.addEventListener('switch-public-tab' as any, handleSwitchPublicTab);
+
+    return () => {
+      unsubscribeNav();
+      window.removeEventListener('switch-public-tab' as any, handleSwitchPublicTab);
+    };
+  }, [userProfile]);
+
+  const handleTabChange = (newTab: PublicTabType) => {
+    const target = normalizeTab(newTab);
+    setActiveTab(target);
+    NavigationEngine.navigateTo(target as any);
+  };
+
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [msgSubTab, setMsgSubTab] = useState<'todas' | 'sms' | 'conversas' | 'arquivos'>('todas');
-  const [callSubTab, setCallSubTab] = useState<'historico' | 'recebidas' | 'efetuadas' | 'perdidas' | 'contactos'>('historico');
+  const [callSubTab, setCallSubTab] = useState<'dialer' | 'historico' | 'recebidas' | 'efetuadas' | 'perdidas' | 'contactos'>('dialer');
   const [notifSubTab, setNotifSubTab] = useState<'todas' | 'nao_lidas' | 'aplicacoes'>('todas');
   const [selectedNotifApp, setSelectedNotifApp] = useState<string>('todos');
 
@@ -281,163 +341,45 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
 
   const navCategories = [
     {
-      group: 'Visão Geral',
+      group: 'Public Portal (8 Domínios)',
       items: [
-        { id: 'inicio', label: 'Início', icon: Home },
-        { id: 'meu_dispositivo', label: 'Meu Dispositivo', icon: Smartphone }
-      ]
-    },
-    {
-      group: 'Comunicação',
-      items: [
-        { id: 'mensagens', label: 'Mensagens', icon: MessageSquare, badge: messages.length },
-        { id: 'chamadas', label: 'Chamadas', icon: PhoneCall, badge: calls.length },
-        { id: 'notificacoes', label: 'Notificações', icon: Bell, badge: notifications.length },
-        { id: 'contactos', label: 'Contactos', icon: Users, badge: contacts.length }
-      ]
-    },
-    {
-      group: 'Gestão',
-      items: [
-        { id: 'dispositivos', label: 'Dispositivos', icon: Grid, badge: activeDevices.length },
-        { id: 'atividade', label: 'Atividade', icon: Activity },
-        { id: 'arquitetura', label: 'Arquitetura', icon: Layers }
-      ]
-    },
-    {
-      group: 'Conta & Definições',
-      items: [
-        { id: 'conta', label: 'Conta', icon: User },
-        { id: 'seguranca', label: 'Segurança', icon: ShieldCheck },
-        { id: 'definicoes', label: 'Definições', icon: Settings }
+        { id: 'inicio', label: 'Home', icon: Home },
+        { id: 'chamadas', label: 'Phone', icon: PhoneCall, badge: calls.length },
+        { id: 'mensagens', label: 'Messages', icon: MessageSquare, badge: messages.length },
+        { id: 'notificacoes', label: 'Notifications', icon: Bell, badge: notifications.length },
+        { id: 'dispositivos', label: 'Devices', icon: Grid, badge: activeDevices.length },
+        { id: 'favoritos', label: 'Favorites', icon: Star },
+        { id: 'pesquisa', label: 'Search', icon: Search },
+        { id: 'definicoes', label: 'Settings', icon: Settings }
       ]
     }
   ];
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-6 font-sans text-slate-100 select-none pb-12">
+    <div className="w-full max-w-5xl mx-auto space-y-5 font-sans text-slate-100 select-none pb-12">
       
-      {/* ── STATE 1: NÃO AUTENTICADO ── */}
-      {!isAuthenticated && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-6">
-          <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto text-white shadow-xl shadow-indigo-500/20 ring-1 ring-white/20">
-            <Zap className="w-8 h-8" />
-          </div>
-
-          <div className="space-y-2 max-w-md mx-auto">
-            <h2 className="text-2xl font-black text-white tracking-tight">PORTALTRMOBILE</h2>
-            <p className="text-sm text-slate-400">
-              Sistema Operacional de Comunicação e Gestão de Dispositivos Móveis.
-            </p>
-          </div>
-
-          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 max-w-sm mx-auto space-y-4">
-            <div className="space-y-1">
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">Estado do Utilizador</span>
-              <p className="text-sm font-extrabold text-white">NÃO AUTENTICADO</p>
-            </div>
-
-            <div className="pt-2 space-y-2.5">
-              <button
-                onClick={onOpenAuthModal}
-                className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
-              >
-                <KeyRound className="w-4 h-4" />
-                <span>Entrar / Criar Conta</span>
-              </button>
-
-              <button
-                onClick={() => loginWithGoogle()}
-                className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-extrabold text-xs rounded-xl border border-slate-700 transition-all cursor-pointer flex items-center justify-center space-x-2 active:scale-95"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                </svg>
-                <span>Continuar com Google</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── STATE 2: AUTENTICADO SEM DISPOSITIVO ── */}
-      {isAuthenticated && !hasDevice && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <QrCode className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-black text-white">Configurar Primeiro Dispositivo</h2>
-                <p className="text-xs text-slate-400">Emparelhe o seu smartphone Android para ativar o Workspace Móvel</p>
-              </div>
-            </div>
-
-            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 font-mono">
-              SEM DISPOSITIVO
-            </span>
-          </div>
-
-          <QRCodePairing
-            onPairingComplete={() => {
-              if (onAddDevice) {
-                onAddDevice({
-                  name: 'Smartphone Android Emparelhado',
-                  model: 'Android Device',
-                  online: true
-                });
-              }
-            }}
+      {/* TAB: INÍCIO — HOME MOBILE CLEAN (DEFAULT) */}
+      {(activeTab === 'inicio' || !activeTab) && (
+        <div className="flex flex-col items-center justify-center py-2">
+          <MobileHomeView
+            onNavigateTab={(tabId) => setActiveTab(tabId as any)}
+            unreadMessagesCount={messages.filter(m => !m.isFavorite).length}
+            unreadNotifsCount={notifications.filter(n => !n.isRead).length}
+            activeDevicesCount={activeDevices.length}
+            primaryDeviceName={primaryDevice.name}
+            batteryLevel={primaryDevice.batteryLevel ?? 98}
+            isOnline={isOnline}
+            daysRemaining={evalState.daysRemaining}
+            onOpenMenu={onSimulateEvent}
           />
         </div>
       )}
 
-      {/* ── STATE 3: AUTENTICADO COM DISPOSITIVO (LIMPO E MINIMALISTA) ── */}
-      {isAuthenticated && hasDevice && (
-        <div className="space-y-4">
-          
-          {/* Back Navigation Bar for Non-Home Tabs */}
-          {activeTab !== 'inicio' && (
-            <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2.5 shadow-md">
-              <button
-                onClick={() => setActiveTab('inicio')}
-                className="flex items-center space-x-2 text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
-              >
-                <ChevronRight className="w-4 h-4 rotate-180" />
-                <span>Voltar ao Início</span>
-              </button>
-              <span className="text-xs font-black uppercase tracking-wider text-slate-300 font-mono">
-                {activeTab.replace('_', ' ')}
-              </span>
-            </div>
-          )}
-
-          {/* Tab Content Display */}
-          <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-3 sm:p-5 shadow-xl">
-            
-            {/* TAB: INÍCIO — HOME MOBILE CLEAN */}
-            {activeTab === 'inicio' && (
-              <div className="flex flex-col items-center justify-center py-2">
-                <MobileHomeView
-                  onNavigateTab={(tabId) => setActiveTab(tabId as any)}
-                  unreadMessagesCount={messages.filter(m => !m.isFavorite).length}
-                  unreadNotifsCount={notifications.filter(n => !n.isRead).length}
-                  activeDevicesCount={activeDevices.length}
-                  primaryDeviceName={primaryDevice.name}
-                  batteryLevel={primaryDevice.batteryLevel ?? 98}
-                  isOnline={isOnline}
-                  daysRemaining={evalState.daysRemaining}
-                  onOpenMenu={onSimulateEvent}
-                />
-              </div>
-            )}
-
-            {/* TAB: MEU DISPOSITIVO */}
-            {activeTab === 'meu_dispositivo' && (
+      {/* OUTROS MÓDULOS (WRAPPER CARD DEDICADO) */}
+      {activeTab !== 'inicio' && activeTab && (
+        <div className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4">
+          {/* TAB: MEU DISPOSITIVO */}
+          {activeTab === 'meu_dispositivo' && (
               <div className="space-y-6">
                 
                 {/* Header / Action Bar */}
@@ -848,54 +790,33 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
                       )}
                     </div>
 
-                    {/* Sub-abas */}
+                    {/* Sub-abas (Phone: Dialer / Calls / Contacts) */}
                     <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none">
+                      <button
+                        onClick={() => {
+                          setCallSubTab('dialer');
+                          InputEngine.openKeyboard('dialer');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+                          callSubTab === 'dialer'
+                            ? 'bg-gradient-to-r from-emerald-600 to-indigo-600 text-white shadow-md font-black ring-1 ring-emerald-400/40'
+                            : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                        }`}
+                      >
+                        <PhoneCall className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Dialer (Teclado)</span>
+                      </button>
+
                       <button
                         onClick={() => setCallSubTab('historico')}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-                          callSubTab === 'historico'
+                          callSubTab === 'historico' || callSubTab === 'recebidas' || callSubTab === 'efetuadas' || callSubTab === 'perdidas'
                             ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
                             : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
                         }`}
                       >
                         <PhoneCall className="w-3.5 h-3.5" />
-                        <span>Histórico ({calls.length})</span>
-                      </button>
-
-                      <button
-                        onClick={() => setCallSubTab('recebidas')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-                          callSubTab === 'recebidas'
-                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-black'
-                            : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-                        }`}
-                      >
-                        <PhoneIncoming className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Recebidas ({calls.filter(c => c.type === 'Recebida').length})</span>
-                      </button>
-
-                      <button
-                        onClick={() => setCallSubTab('efetuadas')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-                          callSubTab === 'efetuadas'
-                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
-                            : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-                        }`}
-                      >
-                        <PhoneOutgoing className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>Efetuadas ({calls.filter(c => c.type === 'Efetuada').length})</span>
-                      </button>
-
-                      <button
-                        onClick={() => setCallSubTab('perdidas')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-                          callSubTab === 'perdidas'
-                            ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20 font-black'
-                            : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-                        }`}
-                      >
-                        <PhoneMissed className="w-3.5 h-3.5 text-rose-400" />
-                        <span>Perdidas ({calls.filter(c => c.type === 'Perdida').length})</span>
+                        <span>Calls / Histórico ({calls.length})</span>
                       </button>
 
                       <button
@@ -907,14 +828,57 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
                         }`}
                       >
                         <Contact className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>Contactos ({contacts.length})</span>
+                        <span>Contacts / Contactos ({contacts.length})</span>
                       </button>
                     </div>
 
                   </div>
 
-                  {/* Conteúdo: Lista de Chamadas OU Lista de Contactos */}
-                  {callSubTab !== 'contactos' ? (
+                  {/* Conteúdo: Dialer / Lista de Chamadas / Lista de Contactos */}
+                  {callSubTab === 'dialer' ? (
+                    <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 text-center space-y-4 max-w-sm mx-auto shadow-2xl">
+                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between">
+                        <span className="text-xl font-mono font-black tracking-widest text-emerald-400">
+                          {InputEngine.getBuffer() || 'Aguardando número...'}
+                        </span>
+                        {InputEngine.getBuffer() && (
+                          <button
+                            onClick={() => InputEngine.backspace()}
+                            className="p-1.5 text-slate-400 hover:text-white cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
+                          <button
+                            key={digit}
+                            onClick={() => InputEngine.typeDigit(digit)}
+                            className="py-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 active:bg-emerald-600 text-slate-100 font-mono font-black text-lg border border-slate-800 hover:border-emerald-500/50 transition-all cursor-pointer shadow"
+                          >
+                            {digit}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="pt-2 flex items-center justify-center space-x-3">
+                        <button
+                          onClick={() => {
+                            if (InputEngine.getBuffer()) {
+                              onSimulateEvent?.();
+                              InputEngine.clearBuffer();
+                            }
+                          }}
+                          className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center space-x-2"
+                        >
+                          <PhoneCall className="w-4 h-4" />
+                          <span>Efetuar Chamada</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : callSubTab !== 'contactos' ? (
                     <div className="space-y-2">
                       {filteredCalls.length > 0 ? (
                         filteredCalls.map((call) => {
@@ -1301,7 +1265,7 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
                     onClick={() => exportEventsToCsv(messages)}
                     className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center space-x-1.5 cursor-pointer"
                   >
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-amber-400" />
+                    <Download className="w-3.5 h-3.5 text-amber-400" />
                     <span>Exportar CSV</span>
                   </button>
                 </div>
@@ -1763,8 +1727,6 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
             {activeTab === 'definicoes' && (
               <SettingsView />
             )}
-
-          </div>
         </div>
       )}
 

@@ -568,14 +568,14 @@ export const IntegrationsConsole: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
-                <span className="text-[10px] text-slate-500 uppercase block font-bold">Cloud Run Container</span>
+                <span className="text-[10px] text-slate-500 uppercase block font-bold">Node.js Express Container</span>
                 <span className="font-bold text-emerald-400 text-sm">Porta 3000 (Proxy Reverse NGINX)</span>
                 <p className="text-[10px] text-slate-400">Ponto único de entrada e roteamento estrito.</p>
               </div>
 
               <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
-                <span className="text-[10px] text-slate-500 uppercase block font-bold">Render Backend Service</span>
-                <span className="font-bold text-cyan-400 text-sm">Stateless CPaaS Microservice</span>
+                <span className="text-[10px] text-slate-500 uppercase block font-bold">CPaaS Webhook Dispatcher</span>
+                <span className="font-bold text-cyan-400 text-sm">Stateless Queue Service</span>
                 <p className="text-[10px] text-slate-400">Execução sem estado de tarefas pesadas de rede.</p>
               </div>
 

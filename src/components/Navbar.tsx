@@ -28,10 +28,13 @@ import {
   Smartphone,
   ShieldCheck,
   CreditCard,
-  Palette
+  Palette,
+  Terminal
 } from 'lucide-react';
 import { useIdentity } from '../engine/identityEngine';
 import { useOnlineStatus } from '../lib/offlineCache';
+import { NavigationEngine } from '../engine/navigationEngine';
+import { CommandEngine } from '../engine/CommandEngine';
 
 interface NavbarProps {
   workspaceMode: 'public' | 'founder';
@@ -97,54 +100,34 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (setActiveTab) {
       setActiveTab(tabId);
     }
+    NavigationEngine.navigateTo(tabId as any);
     setIsMenuOpen(false);
   };
 
-  // Hierarchical Menu Structure definition
+  // Hierarchical Menu Structure definition (8 Core Domains)
   const menuHierarchy = [
     {
-      key: 'comunicacao',
-      title: 'Comunicação',
-      icon: MessageSquare,
-      color: 'text-cyan-400',
+      key: 'principal',
+      title: 'Principal',
+      icon: Home,
+      color: 'text-indigo-400',
       items: [
-        { id: 'mensagens', label: 'Mensagens', icon: MessageSquare, color: 'text-cyan-400' },
-        { id: 'chamadas', label: 'Chamadas', icon: PhoneCall, color: 'text-emerald-400' },
-        { id: 'contactos', label: 'Contactos', icon: Contact, color: 'text-indigo-400' },
-        { id: 'notificacoes', label: 'Notificações', icon: Bell, color: 'text-amber-400' },
+        { id: 'inicio', label: 'Home / Início', icon: Home, color: 'text-indigo-400' },
+        { id: 'chamadas', label: 'Phone (Dialer, Calls, Contacts)', icon: PhoneCall, color: 'text-emerald-400' },
+        { id: 'mensagens', label: 'Messages / SMS', icon: MessageSquare, color: 'text-cyan-400' },
+        { id: 'notificacoes', label: 'Notifications', icon: Bell, color: 'text-amber-400' },
       ]
     },
     {
-      key: 'sistema',
-      title: 'Sistema',
+      key: 'gestao',
+      title: 'Gestão & Ferramentas',
       icon: Smartphone,
       color: 'text-purple-400',
       items: [
-        { id: 'dispositivos', label: 'Dispositivos', icon: Smartphone, color: 'text-purple-400' },
-        { id: 'atividade', label: 'Atividade', icon: Activity, color: 'text-rose-400' },
-        { id: 'seguranca', label: 'Segurança', icon: ShieldCheck, color: 'text-cyan-400' },
-        { id: 'privacidade', label: 'Privacidade', icon: Lock, color: 'text-purple-400' },
-      ]
-    },
-    {
-      key: 'conta',
-      title: 'Conta',
-      icon: User,
-      color: 'text-indigo-400',
-      items: [
-        { id: 'conta', label: 'Perfil / Conta', icon: User, color: 'text-indigo-400' },
-        { id: 'sessoes', label: 'Sessões', icon: UserCheck, color: 'text-emerald-400' },
-      ]
-    },
-    {
-      key: 'personalizacao',
-      title: 'Personalização',
-      icon: Palette,
-      color: 'text-amber-400',
-      items: [
-        { id: 'aparencia', label: 'Aparência', icon: Palette, color: 'text-amber-400' },
-        { id: 'inicio', label: 'Home', icon: Home, color: 'text-indigo-400' },
-        { id: 'notificacoes', label: 'Notificações', icon: Bell, color: 'text-amber-400' },
+        { id: 'dispositivos', label: 'Devices / Dispositivos', icon: Smartphone, color: 'text-purple-400' },
+        { id: 'favoritos', label: 'Favorites / Favoritos', icon: Sparkles, color: 'text-amber-400' },
+        { id: 'pesquisa', label: 'Search / Pesquisa Universal', icon: Search, color: 'text-cyan-400' },
+        { id: 'definicoes', label: 'Settings / Configurações', icon: Settings, color: 'text-rose-400' },
       ]
     }
   ];
@@ -203,6 +186,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
               <span className="uppercase tracking-wider">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
             </div>
+
+            {/* ⚡ Command Engine Quick Palette Button */}
+            <button
+              onClick={() => CommandEngine.togglePalette()}
+              className="w-9 h-9 rounded-xl border border-indigo-500/40 bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 shadow-md font-mono font-bold flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0 group relative"
+              title="Paleta de Comandos (Ctrl+K / Cmd+K)"
+              aria-label="Comandos"
+            >
+              <Terminal className="w-4 h-4 text-indigo-400 group-hover:text-amber-300 transition-colors" />
+            </button>
 
             {/* ⋯ Botão de Menu (Acesso ao Drawer do Sistema) */}
             <button

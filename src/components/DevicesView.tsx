@@ -3,7 +3,6 @@ import {
   Smartphone, 
   QrCode, 
   Battery, 
-  Wifi, 
   ShieldCheck, 
   Plus, 
   Trash2, 
@@ -11,19 +10,18 @@ import {
   RefreshCw, 
   CheckCircle2, 
   Activity, 
-  Cpu, 
   Wrench, 
   Zap, 
-  ChevronDown, 
-  ChevronUp,
   Globe,
   Tablet,
   Laptop,
-  Monitor,
-  Terminal,
   Apple,
   Search,
-  X
+  X,
+  Info,
+  Sliders,
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Device } from '../types';
@@ -156,9 +154,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [newDevicePlatform, setNewDevicePlatform] = useState<'android' | 'iphone' | 'web' | 'desktop' | 'tablet'>('android');
   const [repairingMap, setRepairingMap] = useState<Record<string, boolean>>({});
   const [isBatteryExpanded, setIsBatteryExpanded] = useState<boolean>(false);
-  const [expandedDeviceMap, setExpandedDeviceMap] = useState<Record<string, boolean>>({});
+  const [hoveredTooltipId, setHoveredTooltipId] = useState<string | null>(null);
 
-  // Platform filters matching exact request: todos, android, iphone, web, desktop, tablet
+  // Platform filters: todos, android, iphone, web, desktop, tablet
   const [platformFilter, setPlatformFilter] = useState<'todos' | 'android' | 'iphone' | 'web' | 'desktop' | 'tablet'>('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -214,10 +212,6 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     }, 1200);
   };
 
-  const toggleDeviceExpanded = (deviceId: string) => {
-    setExpandedDeviceMap((prev) => ({ ...prev, [deviceId]: !prev[deviceId] }));
-  };
-
   const getDeviceCategory = (device: Device): 'android' | 'iphone' | 'web' | 'desktop' | 'tablet' => {
     const platform = (device.platform || '').toLowerCase();
     const str = `${device.name || ''} ${device.model || ''} ${device.osVersion || ''}`.toLowerCase();
@@ -231,33 +225,20 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     return 'android';
   };
 
-  const getDeviceOem = (device: Device): string => {
-    if (device.oemProfile) return device.oemProfile;
-    const fullName = `${device.name || ''} ${device.model || ''}`.toLowerCase();
-    if (fullName.includes('samsung') || fullName.includes('galaxy') || fullName.includes('sm-')) return 'samsung';
-    if (fullName.includes('pixel') || fullName.includes('google')) return 'pixel';
-    if (fullName.includes('xiaomi') || fullName.includes('redmi') || fullName.includes('poco') || fullName.includes('hyperos') || fullName.includes('miui')) return 'xiaomi';
-    if (fullName.includes('oppo') || fullName.includes('realme') || fullName.includes('oneplus')) return 'oppo';
-    if (fullName.includes('apple') || fullName.includes('iphone') || fullName.includes('ipad')) return 'apple';
-    if (fullName.includes('itel')) return 'itel';
-    if (fullName.includes('huawei') || fullName.includes('honor')) return 'huawei';
-    return 'generic';
-  };
-
   const renderPlatformIcon = (category: string) => {
     switch (category) {
       case 'android':
-        return <Smartphone className="w-5 h-5 text-emerald-400" />;
+        return <Smartphone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />;
       case 'iphone':
-        return <Apple className="w-5 h-5 text-indigo-400" />;
+        return <Apple className="w-3.5 h-3.5 text-indigo-400 shrink-0" />;
       case 'tablet':
-        return <Tablet className="w-5 h-5 text-cyan-400" />;
+        return <Tablet className="w-3.5 h-3.5 text-cyan-400 shrink-0" />;
       case 'desktop':
-        return <Laptop className="w-5 h-5 text-purple-400" />;
+        return <Laptop className="w-3.5 h-3.5 text-purple-400 shrink-0" />;
       case 'web':
-        return <Globe className="w-5 h-5 text-teal-400" />;
+        return <Globe className="w-3.5 h-3.5 text-teal-400 shrink-0" />;
       default:
-        return <Smartphone className="w-5 h-5 text-indigo-400" />;
+        return <Smartphone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />;
     }
   };
 
@@ -294,17 +275,17 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   );
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-4 font-sans text-slate-100">
       
       {/* Top Header Banner */}
-      <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center space-x-2.5">
             <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 shrink-0">
               <Globe className="w-5 h-5" />
             </div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-base font-black text-slate-100 tracking-tight">
+              <h2 className="text-sm sm:text-base font-black text-slate-100 tracking-tight">
                 Gestão Multiplataforma de Dispositivos (Device Mesh Fleet)
               </h2>
               <span className="px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-mono font-black text-[10px] tracking-wider uppercase">
@@ -313,53 +294,53 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             </div>
           </div>
           <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest pl-11 font-medium opacity-75">
-            ORQUESTRAÇÃO UNIFICADA • ANDROID • IPHONE/IPAD • WEB • DESKTOP • TABLET
+            ORQUESTRAÇÃO COMPACTA ESTILO EXCEL • TABELA UNIFICADA COM TOOLTIPS DETALHADOS
           </p>
         </div>
 
         <button
           onClick={() => setShowPairModal(true)}
-          className="flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20 transition-all cursor-pointer shrink-0 active:scale-95 border border-indigo-400/30"
+          className="flex items-center justify-center space-x-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20 transition-all cursor-pointer shrink-0 active:scale-95 border border-indigo-400/30"
         >
           <QrCode className="w-4 h-4" />
-          <span>Emparelhar Dispositivo (QR Code)</span>
+          <span>Emparelhar Dispositivo</span>
         </button>
       </div>
 
       {/* 4 STRATEGIC OPERATIONAL DIMENSIONS (Estado, Pairing, Health, Sincronização) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         {/* 1. Estado */}
-        <div className="p-3.5 bg-slate-900/80 rounded-2xl border border-slate-800/80 space-y-1.5 shadow-sm">
+        <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80 space-y-1 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               <span>1. ESTADO</span>
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold">
+            <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono font-bold">
               {onlineCount}/{activeFleet.length} ONLINE
             </span>
           </div>
-          <div className="flex items-baseline justify-between pt-1">
-            <span className="text-lg font-black text-slate-100 tracking-tight font-mono">
-              {onlineCount === activeFleet.length ? 'Totalmente Operativo' : 'Em Sincronia'}
+          <div className="flex items-baseline justify-between pt-0.5">
+            <span className="text-base font-black text-slate-100 tracking-tight font-mono">
+              {onlineCount === activeFleet.length ? 'Operativo' : 'Em Sincronia'}
             </span>
             <span className="text-[10px] text-slate-500 font-mono">Heartbeat &lt;10s</span>
           </div>
         </div>
 
         {/* 2. Pairing */}
-        <div className="p-3.5 bg-slate-900/80 rounded-2xl border border-slate-800/80 space-y-1.5 shadow-sm">
+        <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80 space-y-1 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
-              <QrCode className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1">
+              <QrCode className="w-3 h-3 text-indigo-400" />
               <span>2. PAIRING</span>
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[10px] font-mono font-bold">
+            <span className="px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[10px] font-mono font-bold">
               ZERO-TOUCH
             </span>
           </div>
-          <div className="flex items-baseline justify-between pt-1">
-            <span className="text-lg font-black text-slate-100 tracking-tight font-mono">
+          <div className="flex items-baseline justify-between pt-0.5">
+            <span className="text-base font-black text-slate-100 tracking-tight font-mono">
               Emparelhamento
             </span>
             <span className="text-[10px] text-indigo-400 font-mono">Chave E2EE OK</span>
@@ -367,46 +348,46 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         </div>
 
         {/* 3. Health */}
-        <div className="p-3.5 bg-slate-900/80 rounded-2xl border border-slate-800/80 space-y-1.5 shadow-sm">
+        <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80 space-y-1 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
-              <Activity className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1">
+              <Activity className="w-3 h-3 text-amber-400" />
               <span>3. HEALTH</span>
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-mono font-bold">
+            <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-mono font-bold">
               {avgHealth}% SCORE
             </span>
           </div>
-          <div className="flex items-baseline justify-between pt-1">
-            <span className="text-lg font-black text-slate-100 tracking-tight font-mono">
-              Saúde da Frota
+          <div className="flex items-baseline justify-between pt-0.5">
+            <span className="text-base font-black text-slate-100 tracking-tight font-mono">
+              Saúde Frota
             </span>
-            <span className="text-[10px] text-amber-400 font-mono">Auto-Repair Ativo</span>
+            <span className="text-[10px] text-amber-400 font-mono">Auto-Repair</span>
           </div>
         </div>
 
         {/* 4. Sincronização */}
-        <div className="p-3.5 bg-slate-900/80 rounded-2xl border border-slate-800/80 space-y-1.5 shadow-sm">
+        <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80 space-y-1 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
-              <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin-slow" />
-              <span>4. SINCRONIZAÇÃO</span>
+            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1">
+              <RefreshCw className="w-3 h-3 text-cyan-400 animate-spin-slow" />
+              <span>4. SINCRONIA</span>
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono font-bold">
-              {avgSyncDelay}ms LATÊNCIA
+            <span className="px-1.5 py-0.2 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[10px] font-mono font-bold">
+              {avgSyncDelay}ms
             </span>
           </div>
-          <div className="flex items-baseline justify-between pt-1">
-            <span className="text-lg font-black text-slate-100 tracking-tight font-mono">
+          <div className="flex items-baseline justify-between pt-0.5">
+            <span className="text-base font-black text-slate-100 tracking-tight font-mono">
               Realtime SSE
             </span>
-            <span className="text-[10px] text-cyan-400 font-mono">Incremental Sync</span>
+            <span className="text-[10px] text-cyan-400 font-mono">Incremental</span>
           </div>
         </div>
       </div>
 
       {/* Filter Bar & Sub-Tabs */}
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         
         {/* Search Input */}
         <div className="relative">
@@ -415,8 +396,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Pesquisar por nome do dispositivo, modelo ou sistema operativo..."
-            className="w-full pl-10 pr-9 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+            placeholder="Pesquisar nó por nome, modelo, sistema operativo ou ID..."
+            className="w-full pl-10 pr-9 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors font-mono"
           />
           {searchQuery && (
             <button
@@ -428,24 +409,23 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           )}
         </div>
 
-        {/* Platform Sub-Tabs requested: Android, iPhone/iPad, Web, Desktop, Tablet */}
+        {/* Platform Sub-Tabs */}
         <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none">
-          
           <button
             onClick={() => setPlatformFilter('todos')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
               platformFilter === 'todos'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
-            <span>Todos os Dispositivos ({activeFleet.length})</span>
+            <span>Todos ({activeFleet.length})</span>
           </button>
 
           <button
             onClick={() => setPlatformFilter('android')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
               platformFilter === 'android'
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-black'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -457,7 +437,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
           <button
             onClick={() => setPlatformFilter('iphone')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
               platformFilter === 'iphone'
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -469,19 +449,19 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
           <button
             onClick={() => setPlatformFilter('web')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
               platformFilter === 'web'
                 ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20 font-black'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
             }`}
           >
             <Globe className="w-3.5 h-3.5 text-teal-400" />
-            <span>Web Client / PWA ({activeFleet.filter(d => getDeviceCategory(d) === 'web').length})</span>
+            <span>Web Client ({activeFleet.filter(d => getDeviceCategory(d) === 'web').length})</span>
           </button>
 
           <button
             onClick={() => setPlatformFilter('desktop')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
               platformFilter === 'desktop'
                 ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20 font-black'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -493,7 +473,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
           <button
             onClick={() => setPlatformFilter('tablet')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-2 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
               platformFilter === 'tablet'
                 ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/20 font-black'
                 : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -502,200 +482,250 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             <Tablet className="w-3.5 h-3.5 text-cyan-400" />
             <span>Tablet ({activeFleet.filter(d => getDeviceCategory(d) === 'tablet').length})</span>
           </button>
-
         </div>
 
       </div>
 
-      {/* Device Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredDevices.length > 0 ? (
-          filteredDevices.map((device) => {
-            const isRepairing = repairingMap[device.deviceId];
-            const healthScore = device.permissionScore ?? 98;
-            const notificationStatus = device.notificationListenerStatus || 'active';
-            const platform = getDeviceCategory(device);
-            const isExpanded = !!expandedDeviceMap[device.deviceId];
+      {/* COMPACT EXCEL-STYLE TABLE */}
+      <div className="bg-slate-950 rounded-2xl border border-slate-800/80 shadow-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left font-mono border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-900/90 border-b border-slate-800 text-[11px] font-black uppercase text-slate-400 tracking-wider">
+                <th className="py-2.5 px-3 border-r border-slate-800/60 w-10 text-center">#</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60">ESTADO</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60">DISPOSITIVO & NÓ</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60">MODELO / OS</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60">BATERIA</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60">SINCRONIA</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60">CAPACIDADES</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60">SAÚDE</th>
+                <th className="py-2.5 px-3 text-center">AÇÕES</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60">
+              {filteredDevices.length > 0 ? (
+                filteredDevices.map((device, idx) => {
+                  const isRepairing = repairingMap[device.deviceId];
+                  const healthScore = device.permissionScore ?? 98;
+                  const notificationStatus = device.notificationListenerStatus || 'active';
+                  const platform = getDeviceCategory(device);
 
-            return (
-              <div
-                key={device.deviceId}
-                className="bg-slate-900/90 rounded-2xl p-4 sm:p-5 border border-slate-800/80 hover:border-slate-700/80 shadow-md hover:shadow-xl transition-all space-y-3.5"
-              >
-                {/* Header Row: Icon, Title, Platform & Online/Offline Status */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/15 via-slate-800 to-indigo-500/5 border border-indigo-500/20 flex items-center justify-center shrink-0 text-indigo-400">
-                      {renderPlatformIcon(platform)}
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <h3 className="font-bold text-slate-100 text-sm tracking-tight">{device.name}</h3>
-                        <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] uppercase font-mono font-bold">
-                          {platform}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-slate-400 font-medium block">{device.model}</span>
-                    </div>
-                  </div>
+                  // Detailed Tooltip Text Construction for title attributes and popovers
+                  const nodeText = device.nodeId || `node-${device.deviceId.substring(0, 8)}`;
+                  const pairedDateStr = device.pairedAt ? new Date(device.pairedAt).toLocaleString('pt-BR') : 'Desconhecido';
+                  const lastSyncStr = typeof device.lastSync === 'number' ? new Date(device.lastSync).toLocaleTimeString('pt-BR') : (device.lastSync || 'Agora');
+                  
+                  const capSms = device.capabilities?.sms !== false ? '✓ Ativo' : '✕ Inativo';
+                  const capCalls = device.capabilities?.calls !== false ? '✓ Ativo' : '✕ Inativo';
+                  const capBio = device.capabilities?.biometrics !== false ? '✓ Ativo' : '✕ Inativo';
+                  const capAccess = device.capabilities?.accessibility ? '✓ Ativo' : '✕ Inativo';
 
-                  {/* Online / Offline Status Badge with Subtle Gradient */}
-                  <div className="shrink-0">
-                    {device.online ? (
-                      <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-teal-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold flex items-center space-x-1.5 shadow-sm shadow-emerald-950/40">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span>ONLINE</span>
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 rounded-full bg-gradient-to-r from-slate-800 to-slate-900 text-slate-400 border border-slate-700/60 text-[10px] font-mono font-bold flex items-center space-x-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-                        <span>OFFLINE</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
+                  const fullTooltipText = `Dispositivo: ${device.name}\nNó ID: ${nodeText}\nPlataforma: ${platform.toUpperCase()} (${device.osVersion || 'N/A'})\nModelo: ${device.model}\nEmparelhado em: ${pairedDateStr}\nBateria: ${device.batteryLevel ?? 98}% (${device.batteryOptimizationStatus || 'Otimizado'})\nSincronia Latência: ${device.syncDelayMs ?? 5}ms\nÚltimo Sync: ${lastSyncStr}\nCapacidades: SMS: ${capSms} | Calls: ${capCalls} | Biometria: ${capBio} | Acessibilidade: ${capAccess}\nScore de Saúde: ${healthScore}%`;
 
-                {/* Status Badges Row: Simplified Status Labels */}
-                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
-                  <div className="flex items-center space-x-2">
-                    {/* Battery Pill */}
-                    <div className="bg-gradient-to-r from-amber-500/10 to-amber-600/5 text-amber-300 border border-amber-500/20 px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono flex items-center space-x-1.5">
-                      <Battery className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{device.batteryLevel ?? 98}%</span>
-                    </div>
-
-                    {/* Latency Pill */}
-                    <div className="bg-gradient-to-r from-indigo-500/10 to-indigo-600/5 text-indigo-300 border border-indigo-500/20 px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono flex items-center space-x-1.5">
-                      <Zap className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>{device.syncDelayMs ?? 12}ms</span>
-                    </div>
-
-                    {/* Listener Pill */}
-                    <div className={`px-2.5 py-1 rounded-lg text-[11px] font-bold font-mono flex items-center space-x-1.5 border ${
-                      notificationStatus === 'active'
-                        ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/5 text-emerald-300 border-emerald-500/20'
-                        : 'bg-gradient-to-r from-orange-500/10 to-amber-500/5 text-orange-300 border-orange-500/20'
-                    }`}>
-                      <Activity className={`w-3.5 h-3.5 ${notificationStatus === 'active' ? 'text-emerald-400' : 'text-orange-400'}`} />
-                      <span>{notificationStatus === 'active' ? 'Ativo' : 'Atenção'}</span>
-                    </div>
-                  </div>
-
-                  {/* Actions Toolbar */}
-                  <div className="flex items-center space-x-1.5 shrink-0">
-                    <button
-                      onClick={() => handleAutoRepair(device.deviceId)}
-                      disabled={isRepairing}
-                      className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all cursor-pointer flex items-center space-x-1 active:scale-95"
-                      title="Auto-Repair"
+                  return (
+                    <tr
+                      key={device.deviceId}
+                      className="hover:bg-slate-900/60 transition-colors group relative border-b border-slate-800/40"
+                      onMouseEnter={() => setHoveredTooltipId(device.deviceId)}
+                      onMouseLeave={() => setHoveredTooltipId(null)}
+                      title={fullTooltipText}
                     >
-                      <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
-                    </button>
+                      {/* Row Index */}
+                      <td className="py-2 px-3 border-r border-slate-800/60 text-center text-slate-500 font-bold text-[11px]">
+                        {idx + 1}
+                      </td>
 
-                    <button
-                      onClick={onSimulateEvent}
-                      className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all cursor-pointer active:scale-95"
-                      title="Simular Evento"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
+                      {/* Online Status */}
+                      <td className="py-2 px-3 border-r border-slate-800/60">
+                        {device.online ? (
+                          <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] shadow-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span>ONLINE</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 font-bold text-[10px]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                            <span>OFFLINE</span>
+                          </span>
+                        )}
+                      </td>
 
-                    <button
-                      onClick={() => toggleDeviceExpanded(device.deviceId)}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all cursor-pointer active:scale-95 flex items-center space-x-1 text-[11px] font-bold"
-                      title={isExpanded ? "Recolher" : "Detalhes"}
-                    >
-                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-amber-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-                    </button>
+                      {/* Name & Node ID */}
+                      <td className="py-2 px-3 border-r border-slate-800/60">
+                        <div className="flex items-center space-x-2">
+                          <div className="p-1 rounded-md bg-slate-900 border border-slate-800 text-indigo-400 shrink-0">
+                            {renderPlatformIcon(platform)}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-100 text-xs truncate block group-hover:text-indigo-300 transition-colors">
+                              {device.name}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono block truncate">
+                              {nodeText}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
 
-                    <button
-                      onClick={() => handleRemove(device.deviceId)}
-                      className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all cursor-pointer active:scale-95"
-                      title="Desconectar"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
+                      {/* Model & OS */}
+                      <td className="py-2 px-3 border-r border-slate-800/60 text-slate-300">
+                        <span className="font-semibold text-xs block truncate">{device.model}</span>
+                        <span className="text-[10px] text-slate-500 block truncate">{device.osVersion || 'OS 1.0'}</span>
+                      </td>
 
-                {/* Collapsible Details Panel */}
-                {isExpanded && (
-                  <div className="space-y-3 pt-2.5 border-t border-slate-800/80 animate-fadeIn">
-                    {/* Capabilities Badges */}
-                    <div className="flex items-center flex-wrap gap-1.5">
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                        device.capabilities?.sms !== false
-                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-                          : 'bg-slate-800 text-slate-500 border-slate-700'
-                      }`}>
-                        <span>SMS</span>
-                        <span>{device.capabilities?.sms !== false ? '✓' : '✕'}</span>
-                      </span>
+                      {/* Battery */}
+                      <td className="py-2 px-3 border-r border-slate-800/60">
+                        <div className="inline-flex items-center space-x-1 px-2 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-md font-bold text-[11px]" title={`Otimização: ${device.batteryOptimizationStatus || 'Padrão'}`}>
+                          <Battery className="w-3 h-3 text-amber-400 shrink-0" />
+                          <span>{device.batteryLevel ?? 98}%</span>
+                        </div>
+                      </td>
 
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                        device.capabilities?.calls !== false
-                          ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
-                          : 'bg-slate-800 text-slate-500 border-slate-700'
-                      }`}>
-                        <span>CHAMADAS</span>
-                        <span>{device.capabilities?.calls !== false ? '✓' : '✕'}</span>
-                      </span>
+                      {/* Latency & Last Sync */}
+                      <td className="py-2 px-3 border-r border-slate-800/60">
+                        <div className="flex flex-col">
+                          <span className="text-indigo-400 font-bold text-xs flex items-center space-x-1">
+                            <Zap className="w-3 h-3 text-indigo-400 inline" />
+                            <span>{device.syncDelayMs ?? 5}ms</span>
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            {lastSyncStr}
+                          </span>
+                        </div>
+                      </td>
 
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                        device.capabilities?.biometrics !== false
-                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                          : 'bg-slate-800 text-slate-500 border-slate-700'
-                      }`}>
-                        <span>BIOMETRIA</span>
-                        <span>{device.capabilities?.biometrics !== false ? '✓' : '✕'}</span>
-                      </span>
+                      {/* Capabilities Compact Icons */}
+                      <td className="py-2 px-3 border-r border-slate-800/60">
+                        <div className="flex items-center space-x-1" title={`SMS: ${capSms} | Calls: ${capCalls} | Biometria: ${capBio} | Acessibilidade: ${capAccess}`}>
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${device.capabilities?.sms !== false ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-slate-900 text-slate-600 border-slate-800'}`}>
+                            SMS
+                          </span>
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${device.capabilities?.calls !== false ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' : 'bg-slate-900 text-slate-600 border-slate-800'}`}>
+                            CALL
+                          </span>
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${device.capabilities?.biometrics !== false ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' : 'bg-slate-900 text-slate-600 border-slate-800'}`}>
+                            BIO
+                          </span>
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${device.capabilities?.accessibility ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' : 'bg-slate-900 text-slate-600 border-slate-800'}`}>
+                            ACC
+                          </span>
+                        </div>
+                      </td>
 
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center space-x-1 ${
-                        device.capabilities?.accessibility
-                          ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
-                          : 'bg-slate-800/80 text-slate-400 border-slate-800'
-                      }`}>
-                        <span>ACESSIBILIDADE</span>
-                        <span>{device.capabilities?.accessibility ? '✓' : 'OFF'}</span>
-                      </span>
+                      {/* Health Score */}
+                      <td className="py-2 px-3 border-r border-slate-800/60">
+                        <div className="flex items-center space-x-1.5">
+                          <div className="w-12 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full ${healthScore >= 95 ? 'bg-emerald-400' : healthScore >= 80 ? 'bg-amber-400' : 'bg-rose-400'}`}
+                              style={{ width: `${healthScore}%` }}
+                            />
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-200">{healthScore}%</span>
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-2 px-3 text-center">
+                        <div className="flex items-center justify-center space-x-1">
+                          {/* Tooltip Info Popover Trigger */}
+                          <div className="relative group/popover">
+                            <button
+                              type="button"
+                              className="p-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-indigo-300 border border-slate-800 transition-colors cursor-pointer"
+                              title="Ver Detalhes do Nó"
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Floating Custom Tooltip Popover */}
+                            <div className="absolute right-0 bottom-full mb-2 hidden group-hover/popover:block z-50 w-64 p-3 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl text-[11px] text-slate-200 font-mono space-y-1.5 pointer-events-none animate-in fade-in duration-150">
+                              <div className="font-bold text-indigo-400 border-b border-slate-800 pb-1 flex items-center justify-between">
+                                <span>{device.name}</span>
+                                <span className="text-[9px] text-slate-400">{platform.toUpperCase()}</span>
+                              </div>
+                              <div className="space-y-0.5 text-[10px] text-slate-300">
+                                <p><strong className="text-slate-400">Nó ID:</strong> {nodeText}</p>
+                                <p><strong className="text-slate-400">Modelo:</strong> {device.model}</p>
+                                <p><strong className="text-slate-400">Emparelhado:</strong> {pairedDateStr}</p>
+                                <p><strong className="text-slate-400">Bateria:</strong> {device.batteryLevel}% ({device.batteryOptimizationStatus || 'Normal'})</p>
+                                <p><strong className="text-slate-400">Notificações:</strong> {notificationStatus === 'active' ? '✓ Listener Ativo' : '⚠️ Requer Atenção'}</p>
+                                <p><strong className="text-slate-400">Capabilities:</strong> SMS ({capSms}), Chamadas ({capCalls}), Biometria ({capBio}), Acessibilidade ({capAccess})</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => handleAutoRepair(device.deviceId)}
+                            disabled={isRepairing}
+                            className="p-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all cursor-pointer"
+                            title="Auto-Repair (Reativar Listener)"
+                          >
+                            <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
+                          </button>
+
+                          <button
+                            onClick={onSimulateEvent}
+                            className="p-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all cursor-pointer"
+                            title="Simular Evento"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleRemove(device.deviceId)}
+                            className="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all cursor-pointer"
+                            title="Desconectar Dispositivo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={9} className="py-8 text-center bg-slate-950 text-slate-500">
+                    <div className="max-w-sm mx-auto space-y-2">
+                      <Globe className="w-6 h-6 mx-auto text-slate-600" />
+                      <span className="block text-xs font-bold text-slate-300">Nenhum dispositivo encontrado</span>
+                      <p className="text-[11px] text-slate-500">
+                        Não foram encontrados nós para os filtros selecionados ({platformFilter}).
+                      </p>
+                      {(searchQuery || platformFilter !== 'todos') && (
+                        <button
+                          onClick={() => {
+                            setSearchQuery('');
+                            setPlatformFilter('todos');
+                          }}
+                          className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-indigo-400 rounded-lg text-xs font-bold border border-slate-800 transition-all cursor-pointer"
+                        >
+                          Limpar Filtros
+                        </button>
+                      )}
                     </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-                    {/* Node Metadata & Heartbeat */}
-                    <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 bg-slate-950/80 p-2 rounded-xl border border-slate-800/60">
-                      <span>Nó: <strong className="text-slate-300">{device.nodeId || `node-${device.deviceId.substring(0, 8)}`}</strong></span>
-                      <span>Sincronia: <strong className="text-indigo-300">{typeof device.lastSync === 'number' ? new Date(device.lastSync).toLocaleTimeString('pt-BR') : device.lastSync}</strong></span>
-                      <span>Saúde: <strong className="text-emerald-400">{healthScore}%</strong></span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })
-        ) : (
-          <div className="col-span-full bg-slate-950 p-8 rounded-2xl border border-slate-800 text-center space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500">
-              <Globe className="w-6 h-6" />
-            </div>
-            <span className="block text-sm font-bold text-slate-300">Nenhum dispositivo encontrado</span>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Não existem dispositivos emparelhados na plataforma selecionada ({platformFilter}).
-            </p>
-            {(searchQuery || platformFilter !== 'todos') && (
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setPlatformFilter('todos');
-                }}
-                className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-indigo-400 rounded-xl text-xs font-bold border border-slate-800 transition-all cursor-pointer"
-              >
-                Limpar Filtros
-              </button>
-            )}
+        {/* Excel Table Footer Status Bar */}
+        <div className="bg-slate-900/90 border-t border-slate-800 px-3 py-1.5 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+          <div>
+            Exibindo <strong className="text-slate-300">{filteredDevices.length}</strong> de <strong className="text-slate-300">{activeFleet.length}</strong> dispositivos na frota
           </div>
-        )}
+          <div className="flex items-center space-x-3">
+            <span>Passe o cursor sobre qualquer linha para ver a ficha técnica completa</span>
+            <span className="text-emerald-400 font-bold">SSE Realtime Sync Active</span>
+          </div>
+        </div>
       </div>
 
-      {/* Historical Battery Usage & Drain Monitor (Collapsible) */}
+      {/* Historical Battery Usage & Drain Monitor */}
       <BatteryUsageMonitor
         devices={activeFleet}
         isExpanded={isBatteryExpanded}
@@ -787,4 +817,3 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     </div>
   );
 };
-

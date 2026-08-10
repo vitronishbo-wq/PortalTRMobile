@@ -591,7 +591,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ stats, devices = [
               </div>
               <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block font-bold">Zero Downtime Deploy</span>
-                <span className="text-lg font-black text-sky-400">Ativo (Cloud Run Container)</span>
+                <span className="text-lg font-black text-sky-400">Ativo (Express Container Engine)</span>
               </div>
             </div>
           </div>

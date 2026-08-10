@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Search, Filter, Star, CheckCheck, Trash2, Smartphone, 
-  AlertCircle, MessageSquare, PhoneCall, Bell, Shield, RefreshCw, X, FileSpreadsheet 
+  AlertCircle, MessageSquare, PhoneCall, Bell, Shield, RefreshCw, X, Download 
 } from 'lucide-react';
 import { PortalEvent, EventPriority, Device } from '../types';
 import { exportEventsToCsv } from '../lib/csvExporter';
@@ -130,7 +130,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/40 transition-all cursor-pointer shadow-sm shadow-amber-500/10"
               title="Baixar eventos filtrados em formato CSV"
             >
-              <FileSpreadsheet className="w-4 h-4 text-amber-400" />
+              <Download className="w-4 h-4 text-amber-400" />
               <span className="hidden sm:inline">Exportar CSV ({filteredEvents.length})</span>
             </button>
 

@@ -541,6 +541,98 @@ export class AuthorityEngine {
   }
 
   /**
+   * Directly creates an administrator account. Requiress ROOT elevation.
+   */
+  static async createAdminDirectlyAsync(
+    email: string,
+    displayName: string,
+    role: AdminRole,
+    permissions: PermissionClaim[]
+  ): Promise<{ success: boolean; admin?: AdminAccount; message: string }> {
+    const rootSession = AuthorityEngine.getActiveRootSession();
+    if (!rootSession) {
+      return { success: false, message: 'Operação Rejeitada: Somente a Autoridade ROOT pode criar administradores.' };
+    }
+
+    if (!email || !displayName) {
+      return { success: false, message: 'Email e Nome do Administrador são obrigatórios.' };
+    }
+
+    const now = Date.now();
+    const adminUid = `admin-root-${now}-${Math.random().toString(36).substring(2, 6)}`;
+    const finalPermissions = permissions.length > 0 ? permissions : AuthorityEngine.ROLE_PERMISSIONS[role] || ['canAudit'];
+
+    await FirestoreService.createOrUpdateAdminUser(
+      adminUid,
+      email,
+      displayName,
+      role,
+      finalPermissions
+    );
+
+    const newAdmin: AdminAccount = {
+      id: adminUid,
+      email,
+      displayName,
+      role,
+      status: 'ACTIVE',
+      mfaEnforced: true,
+      createdAt: now,
+      lastActive: now
+    };
+
+    AuthorityEngine.logAudit({
+      actor: rootSession.actorEmail,
+      target: 'AdminManagement',
+      action: 'DIRECT_ADMIN_CREATED_BY_ROOT',
+      afterState: `AdminEmail: ${email}, Role: ${role}, Permissions: ${finalPermissions.join(',')}`,
+      ip: rootSession.ipAddress,
+      deviceId: rootSession.trustedDeviceId
+    });
+
+    return { success: true, admin: newAdmin, message: `Administrador '${displayName}' (${role}) criado directamente por Autoridade ROOT.` };
+  }
+
+  /**
+   * Revokes an administrator account. Requiress ROOT elevation.
+   */
+  static async revokeAdminAccountAsync(
+    adminUid: string,
+    reason: string
+  ): Promise<{ success: boolean; message: string }> {
+    const rootSession = AuthorityEngine.getActiveRootSession();
+    if (!rootSession) {
+      return { success: false, message: 'Operação Rejeitada: Somente a Autoridade ROOT pode revogar administradores.' };
+    }
+
+    if (!adminUid) {
+      return { success: false, message: 'UID do Administrador não fornecido.' };
+    }
+
+    if (db) {
+      const userRef = doc(db, 'users', adminUid);
+      await setDoc(userRef, {
+        status: 'REVOKED',
+        role: 'user',
+        revokedAt: Date.now(),
+        revokedBy: rootSession.actorEmail,
+        revocationReason: reason || 'Revogação manual por autoridade ROOT'
+      }, { merge: true });
+    }
+
+    AuthorityEngine.logAudit({
+      actor: rootSession.actorEmail,
+      target: adminUid,
+      action: 'ADMIN_ACCOUNT_REVOKED_BY_ROOT',
+      afterState: `Reason: ${reason || 'Revogação manual ROOT'}`,
+      ip: rootSession.ipAddress,
+      deviceId: rootSession.trustedDeviceId
+    });
+
+    return { success: true, message: `Acesso do administrador '${adminUid}' revogado com sucesso pela Autoridade ROOT.` };
+  }
+
+  /**
    * Fetches admin users directly from Firestore `users` collection.
    */
   static async listAdminAccountsAsync(): Promise<AdminAccount[]> {

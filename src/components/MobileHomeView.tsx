@@ -20,7 +20,9 @@ import {
   Palette,
   Clock,
   Plus,
-  Sliders
+  Sliders,
+  Users,
+  ShieldCheck
 } from 'lucide-react';
 
 import { HomeWidget, WidgetType } from './HomeWidget';
@@ -66,7 +68,14 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
     try {
       const saved = localStorage.getItem('portal_home_customization_v1');
       if (saved) {
-        return { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        const visibleShortcuts = (parsed.visibleShortcuts && parsed.visibleShortcuts.length > 0)
+          ? parsed.visibleShortcuts
+          : DEFAULT_CONFIG.visibleShortcuts;
+        const pinnedWidgets = (parsed.pinnedWidgets && parsed.pinnedWidgets.length > 0)
+          ? parsed.pinnedWidgets
+          : DEFAULT_CONFIG.pinnedWidgets;
+        return { ...DEFAULT_CONFIG, ...parsed, visibleShortcuts, pinnedWidgets };
       }
     } catch (e) {
       console.warn('Erro ao carregar personalização da home:', e);
@@ -187,6 +196,18 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
       icon: Activity,
       colorClass: 'from-rose-500/20 to-pink-600/20 text-rose-400 border-rose-500/40',
       borderClass: 'hover:border-rose-500/50'
+    },
+    contactos: {
+      label: 'Contactos',
+      icon: Users,
+      colorClass: 'from-blue-500/20 to-indigo-600/20 text-blue-400 border-blue-500/40',
+      borderClass: 'hover:border-blue-500/50'
+    },
+    seguranca: {
+      label: 'Segurança',
+      icon: ShieldCheck,
+      colorClass: 'from-emerald-500/20 to-teal-600/20 text-emerald-400 border-emerald-500/40',
+      borderClass: 'hover:border-emerald-500/50'
     },
     arquitetura: {
       label: 'Arquitetura',

@@ -44,6 +44,9 @@ import {
 } from './lib/offlineCache';
 import { OfflineBanner } from './components/OfflineBanner';
 import { ExpiredSubscriptionBanner } from './components/ExpiredSubscriptionBanner';
+import { ClipboardProvider } from './engine/ClipboardEngine';
+import { CommandProvider } from './engine/CommandEngine';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
 
 interface ToastItem {
   id: string;
@@ -276,7 +279,7 @@ export default function App() {
     return () => window.removeEventListener('user-profile-updated' as any, handleProfileUpdate);
   }, []);
 
-  const [currentPublicTab, setCurrentPublicTab] = useState<string | null>('timeline');
+  const [currentPublicTab, setCurrentPublicTab] = useState<string | null>('inicio');
 
   useEffect(() => {
     const handleTabChanged = (e: CustomEvent<string | null>) => {
@@ -633,7 +636,10 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white relative w-full max-w-[100vw] overflow-x-hidden">
+    <CommandProvider>
+      <ClipboardProvider>
+        <CommandPaletteModal />
+        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased flex flex-col selection:bg-indigo-500 selection:text-white relative w-full max-w-[100vw] overflow-x-hidden">
       
       {/* Toast Notifications Floating Stack */}
       <div className="fixed top-16 right-4 sm:right-6 z-50 space-y-2.5 max-w-sm w-full px-4 sm:px-0 pointer-events-none">
@@ -740,7 +746,11 @@ export default function App() {
       />
 
       {/* Main Content Body */}
-      <main className="flex-1 w-full max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-6 lg:px-8 overflow-x-hidden bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl shadow-slate-950/80 my-2 sm:my-4 pb-24 transition-all">
+      <main className={`flex-1 w-full max-w-7xl mx-auto overflow-x-hidden transition-all ${
+        workspaceMode === 'public' || !isFounderUser
+          ? 'py-2 px-2 sm:px-4 my-1 sm:my-2 pb-16'
+          : 'py-4 sm:py-6 px-3 sm:px-6 lg:px-8 bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl shadow-slate-950/80 my-2 sm:my-4 pb-24'
+      }`}>
         {workspaceMode === 'public' || !isFounderUser ? (
           <PublicWorkspace 
             onOpenFounderWorkspace={isFounderUser ? () => setWorkspaceMode('founder') : undefined} 
@@ -781,9 +791,22 @@ export default function App() {
       <footer className="bg-slate-900/95 border-t border-slate-800/80 py-2.5 text-center text-xs text-slate-500 mt-auto sticky bottom-0 z-30 backdrop-blur-md">
         <div className="max-w-md mx-auto px-4 flex items-center justify-center space-x-6 sm:space-x-8">
           <button
+            onClick={() => triggerTabSwitch('inicio')}
+            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+              currentPublicTab === 'inicio' || currentPublicTab === 'home' || !currentPublicTab
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400/50'
+                : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
+            }`}
+            title="Smartphone Principal"
+            aria-label="Smartphone Principal"
+          >
+            <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+          </button>
+
+          <button
             onClick={() => triggerTabSwitch('timeline')}
             className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              currentPublicTab === 'timeline'
+              currentPublicTab === 'timeline' || currentPublicTab === 'atividade'
                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400/50'
                 : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
             }`}
@@ -796,7 +819,7 @@ export default function App() {
           <button
             onClick={() => triggerTabSwitch('favorites')}
             className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              currentPublicTab === 'favorites'
+              currentPublicTab === 'favorites' || currentPublicTab === 'favoritos'
                 ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 scale-105 ring-1 ring-amber-300/50'
                 : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
             }`}
@@ -809,7 +832,7 @@ export default function App() {
           <button
             onClick={() => triggerTabSwitch('search')}
             className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              currentPublicTab === 'search'
+              currentPublicTab === 'search' || currentPublicTab === 'pesquisa'
                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400/50'
                 : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
             }`}
@@ -818,21 +841,10 @@ export default function App() {
           >
             <Search className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
           </button>
-
-          <button
-            onClick={() => triggerTabSwitch('devices')}
-            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              currentPublicTab === 'devices'
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400/50'
-                : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
-            }`}
-            title="Dispositivo"
-            aria-label="Dispositivo"
-          >
-            <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-          </button>
         </div>
       </footer>
     </div>
+    </ClipboardProvider>
+    </CommandProvider>
   );
 }

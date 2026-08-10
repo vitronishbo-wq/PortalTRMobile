@@ -58,9 +58,11 @@ import { UserProfile, UserRole, resolveRootLevel, getDefaultPermissionsForRole }
 import { FirestoreService } from '../services/firestore';
 import { TrialEngine } from '../services/trialEngine';
 import { AppyPayGatewayConsole } from './AppyPayGatewayConsole';
+import { SecurityConsole } from './SecurityConsole';
 import { IntegrationsConsole } from './IntegrationsConsole';
 import { InfrastructureConsole } from './InfrastructureConsole';
 import { AnalyticsView } from './AnalyticsView';
+import { AuditConsole } from './AuditConsole';
 import { RootConsoleView } from './workspaces/RootConsoleView';
 import { OperationalOverviewConsole } from './workspaces/OperationalOverviewConsole';
 
@@ -144,7 +146,6 @@ export type RootWorkspaceTab =
   | 'infrastructure'
   | 'releases'
   | 'audit'
-  | 'configuration'
   | 'developer'
   | 'security';
 
@@ -161,17 +162,16 @@ const TAB_DEFS: TabDef[] = [
   { id: 'overview', label: 'Overview Operacional', icon: LayoutDashboard, color: 'text-sky-400', badge: '8 PILARES', desc: 'Visão Operacional Consolidada de Sistema' },
   { id: 'root', label: 'Root Authority', icon: Crown, color: 'text-amber-400', badge: 'MASTER', desc: 'Controlo Root & Autoridade Bootstrap' },
   { id: 'automation', label: 'Automation Engine', icon: Zap, color: 'text-yellow-400', badge: '3 Ativas', desc: 'Regras de Eventos e Gatilhos' },
-  { id: 'monitoring', label: 'Telemetry & Observability', icon: Activity, color: 'text-emerald-400', badge: '99.9%', desc: 'Telemetria, Saúde & Métricas de Desempenho' },
+  { id: 'monitoring', label: 'Telemetry & Health', icon: Activity, color: 'text-emerald-400', badge: 'Ativo', desc: 'Telemetria, Saúde dos Dispositivos & Métricas' },
   { id: 'identity', label: 'Identity & Access', icon: Users, color: 'text-indigo-400', badge: 'RBAC', desc: 'Gestão de Utilizadores e Zero-Knowledge' },
   { id: 'devices', label: 'Devices & Agent Mesh', icon: Smartphone, color: 'text-emerald-400', badge: 'Agentes', desc: 'Agentes Android e Dispositivos Pareados' },
-  { id: 'billing', label: 'Billing & AppyPay', icon: CreditCard, color: 'text-amber-400', badge: 'AppyPay', desc: 'Subscrições & Multicaixa Express' },
-  { id: 'integrations', label: 'Integrations & CPaaS', icon: Plug, color: 'text-purple-400', desc: 'Webhooks & APIs Externas' },
-  { id: 'infrastructure', label: 'Infrastructure & Storage', icon: Cloud, color: 'text-cyan-400', desc: 'Servidores Cloud Run, Express & Firestore' },
+  { id: 'billing', label: 'Billing & Subscriptions', icon: CreditCard, color: 'text-amber-400', badge: 'AppyPay', desc: 'Subscrições, Licenças & Gateway AppyPay' },
+  { id: 'integrations', label: 'Integrations & CPaaS', icon: Plug, color: 'text-purple-400', desc: 'Webhooks, CPaaS & APIs' },
+  { id: 'infrastructure', label: 'Infrastructure & Storage', icon: Cloud, color: 'text-cyan-400', desc: 'Servidores Node.js Express & Firestore' },
   { id: 'releases', label: 'Releases & Build', icon: Rocket, color: 'text-rose-400', badge: 'v2.4.0', desc: 'Versões PWA & Compilações APK' },
-  { id: 'audit', label: 'Audit & DLQ Logs', icon: ScrollText, color: 'text-orange-400', desc: 'Registo Inalterável de Atividades' },
-  { id: 'configuration', label: 'Feature Flags', icon: Settings, color: 'text-slate-300', desc: 'Parâmetros Globais & Flags' },
+  { id: 'audit', label: 'Audit & DLQ Logs', icon: ScrollText, color: 'text-orange-400', desc: 'Registo Inalterável & Incidentes DLQ' },
   { id: 'developer', label: 'Command Center & CLI', icon: Wrench, color: 'text-emerald-400', badge: 'CLI', desc: 'Terminal Único & Registos de Depuração' },
-  { id: 'security', label: 'Security & Secrets', icon: ShieldCheck, color: 'text-rose-400', badge: 'E2EE', desc: 'Chaves Criptográficas & Segredos' }
+  { id: 'security', label: 'Security & Feature Flags', icon: ShieldCheck, color: 'text-rose-400', badge: 'E2EE', desc: 'Chaves, Segredos & Feature Flags Globais' }
 ];
 
 interface FounderConsoleContentProps {
@@ -405,7 +405,7 @@ const FounderConsoleContent: React.FC<FounderConsoleContentProps> = ({ sessionPr
     } else if (cmd === 'status') {
       setTerminalLogs((prev) => [
         ...prev,
-        '● Cloud Run: OK (Port 3000)',
+        '● Node.js Server: OK (Port 3000)',
         '● Firestore: Conectado (Realtime ON)',
         '● ServiceWorker: Ativo',
         '● AppyPay: Sandbox Pronta'
@@ -605,37 +605,6 @@ const FounderConsoleContent: React.FC<FounderConsoleContentProps> = ({ sessionPr
         <AnalyticsView stats={null} />
       )}
 
-      {/* 4. 🏠 DASHBOARD */}
-      {activeTab === 'dashboard' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Utilizadores Ativos</span>
-              <div className="text-xl font-extrabold text-amber-400">{usersList.length}</div>
-              <span className="text-[10px] text-slate-500">Inscritos no Sistema</span>
-            </div>
-
-            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Gateway AppyPay</span>
-              <div className="text-xl font-extrabold text-emerald-400">Ativo</div>
-              <span className="text-[10px] text-slate-500">Sandbox Multicaixa AOA</span>
-            </div>
-
-            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Agentes Android</span>
-              <div className="text-xl font-extrabold text-indigo-400">1 Conectado</div>
-              <span className="text-[10px] text-slate-500">Samsung OneUI Agent</span>
-            </div>
-
-            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Sincronização</span>
-              <div className="text-xl font-extrabold text-emerald-400">Realtime</div>
-              <span className="text-[10px] text-slate-500">Firestore Listeners</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 5. 👥 IDENTITY */}
       {activeTab === 'identity' && (
         <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
@@ -733,7 +702,7 @@ const FounderConsoleContent: React.FC<FounderConsoleContentProps> = ({ sessionPr
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
             <div>
               <h4 className="font-bold text-slate-200">PortalTRMobile PWA v2.4.0</h4>
-              <p className="text-[10px] text-slate-400 font-mono">Compilação Produção - Cloud Run Engine</p>
+              <p className="text-[10px] text-slate-400 font-mono">Compilação Produção - Container Engine</p>
             </div>
             <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 font-mono font-bold text-[10px] rounded border border-emerald-500/30">
               PRODUÇÃO (STABLE)
@@ -744,56 +713,7 @@ const FounderConsoleContent: React.FC<FounderConsoleContentProps> = ({ sessionPr
 
       {/* 10. 📜 AUDIT */}
       {activeTab === 'audit' && (
-        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-orange-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
-            <ScrollText className="w-4 h-4" />
-            <span>Registo de Auditoria Inalterável</span>
-          </h3>
-
-          <div className="space-y-2 text-xs font-mono">
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between">
-              <span className="text-slate-400">[2026-08-07 17:02] FOUNDER_LOGIN</span>
-              <span className="text-amber-400">silajaneiro9@gmail.com</span>
-              <span className="text-emerald-400 font-bold">SUCESSO</span>
-            </div>
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between">
-              <span className="text-slate-400">[2026-08-07 16:55] BOOTSTRAP_INIT</span>
-              <span className="text-slate-300">System Root</span>
-              <span className="text-emerald-400 font-bold">CONCLUÍDO</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 14. ⚙ CONFIGURATION */}
-      {activeTab === 'configuration' && (
-        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-slate-200 border-b border-slate-800 pb-3 flex items-center space-x-2">
-            <Settings className="w-4 h-4" />
-            <span>Gestão Dinâmica de Feature Flags</span>
-          </h3>
-
-          <div className="space-y-3">
-            {(Object.keys(flags) as (keyof FeatureFlagsState)[]).map((flagKey) => {
-              const isEnabled = flags[flagKey];
-              return (
-                <div key={flagKey} className="flex items-center justify-between bg-slate-950 p-4 rounded-xl border border-slate-800">
-                  <div>
-                    <span className="font-bold text-xs text-slate-200 font-mono block">{flagKey}</span>
-                  </div>
-                  <button
-                    onClick={() => handleToggleFlag(flagKey)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer ${
-                      isEnabled ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {isEnabled ? '● ATIVO' : '○ DESATIVADO'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <AuditConsole />
       )}
 
       {/* 15. 🛠 DEVELOPER */}
@@ -825,28 +745,9 @@ const FounderConsoleContent: React.FC<FounderConsoleContentProps> = ({ sessionPr
         </div>
       )}
 
-      {/* 16. 🛡 SECURITY */}
+      {/* 16. 🛡 SECURITY & FEATURE FLAGS */}
       {activeTab === 'security' && (
-        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4">
-          <h3 className="text-sm font-bold text-rose-400 border-b border-slate-800 pb-3 flex items-center space-x-2">
-            <ShieldCheck className="w-4 h-4" />
-            <span>Estado dos Segredos e Chaves de Encriptação</span>
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {secrets.map((sec) => (
-              <div key={sec.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-200">{sec.name}</h4>
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold font-mono border border-emerald-500/30">
-                    {sec.statusLabel}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 font-mono">{sec.modeLabel}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        <SecurityConsole />
       )}
 
       {/* Zero-Knowledge SHA-256 Identity Modal */}
