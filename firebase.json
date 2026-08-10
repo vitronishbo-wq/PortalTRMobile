@@ -9,7 +9,7 @@
     "rewrites": [
       {
         "source": "/api/**",
-        "destination": "https://portaltrmobile-api.onrender.com/api/"
+        "destination": "https://portaltrmobile-api.onrender.com/api/**"
       },
       {
         "source": "**",
