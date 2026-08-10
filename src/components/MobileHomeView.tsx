@@ -370,9 +370,9 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
             </div>
           )}
 
-          {/* CONTEXTUAL AUTOMATIC CARD (Apenas quando relevante) */}
+          {/* CONTEXTUAL AUTOMATIC CARD (Apenas quando relevante e não duplicado) */}
           <div className="relative z-10 max-w-xs mx-auto w-full transition-all">
-            {unreadMessagesCount > 0 ? (
+            {unreadMessagesCount > 0 && !config.pinnedWidgets?.includes('messageSummary') ? (
               /* CASO 1: Nova mensagem */
               <button
                 onClick={() => onNavigateTab('mensagens')}

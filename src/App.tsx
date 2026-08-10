@@ -23,7 +23,7 @@ import { CapabilityEngine } from './engine/CapabilityEngine';
 import { useIdentity, IdentityEngine } from './engine/identityEngine';
 import { AuthorityEngine } from './engine/authorityEngine';
 import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
-import { Bell, X, Activity, Star, Search, Smartphone } from 'lucide-react';
+import { Bell, X, Activity, Star, Search, Smartphone, PhoneCall } from 'lucide-react';
 import {
   subscribeToEvents,
   subscribeToDevices,
@@ -804,16 +804,16 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => triggerTabSwitch('timeline')}
+            onClick={() => triggerTabSwitch('chamadas')}
             className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              currentPublicTab === 'timeline' || currentPublicTab === 'atividade'
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400/50'
+              currentPublicTab === 'chamadas'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 scale-105 ring-1 ring-emerald-400/50'
                 : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
             }`}
-            title="Linha do Tempo"
-            aria-label="Linha do Tempo"
+            title="Tecla de Chamada (Teclado)"
+            aria-label="Tecla de Chamada (Teclado)"
           >
-            <Activity className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+            <PhoneCall className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
           </button>
 
           <button

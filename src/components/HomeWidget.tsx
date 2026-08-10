@@ -134,10 +134,10 @@ export const HomeWidget: React.FC<HomeWidgetProps> = ({
         {onNavigateTab && (
           <button
             onClick={() => onNavigateTab('mensagens')}
-            className="w-full py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer"
+            className="w-full py-2 px-3 rounded-xl bg-cyan-900/40 hover:bg-cyan-800/60 border border-cyan-500/50 text-cyan-200 text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-md active:scale-98"
           >
             <span>Abrir Caixa de Entrada</span>
-            <ArrowUpRight className="w-3 h-3" />
+            <ArrowUpRight className="w-3.5 h-3.5 text-cyan-400" />
           </button>
         )}
       </div>
