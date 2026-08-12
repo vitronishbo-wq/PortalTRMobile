@@ -40,7 +40,8 @@ import {
   Radio,
   Folder,
   FolderOpen,
-  FileText
+  FileText,
+  PhoneCall
 } from 'lucide-react';
 import { AuthorityEngine, FeatureFlagsState, DEUS_FUNDADOR_CREDENTIALS } from '../../engine/authorityEngine';
 import { PaymentRegistry, ChargeResponse, ChargeRequest } from '../../services/paymentEngine';
@@ -66,10 +67,12 @@ import { HealthEngine, DeviceHealthMetric, OperationalDiagnostic, DeviceTimeline
 import { SubscriptionsConsole } from './SubscriptionsConsole';
 import { BatchQueueEngine, BatchQueueMetrics } from '../../services/batchQueueEngine';
 
+import { VirtualPhoneCloudWorkspace } from '../VirtualPhoneCloudWorkspace';
+
 export interface IDETab {
   id: string;
   title: string;
-  type: 'overview' | 'user' | 'appypay' | 'flags' | 'runtime' | 'firestore' | 'device' | 'audit' | 'rules' | 'root_authority' | 'automation' | 'health';
+  type: 'overview' | 'user' | 'appypay' | 'flags' | 'runtime' | 'firestore' | 'device' | 'audit' | 'rules' | 'root_authority' | 'automation' | 'health' | 'virtual_phone';
   data?: any;
 }
 
@@ -240,9 +243,10 @@ export const FounderIDEWorkspace: React.FC = () => {
     return () => unsub();
   }, []);
 
-  // Activity Bar Navigation Definition (Clean Founder IDE 11 Root Modules Architecture)
+  // Activity Bar Navigation Definition (Clean Founder IDE 12 Root Modules Architecture)
   const activityItems = [
     { id: 'root_authority', label: '👑 ROOT', icon: Crown },
+    { id: 'virtual_phone', label: '📞 VIRTUAL PHONE', icon: PhoneCall },
     { id: 'workspace', label: '📁 WORKSPACE / FILES', icon: FolderOpen },
     { id: 'console', label: '🖥️ CONSOLE', icon: LayoutDashboard },
     { id: 'devices', label: '📱 DEVICES', icon: Smartphone },
@@ -836,6 +840,8 @@ export const FounderIDEWorkspace: React.FC = () => {
           <div className="flex-1 overflow-y-auto p-6">
             {activeActivity === 'root_authority' || activeTabObj?.type === 'root_authority' ? (
               <RootConsoleView />
+            ) : activeActivity === 'virtual_phone' || activeTabObj?.type === 'virtual_phone' ? (
+              <VirtualPhoneCloudWorkspace />
             ) : activeActivity === 'workspace' ? (
               <InfrastructureConsole />
             ) : activeActivity === 'console' || activeActivity === 'overview' || activeTabObj?.type === 'overview' ? (
