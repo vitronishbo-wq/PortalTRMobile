@@ -625,10 +625,11 @@ const FounderConsoleContent: React.FC<FounderConsoleContentProps> = ({ sessionPr
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono">
-                {usersList.map((usr) => {
+                {usersList.map((usr, idx) => {
                   const level = usr.rootLevel || resolveRootLevel(usr.role, usr.authority);
+                  const uKey = usr.userId || usr.id || usr.email || `usr-table-${idx}`;
                   return (
-                    <tr key={usr.userId} className="hover:bg-slate-950/50">
+                    <tr key={uKey} className="hover:bg-slate-950/50">
                       <td className="p-3 font-bold text-slate-200">{usr.displayName}</td>
                       <td className="p-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${getRoleBadgeStyle(usr.role)}`}>

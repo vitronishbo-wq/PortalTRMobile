@@ -505,18 +505,165 @@ export class FirestoreService {
   }
 
   /**
+   * Obtém os dados de um dispositivo pelo ID
+   */
+  static async getDevice(deviceId: string): Promise<(Device & { blocked?: boolean; trusted?: boolean }) | null> {
+    if (!db) return null;
+    try {
+      const devRef = doc(db, 'devices', deviceId);
+      const snap = await getDoc(devRef);
+      if (snap.exists()) {
+        return { deviceId: snap.id, ...snap.data() } as any;
+      }
+    } catch (e) {
+      console.warn('[FirestoreService] Erro ao obter dispositivo:', e);
+    }
+    return null;
+  }
+
+  /**
    * Regista uma nova sessão
    */
-  static async saveSession(session: AppSession): Promise<void> {
+  static async saveSession(session: any): Promise<void> {
     if (!db) return;
     try {
-      const sessionRef = doc(db, 'sessions', session.sessionId);
+      const sessionId = session.sessionId || session.id;
+      const sessionRef = doc(db, 'sessions', sessionId);
       await setDoc(sessionRef, {
         ...session,
         lastActive: Date.now()
       }, { merge: true });
     } catch (error) {
       console.error('[FirestoreService] Erro ao salvar sessão:', error);
+    }
+  }
+
+  /**
+   * Chama / Chamadas telefónicas (calls/{callId})
+   */
+  static async saveCallRecord(call: any): Promise<void> {
+    if (!db) return;
+    try {
+      const callRef = doc(db, 'calls', call.id);
+      await setDoc(callRef, {
+        ...call,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao salvar registo de chamada:', e);
+    }
+  }
+
+  /**
+   * Números Virtuais (virtual_numbers/{numberId})
+   */
+  static async saveVirtualNumber(num: any): Promise<void> {
+    if (!db) return;
+    try {
+      const numRef = doc(db, 'virtual_numbers', num.id);
+      await setDoc(numRef, {
+        ...num,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao salvar número virtual:', e);
+    }
+  }
+
+  /**
+   * Pareamento de Dispositivo (device_pairing/{pairingId})
+   */
+  static async saveDevicePairing(pairing: any): Promise<void> {
+    if (!db) return;
+    try {
+      const pairRef = doc(db, 'device_pairing', pairing.id || pairing.pairingId);
+      await setDoc(pairRef, {
+        ...pairing,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao salvar pareamento de dispositivo:', e);
+    }
+  }
+
+  /**
+   * Contactos (contacts/{contactId})
+   */
+  static async saveContact(contact: any): Promise<void> {
+    if (!db) return;
+    try {
+      const contactRef = doc(db, 'contacts', contact.id);
+      await setDoc(contactRef, {
+        ...contact,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao salvar contacto:', e);
+    }
+  }
+
+  /**
+   * Mensagens SMS (sms/{messageId})
+   */
+  static async saveSmsMessage(sms: any): Promise<void> {
+    if (!db) return;
+    try {
+      const smsRef = doc(db, 'sms', sms.id);
+      await setDoc(smsRef, {
+        ...sms,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao salvar mensagem SMS:', e);
+    }
+  }
+
+  /**
+   * Notificações (notifications/{notificationId})
+   */
+  static async saveNotification(notification: any): Promise<void> {
+    if (!db) return;
+    try {
+      const notifRef = doc(db, 'notifications', notification.id);
+      await setDoc(notifRef, {
+        ...notification,
+        timestamp: notification.timestamp || Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao salvar notificação:', e);
+    }
+  }
+
+  /**
+   * Logs de Segurança (security_logs/{logId})
+   */
+  static async logSecurityEvent(log: any): Promise<void> {
+    if (!db) return;
+    try {
+      const logId = log.id || log.logId || `sec-${Date.now()}`;
+      const logRef = doc(db, 'security_logs', logId);
+      await setDoc(logRef, {
+        ...log,
+        timestamp: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao gravar log de segurança:', e);
+    }
+  }
+
+  /**
+   * Telecom Providers Config (telecom_providers/{providerId})
+   */
+  static async saveTelecomProvider(provider: any): Promise<void> {
+    if (!db) return;
+    try {
+      const provRef = doc(db, 'telecom_providers', provider.id || provider.providerId);
+      await setDoc(provRef, {
+        ...provider,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao salvar provedor de telefonia:', e);
     }
   }
 }

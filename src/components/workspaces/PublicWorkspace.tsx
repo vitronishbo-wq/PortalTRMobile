@@ -40,7 +40,8 @@ import {
   Layers,
   Star,
   UserCheck,
-  AlertTriangle
+  AlertTriangle,
+  ArrowLeft
 } from 'lucide-react';
 import { db } from '../../firebase/firebase';
 import { collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
@@ -48,6 +49,7 @@ import { useIdentity } from '../../engine/identityEngine';
 import { useOnlineStatus } from '../../lib/offlineCache';
 import { TrialEngine } from '../../services/trialEngine';
 import { exportEventsToCsv } from '../../lib/csvExporter';
+import { VirtualPhoneCloudWorkspace } from '../VirtualPhoneCloudWorkspace';
 import { SwipeableEventCard, DeviceEvent } from '../SwipeableEventCard';
 import { DevicesView } from '../DevicesView';
 import { SettingsView } from '../SettingsView';
@@ -57,7 +59,6 @@ import { QRCodePairing } from '../QRCodePairing';
 import { InputEngine } from '../../engine/inputEngine';
 import { InteractionEngine, NavigationEngine, MultiDeviceMeshEngine } from '../../engine';
 import { Device } from '../../types';
-import { VirtualPhoneCloudWorkspace } from '../VirtualPhoneCloudWorkspace';
 
 interface PublicWorkspaceProps {
   onOpenFounderWorkspace?: () => void;
@@ -171,32 +172,28 @@ const defaultDevicesList: Device[] = [
 
 export type PublicTabType =
   | 'inicio'
-  | 'meu_dispositivo'
-  | 'mensagens'
   | 'chamadas'
-  | 'notificacoes'
+  | 'mensagens'
   | 'contactos'
   | 'dispositivos'
-  | 'utilizadores'
-  | 'atividade'
+  | 'notificacoes'
   | 'favoritos'
   | 'pesquisa'
-  | 'arquitetura'
-  | 'conta'
-  | 'subscricao'
-  | 'seguranca'
-  | 'privacidade'
-  | 'sessoes'
-  | 'aparencia'
   | 'definicoes';
 
 export interface UserIdentity {
   id: string;
   name: string;
   email: string;
-  role: 'founder' | 'admin' | 'user';
+  avatar?: string;
+  role: 'founder' | 'admin' | 'supervisor' | 'operator' | 'auditor' | 'user';
   status: 'Active' | 'Suspended';
   lastAuthTimestamp: number;
+  primaryDevice?: string;
+  linkedDevicesCount?: number;
+  virtualNumber?: string;
+  carrier?: string;
+  licenseType?: string;
 }
 
 export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
@@ -218,23 +215,15 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
   const normalizeTab = (tab: string): PublicTabType => {
     if (!tab) return 'inicio';
     const t = tab.toLowerCase();
-    if (t === 'timeline' || t === 'activity' || t === 'atividade') return 'atividade';
-    if (t === 'devices' || t === 'dispositivos') return 'dispositivos';
-    if (t === 'favorites' || t === 'favoritos') return 'favoritos';
-    if (t === 'search' || t === 'pesquisa') return 'pesquisa';
-    if (t === 'home' || t === 'inicio') return 'inicio';
+    if (t === 'inicio' || t === 'home' || t === 'smartphone') return 'inicio';
     if (t === 'chamadas' || t === 'phone' || t === 'calls') return 'chamadas';
-    if (t === 'mensagens' || t === 'messages') return 'mensagens';
-    if (t === 'notificacoes' || t === 'notifications') return 'notificacoes';
+    if (t === 'mensagens' || t === 'messages' || t === 'sms') return 'mensagens';
     if (t === 'contactos' || t === 'contacts') return 'contactos';
+    if (t === 'dispositivos' || t === 'devices' || t === 'meu_dispositivo') return 'dispositivos';
+    if (t === 'notificacoes' || t === 'notifications') return 'notificacoes';
+    if (t === 'favoritos' || t === 'favorites') return 'favoritos';
+    if (t === 'pesquisa' || t === 'search') return 'pesquisa';
     if (t === 'definicoes' || t === 'settings') return 'definicoes';
-    if (t === 'meu_dispositivo') return 'meu_dispositivo';
-    if (t === 'conta' || t === 'subscricao') return 'conta';
-    if (t === 'seguranca') return 'seguranca';
-    if (t === 'privacidade') return 'privacidade';
-    if (t === 'sessoes') return 'sessoes';
-    if (t === 'aparencia') return 'aparencia';
-    if (t === 'arquitetura') return 'arquitetura';
     return 'inicio';
   };
 
@@ -273,7 +262,7 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
   };
 
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [msgSubTab, setMsgSubTab] = useState<'todas' | 'sms' | 'conversas' | 'arquivos'>('todas');
+  const [msgSubTab, setMsgSubTab] = useState<'todas' | 'sms' | 'favoritos'>('todas');
   const [callSubTab, setCallSubTab] = useState<'dialer' | 'historico' | 'recebidas' | 'efetuadas' | 'perdidas' | 'contactos'>('dialer');
   const [notifSubTab, setNotifSubTab] = useState<'todas' | 'nao_lidas' | 'aplicacoes'>('todas');
   const [selectedNotifApp, setSelectedNotifApp] = useState<string>('todos');
@@ -390,10 +379,6 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
     }
   ]);
 
-  const [roleModalUser, setRoleModalUser] = useState<UserIdentity | null>(null);
-  const [selectedRoleInput, setSelectedRoleInput] = useState<'founder' | 'admin' | 'user'>('user');
-  const [identitySearchQuery, setIdentitySearchQuery] = useState<string>('');
-
   // Fetch real-time user identities from Firestore 'users' collection
   useEffect(() => {
     if (!db) return;
@@ -463,58 +448,20 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
     }
   };
 
-  const handleConfirmRoleAssignment = async () => {
-    if (!roleModalUser) return;
-    const targetId = roleModalUser.id;
-    const newRole = selectedRoleInput;
-    setUserIdentities((prev) => prev.map((u) => (u.id === targetId ? { ...u, role: newRole } : u)));
-    if (db) {
-      try {
-        await updateDoc(doc(db, 'users', targetId), { role: newRole });
-      } catch (err) {
-        await setDoc(doc(db, 'users', targetId), {
-          displayName: roleModalUser.name,
-          email: roleModalUser.email,
-          role: newRole,
-          status: roleModalUser.status,
-          lastAuthTimestamp: roleModalUser.lastAuthTimestamp
-        }, { merge: true }).catch(() => {});
-      }
-    }
-    setRoleModalUser(null);
-  };
-
   const primaryDevice = activeDevices[0] || defaultDevicesList[0];
 
   const displayEmail = userProfile?.email || authUser?.email || 'utilizador@portal.co.ao';
   const license = TrialEngine.getLicense(authUser?.uid || 'usr-public-001', displayEmail);
   const evalState = TrialEngine.evaluateState(license);
 
-  const navCategories = [
-    {
-      group: 'Public Portal (9 Domínios)',
-      items: [
-        { id: 'inicio', label: 'Home', icon: Home },
-        { id: 'chamadas', label: 'Phone', icon: PhoneCall, badge: calls.length },
-        { id: 'mensagens', label: 'Messages', icon: MessageSquare, badge: messages.length },
-        { id: 'notificacoes', label: 'Notifications', icon: Bell, badge: notifications.length },
-        { id: 'dispositivos', label: 'Devices', icon: Grid, badge: activeDevices.length },
-        { id: 'utilizadores', label: 'Users', icon: Users, badge: userIdentities.length },
-        { id: 'favoritos', label: 'Favorites', icon: Star },
-        { id: 'pesquisa', label: 'Search', icon: Search },
-        { id: 'definicoes', label: 'Settings', icon: Settings }
-      ]
-    }
-  ];
-
   return (
     <div className="w-full max-w-5xl mx-auto space-y-5 font-sans text-slate-100 select-none pb-12">
       
-      {/* TAB: INÍCIO — HOME MOBILE CLEAN (DEFAULT) */}
+      {/* TAB: INÍCIO — INTERFACE SMARTPHONE (DEFAULT) */}
       {(activeTab === 'inicio' || !activeTab) && (
         <div className="flex flex-col items-center justify-center py-2">
           <MobileHomeView
-            onNavigateTab={(tabId) => setActiveTab(tabId as any)}
+            onNavigateTab={(tabId) => handleTabChange(normalizeTab(tabId))}
             unreadMessagesCount={messages.filter(m => !m.isFavorite).length}
             unreadNotifsCount={notifications.filter(n => !n.isRead).length}
             activeDevicesCount={activeDevices.length}
@@ -527,104 +474,32 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
         </div>
       )}
 
-      {/* OUTROS MÓDULOS (WRAPPER CARD DEDICADO) */}
-      {activeTab !== 'inicio' && activeTab && (
+      {/* COMMERCIAL CONTENT CONTAINER FOR OTHER TABS */}
+      {activeTab !== 'inicio' && (
         <div className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4">
-          {/* TAB: MEU DISPOSITIVO */}
-          {activeTab === 'meu_dispositivo' && (
-            <div className="space-y-3 font-mono text-xs">
-              {/* Dense Header Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
-                <div className="flex items-center space-x-2">
-                  <Smartphone className="w-4 h-4 text-indigo-400 shrink-0" />
-                  <span className="font-bold text-white text-xs">{primaryDevice.name} ({primaryDevice.model})</span>
-                </div>
-                <button 
-                  onClick={() => {
-                    const now = Date.now();
-                    primaryDevice.lastSync = now;
-                    onSimulateEvent?.();
-                  }}
-                  className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] transition-all flex items-center justify-center space-x-1 cursor-pointer active:scale-95 shrink-0"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>FORÇAR SYNC</span>
-                </button>
-              </div>
+          
+          {/* Header Bar to return to Smartphone */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+            <button
+              onClick={() => setActiveTab('inicio')}
+              className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 text-xs font-bold transition-all cursor-pointer active:scale-95"
+            >
+              <ArrowLeft className="w-4 h-4 text-indigo-400" />
+              <span>Voltar ao Smartphone</span>
+            </button>
+            <span className="text-xs font-mono text-slate-400 uppercase font-bold tracking-wider">
+              {activeTab}
+            </span>
+          </div>
 
-              {/* Dense Table Layout for Telemetry & Diagnostics */}
-              <div className="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-900 text-slate-400 border-b border-slate-800 uppercase text-[10px]">
-                      <th className="p-2">METRICA / MÓDULO</th>
-                      <th className="p-2">VALOR / PARÂMETRO</th>
-                      <th className="p-2">ESTADO</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b border-slate-800/60">
-                      <td className="p-2 text-slate-300 font-bold">Estado da Conexão</td>
-                      <td className="p-2 text-slate-400">Wi-Fi / LTE (WebSocket Node)</td>
-                      <td className="p-2 text-emerald-400 font-bold">● ONLINE</td>
-                    </tr>
-                    <tr className="border-b border-slate-800/60">
-                      <td className="p-2 text-slate-300 font-bold">Nível de Bateria</td>
-                      <td className="p-2 text-amber-400 font-bold">{primaryDevice.batteryLevel ?? 98}%</td>
-                      <td className="p-2 text-emerald-400 font-bold">CARREGANDO</td>
-                    </tr>
-                    <tr className="border-b border-slate-800/60">
-                      <td className="p-2 text-slate-300 font-bold">Última Sincronização</td>
-                      <td className="p-2 text-indigo-300">{new Date(primaryDevice.lastSync).toLocaleTimeString('pt-BR')}</td>
-                      <td className="p-2 text-emerald-400 font-bold">REALTIME ACTIVE</td>
-                    </tr>
-                    <tr className="border-b border-slate-800/60">
-                      <td className="p-2 text-slate-300 font-bold">Permissão: SMS</td>
-                      <td className="p-2 text-slate-400">Telephony Receiver</td>
-                      <td className="p-2 text-emerald-400 font-bold">CONCEDIDA</td>
-                    </tr>
-                    <tr className="border-b border-slate-800/60">
-                      <td className="p-2 text-slate-300 font-bold">Permissão: Notificações</td>
-                      <td className="p-2 text-slate-400">NotificationListenerService</td>
-                      <td className="p-2 text-emerald-400 font-bold">CONCEDIDA</td>
-                    </tr>
-                    <tr className="border-b border-slate-800/60">
-                      <td className="p-2 text-slate-300 font-bold">Permissão: Registo Chamadas</td>
-                      <td className="p-2 text-slate-400">Call Log Manager</td>
-                      <td className="p-2 text-emerald-400 font-bold">CONCEDIDA</td>
-                    </tr>
-                    <tr className="border-b border-slate-800/60">
-                      <td className="p-2 text-slate-300 font-bold">Permissão: Acessibilidade</td>
-                      <td className="p-2 text-slate-400">AccessibilityService Engine</td>
-                      <td className="p-2 text-emerald-400 font-bold">CONCEDIDA</td>
-                    </tr>
-                    <tr className="border-b border-slate-800/60">
-                      <td className="p-2 text-slate-300 font-bold">Latência WebSocket</td>
-                      <td className="p-2 text-slate-400">Node Relay Router</td>
-                      <td className="p-2 text-emerald-400 font-bold">18 ms</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2 text-slate-300 font-bold">Motor Camuflagem</td>
-                      <td className="p-2 text-slate-400">Calculadora Disfarçada</td>
-                      <td className="p-2 text-indigo-400 font-bold">PRONTO</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-            {/* TAB: MENSAGENS */}
+          {/* TAB: MENSAGENS */}
             {activeTab === 'mensagens' && (() => {
               const filteredMessages = messages.filter((msg) => {
                 // Filter by sub-tab
                 if (msgSubTab === 'sms' && msg.type !== 'sms' && !msg.title.toLowerCase().includes('sms')) {
                   return false;
                 }
-                if (msgSubTab === 'conversas' && msg.type === 'sms' && !msg.title.toLowerCase().includes('whatsapp') && !msg.title.toLowerCase().includes('telegram')) {
-                  return false;
-                }
-                if (msgSubTab === 'arquivos' && !msg.isFavorite) {
+                if (msgSubTab === 'favoritos' && !msg.isFavorite) {
                   return false;
                 }
 
@@ -686,7 +561,7 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
                       )}
                     </div>
 
-                    {/* Sub-abas (Todas / SMS / Conversas / Arquivos) */}
+                    {/* Sub-abas (Todas / SMS / Favoritos) */}
                     <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none">
                       <button
                         onClick={() => setMsgSubTab('todas')}
@@ -713,27 +588,15 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
                       </button>
 
                       <button
-                        onClick={() => setMsgSubTab('conversas')}
+                        onClick={() => setMsgSubTab('favoritos')}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-                          msgSubTab === 'conversas'
+                          msgSubTab === 'favoritos'
                             ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                             : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
                         }`}
                       >
-                        <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Conversas ({messages.filter(m => m.type !== 'sms' || m.title.toLowerCase().includes('whatsapp') || m.title.toLowerCase().includes('telegram')).length})</span>
-                      </button>
-
-                      <button
-                        onClick={() => setMsgSubTab('arquivos')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-                          msgSubTab === 'arquivos'
-                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                            : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-                        }`}
-                      >
-                        <Archive className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Arquivos / Guardadas ({messages.filter(m => m.isFavorite).length})</span>
+                        <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                        <span>Favoritos ({messages.filter(m => m.isFavorite).length})</span>
                       </button>
                     </div>
 
@@ -1090,36 +953,6 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
               />
             )}
 
-            {/* TAB: ATIVIDADE */}
-            {activeTab === 'atividade' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
-                    <Activity className="w-4 h-4 text-indigo-400" />
-                    <span>Registo Global de Atividade (Timeline & Eventos)</span>
-                  </h3>
-                  <button
-                    onClick={() => exportEventsToCsv(messages)}
-                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center space-x-1.5 cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Exportar CSV</span>
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  {messages.map((msg) => (
-                    <SwipeableEventCard
-                      key={msg.id}
-                      event={msg}
-                      onDelete={(id) => setMessages(prev => prev.filter(m => m.id !== id))}
-                      onToggleFavorite={(id) => setMessages(prev => prev.map(m => m.id === id ? { ...m, isFavorite: !m.isFavorite } : m))}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* TAB: FAVORITOS (★ — Favorites) */}
             {activeTab === 'favoritos' && (
               <div className="space-y-5">
@@ -1204,12 +1037,12 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
                     </button>
 
                     <button
-                      onClick={() => setActiveTab('seguranca')}
+                      onClick={() => setActiveTab('definicoes')}
                       className="p-3 rounded-2xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-rose-500/50 text-left space-y-1.5 transition-all cursor-pointer group"
                     >
-                      <ShieldCheck className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
-                      <span className="block text-xs font-bold text-slate-200">Segurança</span>
-                      <span className="block text-[10px] text-slate-500">Sessões e Chaves</span>
+                      <Settings className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                      <span className="block text-xs font-bold text-slate-200">Definições</span>
+                      <span className="block text-[10px] text-slate-500">Configurações do sistema</span>
                     </button>
                   </div>
                 </div>
@@ -1323,440 +1156,12 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
               </div>
             )}
 
-            {/* TAB: CONTA & ESTADO GLOBAL DA SUBSCRIÇÃO */}
-            {(activeTab === 'conta' || (activeTab as string) === 'subscricao') && (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
-                    <User className="w-4 h-4 text-indigo-400" />
-                    <span>Informações da Conta & Estado Global</span>
-                  </h3>
-                  <button
-                    onClick={() => logout()}
-                    className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold flex items-center space-x-1 cursor-pointer"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Sair</span>
-                  </button>
-                </div>
-
-                {/* 1. ESTADO GLOBAL DA SUBSCRIÇÃO (NO TOPO DA CONTA) */}
-                <div className={`p-5 rounded-2xl border transition-all ${
-                  !evalState.active
-                    ? 'bg-rose-950/70 border-rose-500/80 text-rose-200 shadow-xl shadow-rose-950/50'
-                    : license.lifetime
-                      ? 'bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-cyan-500/10 border-amber-500/40 text-slate-100 shadow-lg'
-                      : 'bg-slate-950 border-slate-800 text-slate-100'
-                }`}>
-                  <div className="flex items-center justify-between pb-3 border-b border-white/10">
-                    <div className="flex items-center space-x-2.5">
-                      <div className={`p-2 rounded-xl ${
-                        !evalState.active
-                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
-                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                      }`}>
-                        <CreditCard className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black uppercase tracking-wider text-white">Estado Global da Subscrição</h4>
-                        <p className="text-[10px] text-slate-400">Estado de Licenciamento da Conta</p>
-                      </div>
-                    </div>
-
-                    {/* Badge de Estado */}
-                    {!evalState.active ? (
-                      <span className="px-2.5 py-1 rounded-full bg-rose-500 text-white font-mono font-black text-[10px] tracking-wider uppercase animate-bounce shadow">
-                        Subscrição Expirada
-                      </span>
-                    ) : license.lifetime ? (
-                      <span className="px-2.5 py-1 rounded-full bg-amber-500 text-slate-950 font-mono font-black text-[10px] tracking-wider uppercase shadow">
-                        Licença Vitalícia
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono font-bold text-[10px] tracking-wider uppercase">
-                        Ativa ({evalState.daysRemaining}d restantes)
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="pt-3 space-y-3">
-                    {!evalState.active ? (
-                      <div className="space-y-3">
-                        <div className="bg-rose-900/40 border border-rose-500/50 p-3.5 rounded-xl space-y-1">
-                          <h5 className="text-xs font-black text-white flex items-center space-x-1.5">
-                            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                            <span>Subscrição expirada</span>
-                          </h5>
-                          <p className="text-[11px] text-rose-200 leading-snug">
-                            O seu período de utilização expirou. Renove sua subscrição para manter a sincronização em tempo real e acesso a todas as funcionalidades do sistema.
-                          </p>
-                        </div>
-
-                        <button
-                          onClick={() => {
-                            const userId = authUser?.uid || 'usr-public-001';
-                            TrialEngine.modifyLicense(userId, '+30d', 'Renovação Manual efetuada na Conta');
-                            window.location.reload();
-                          }}
-                          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 transition-all cursor-pointer active:scale-95 flex items-center justify-center space-x-2"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                          <span>Renove sua subscrição</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800/80">
-                            <span className="text-[10px] text-slate-400 font-bold block uppercase">Plano Atual</span>
-                            <span className="font-extrabold text-amber-400 uppercase">{license.plan || 'Premium'}</span>
-                          </div>
-                          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800/80">
-                            <span className="text-[10px] text-slate-400 font-bold block uppercase">Validade</span>
-                            <span className="font-mono text-slate-200">
-                              {license.lifetime ? 'Ilimitada (Vitalício)' : `${evalState.daysRemaining} dias restantes`}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-1">
-                          <button
-                            onClick={() => {
-                              const userId = authUser?.uid || 'usr-public-001';
-                              TrialEngine.modifyLicense(userId, '+30d', 'Renovação estendida pelo utilizador');
-                              window.location.reload();
-                            }}
-                            className="text-[11px] font-mono text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer flex items-center space-x-1"
-                          >
-                            <RefreshCw className="w-3 h-3" />
-                            <span>Renove sua subscrição (+30 Dias)</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. INFORMAÇÕES DA CONTA DO UTILIZADOR */}
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Detalhes do Perfil</h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400 font-bold">Email:</span>
-                    <span className="text-xs font-mono text-indigo-300">{displayEmail}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400 font-bold">Estado da Conta:</span>
-                    <span className={`text-xs font-bold ${evalState.active ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {evalState.active ? 'Ativo' : 'Subscrição Expirada'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB: SEGURANÇA */}
-            {activeTab === 'seguranca' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
-                    <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                    <span>Segurança & Encriptação</span>
-                  </h3>
-                </div>
-
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400 font-bold">Camuflagem (Calculadora):</span>
-                    <span className="text-xs font-bold text-emerald-400">Ativada</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400 font-bold">Encriptação de Dados:</span>
-                    <span className="text-xs font-mono text-cyan-300">AES-256 / RSA-4096</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB: PRIVACIDADE */}
-            {activeTab === 'privacidade' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
-                    <Lock className="w-4 h-4 text-purple-400" />
-                    <span>Privacidade & Permissões</span>
-                  </h3>
-                </div>
-
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-300 font-bold">Acesso a Contactos Locais:</span>
-                    <span className="text-emerald-400 font-mono font-bold">Autorizado</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-300 font-bold">Ocultar Número de Telefone:</span>
-                    <span className="text-cyan-400 font-mono font-bold">Ativado</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-300 font-bold">Registos de Atividade Anónimos:</span>
-                    <span className="text-emerald-400 font-mono font-bold">Sim</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB: SESSÕES */}
-            {activeTab === 'sessoes' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
-                    <UserCheck className="w-4 h-4 text-indigo-400" />
-                    <span>Sessões Ativas</span>
-                  </h3>
-                </div>
-
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
-                  <div className="flex items-center justify-between p-3 bg-slate-900 rounded-xl border border-slate-800">
-                    <div>
-                      <span className="block font-bold text-white">Sessão Atual (Navegador Web)</span>
-                      <span className="block text-[10px] font-mono text-slate-400">Lisboa, Portugal • Chrome / PWA</span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
-                      Ativa Agora
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB: APARÊNCIA */}
-            {activeTab === 'aparencia' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span>Aparência & Temas</span>
-                  </h3>
-                </div>
-
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
-                  <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
-                    <span className="text-slate-300 font-bold block">Tema Visual do Sistema</span>
-                    <span className="text-slate-400 text-[11px] block">
-                      Ajuste temas, wallpapers e visual no ecrã de início através das opções de personalização da Home.
-                    </span>
-                    <button
-                      onClick={() => setActiveTab('inicio')}
-                      className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold cursor-pointer"
-                    >
-                      Ir para Personalização da Home
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB: ARQUITETURA */}
-            {activeTab === 'arquitetura' && (
-              <SystemArchitectureDiagram />
-            )}
-
-            {/* TAB: UTILIZADORES / IDENTIDADES (USER IDENTITIES DENSE TABLE) */}
-            {(activeTab === 'utilizadores' || activeTab === 'conta') && (
-              <div className="space-y-4 border-t border-slate-800/80 pt-4 mt-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
-                  <div className="flex items-center space-x-2">
-                    <Users className="w-4 h-4 text-emerald-400" />
-                    <h3 className="text-xs font-black text-white uppercase tracking-wider">Gestão de Identidades de Utilizadores (RBAC)</h3>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <input
-                        type="text"
-                        value={identitySearchQuery}
-                        onChange={(e) => setIdentitySearchQuery(e.target.value)}
-                        placeholder="Filtrar por nome, email ou UID..."
-                        className="pl-8 pr-3 py-1 bg-black border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* DENSE TABLE FOR USER IDENTITIES */}
-                <div className="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950 font-mono text-xs">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-900 text-slate-400 border-b border-slate-800 uppercase text-[10px] tracking-wider">
-                        <th className="p-2.5">USER UID</th>
-                        <th className="p-2.5">NAME & EMAIL</th>
-                        <th className="p-2.5">ROLE (RBAC)</th>
-                        <th className="p-2.5">STATUS</th>
-                        <th className="p-2.5">LAST AUTH</th>
-                        <th className="p-2.5 text-right">ACTIONS</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {userIdentities
-                        .filter(u => {
-                          if (!identitySearchQuery) return true;
-                          const q = identitySearchQuery.toLowerCase();
-                          return (
-                            u.id.toLowerCase().includes(q) ||
-                            u.name.toLowerCase().includes(q) ||
-                            u.email.toLowerCase().includes(q) ||
-                            u.role.toLowerCase().includes(q) ||
-                            u.status.toLowerCase().includes(q)
-                          );
-                        })
-                        .map((usr) => (
-                          <tr key={usr.id} className="border-b border-slate-800/80 hover:bg-slate-900/50 transition-colors">
-                            <td className="p-2.5 text-cyan-400 font-bold text-[11px]">{usr.id}</td>
-                            <td className="p-2.5">
-                              <span className="block font-sans font-bold text-slate-100">{usr.name}</span>
-                              <span className="block text-[10px] text-slate-400">{usr.email}</span>
-                            </td>
-                            <td className="p-2.5">
-                              <button
-                                onClick={() => {
-                                  setRoleModalUser(usr);
-                                  setSelectedRoleInput(usr.role);
-                                }}
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer border hover:opacity-80 transition-opacity ${
-                                  usr.role === 'founder'
-                                    ? 'bg-amber-950 text-amber-400 border-amber-700'
-                                    : usr.role === 'admin'
-                                    ? 'bg-indigo-950 text-indigo-400 border-indigo-700'
-                                    : 'bg-emerald-950 text-emerald-400 border-emerald-800'
-                                }`}
-                              >
-                                {usr.role}
-                              </button>
-                            </td>
-                            <td className="p-2.5">
-                              <button
-                                onClick={() => handleToggleStatus(usr)}
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer border hover:opacity-80 transition-opacity ${
-                                  usr.status === 'Active'
-                                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-600'
-                                    : 'bg-rose-950/80 text-rose-400 border-rose-600'
-                                }`}
-                              >
-                                {usr.status}
-                              </button>
-                            </td>
-                            <td className="p-2.5 text-slate-400 text-[10px]">
-                              {new Date(usr.lastAuthTimestamp).toISOString().replace('T', ' ').substring(0, 19)}
-                            </td>
-                            <td className="p-2.5 text-right">
-                              <div className="flex items-center justify-end space-x-1.5">
-                                <button
-                                  onClick={() => {
-                                    setRoleModalUser(usr);
-                                    setSelectedRoleInput(usr.role);
-                                  }}
-                                  className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-slate-700 rounded text-[10px] font-bold uppercase cursor-pointer active:scale-95 transition-all"
-                                >
-                                  ASSIGN ROLE
-                                </button>
-                                <button
-                                  onClick={() => handleToggleStatus(usr)}
-                                  className={`px-2 py-1 rounded text-[10px] font-bold uppercase cursor-pointer border active:scale-95 transition-all ${
-                                    usr.status === 'Active'
-                                      ? 'bg-rose-950 text-rose-400 border-rose-800 hover:bg-rose-900'
-                                      : 'bg-emerald-950 text-emerald-400 border-emerald-800 hover:bg-emerald-900'
-                                  }`}
-                                >
-                                  {usr.status === 'Active' ? 'SUSPEND' : 'ACTIVATE'}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
             {/* TAB: DEFINIÇÕES */}
             {activeTab === 'definicoes' && (
               <SettingsView />
             )}
         </div>
       )}
-
-      {/* SELECT MODAL FOR ROLE ASSIGNMENT (FOUNDER / ADMIN / USER) */}
-      {roleModalUser && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
-          <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl w-full max-w-md font-mono text-xs space-y-3 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <div className="flex items-center space-x-2">
-                <Users className="w-4 h-4 text-emerald-400" />
-                <span className="text-emerald-400 font-bold uppercase tracking-wider">SELECT ROLE ASSIGNMENT</span>
-              </div>
-              <button
-                onClick={() => setRoleModalUser(null)}
-                className="text-slate-500 hover:text-slate-200 p-1 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 space-y-1">
-              <span className="text-[10px] text-slate-500 uppercase block">TARGET USER IDENTITY</span>
-              <span className="block font-bold text-white text-xs">{roleModalUser.name} ({roleModalUser.id})</span>
-              <span className="block text-[11px] text-cyan-400 font-mono">{roleModalUser.email}</span>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-slate-400 uppercase font-bold block">ASSIGN ROLE LEVEL</label>
-              <div className="grid grid-cols-1 gap-1.5">
-                {(
-                  [
-                    ['founder', 'FOUNDER (Deus Fundador / Root Authority)', 'Full Infrastructure, RBAC & Secret Access'],
-                    ['admin', 'ADMINISTRATOR (System Admin)', 'System-wide configuration, Users & Automation'],
-                    ['user', 'USER (Standard Operational User)', 'Public portal access, devices & telemetry']
-                  ] as const
-                ).map(([rKey, rLabel, rDesc]) => (
-                  <button
-                    key={rKey}
-                    type="button"
-                    onClick={() => setSelectedRoleInput(rKey)}
-                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                      selectedRoleInput === rKey
-                        ? 'bg-emerald-950 border-emerald-500 text-emerald-300 shadow'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-850'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs uppercase">{rLabel}</span>
-                      {selectedRoleInput === rKey && <CheckCheck className="w-4 h-4 text-emerald-400" />}
-                    </div>
-                    <span className="block text-[10px] text-slate-500 mt-0.5">{rDesc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
-              <button
-                onClick={() => setRoleModalUser(null)}
-                className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-bold uppercase cursor-pointer"
-              >
-                CANCEL
-              </button>
-              <button
-                onClick={handleConfirmRoleAssignment}
-                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider shadow cursor-pointer active:scale-95 transition-all"
-              >
-                CONFIRM ROLE ASSIGNMENT
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };

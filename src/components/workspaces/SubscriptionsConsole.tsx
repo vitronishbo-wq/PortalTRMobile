@@ -602,11 +602,14 @@ export const SubscriptionsConsole: React.FC = () => {
                   onChange={(e) => setRedeemUserInput(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer font-mono"
                 >
-                  {users.map((u) => (
-                    <option key={u.userId} value={u.userId}>
-                      {u.displayName} ({u.email})
-                    </option>
-                  ))}
+                  {users.map((u, idx) => {
+                    const uKey = u.userId || u.id || u.email || `usr-opt-${idx}`;
+                    return (
+                      <option key={uKey} value={u.userId || uKey}>
+                        {u.displayName} ({u.email})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

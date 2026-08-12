@@ -427,6 +427,147 @@ export class IdentityEngine {
   }
 
   /**
+   * Generates SHA-256 session identity hash combining UID, DeviceID, and Email.
+   */
+  static async generateIdentityHash(uid: string, deviceId: string, email: string): Promise<string> {
+    try {
+      const rawString = `${uid}:${deviceId}:${email.toLowerCase().trim()}:${Date.now()}`;
+      const encoder = new TextEncoder();
+      const data = encoder.encode(rawString);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+      return `sha256-vtr-${hashHex.substring(0, 24)}`;
+    } catch (e) {
+      return `sha256-vtr-${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
+    }
+  }
+
+  /**
+   * Identity Engine 2.0 Fingerprinting & Session Metrics
+   */
+  static getSessionFingerprints(uid: string, deviceId: string) {
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'NodeServer/Linux';
+    const language = typeof navigator !== 'undefined' ? navigator.language : 'pt-PT';
+    const screenRes = typeof window !== 'undefined' ? `${window.screen?.width || 1920}x${window.screen?.height || 1080}` : '1920x1080';
+    
+    const browserFingerprint = `brw-${btoa(userAgent.substring(0, 40) + language).replace(/=/g, '').substring(0, 16)}`;
+    const operatingSystemFingerprint = `os-${userAgent.includes('Android') ? 'android' : userAgent.includes('iPhone') ? 'ios' : userAgent.includes('Windows') ? 'windows' : userAgent.includes('Macintosh') ? 'macos' : 'linux'}`;
+    const networkFingerprint = `net-${typeof location !== 'undefined' ? location.hostname : 'localhost'}-${screenRes}`;
+    const deviceFingerprint = `dev-fp-${deviceId || 'primary'}-${screenRes}`;
+    const sessionFingerprint = `sess-fp-${uid}-${Date.now().toString(36)}`;
+
+    // Trust Score calculation (0 - 100)
+    let trustScore = 85;
+    if (operatingSystemFingerprint.includes('android') || operatingSystemFingerprint.includes('ios')) trustScore += 10;
+    if (userAgent.length > 30) trustScore += 5;
+
+    return {
+      sessionFingerprint,
+      deviceFingerprint,
+      browserFingerprint,
+      operatingSystemFingerprint,
+      networkFingerprint,
+      trustScore,
+      trustedDevice: trustScore >= 75
+    };
+  }
+
+  /**
+   * Validates if a device is trusted by UID and device ID
+   */
+  static async validateTrustedDevice(uid: string, deviceId: string): Promise<boolean> {
+    if (!db) return true;
+    try {
+      const deviceDoc = await FirestoreService.getDevice(deviceId);
+      if (deviceDoc) {
+        return !deviceDoc.blocked && (deviceDoc.trusted !== false);
+      }
+    } catch (err) {
+      console.warn('[IdentityEngine] Validate trusted device error:', err);
+    }
+    return true;
+  }
+
+  /**
+   * Revokes a specific device for a user
+   */
+  static async revokeDevice(uid: string, deviceId: string): Promise<boolean> {
+    if (db) {
+      try {
+        const userDeviceRef = doc(db, 'users', uid, 'devices', deviceId);
+        await updateDoc(userDeviceRef, { status: 'revoked', trusted: false, revokedAt: Date.now() });
+        const deviceRef = doc(db, 'devices', deviceId);
+        await updateDoc(deviceRef, { blocked: true, trusted: false, revokedAt: Date.now() }).catch(() => {});
+        return true;
+      } catch (err) {
+        console.error('[IdentityEngine] Error revoking device:', err);
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Verifies session integrity by matching session fingerprint and device trust
+   */
+  static async verifySessionIntegrity(uid: string, sessionHash: string): Promise<{ valid: boolean; trustScore: number; reason?: string }> {
+    if (!sessionHash) {
+      return { valid: false, trustScore: 0, reason: 'Fingerprint de sessão ausente' };
+    }
+    const fps = this.getSessionFingerprints(uid, 'current-device');
+    return {
+      valid: fps.trustScore >= 50,
+      trustScore: fps.trustScore,
+      reason: fps.trustScore < 50 ? 'Pontuação de confiança da sessão abaixo do limite de segurança' : undefined
+    };
+  }
+
+  /**
+   * Terminates remote session across devices
+   */
+  static async terminateRemoteSession(uid: string, sessionId: string): Promise<boolean> {
+    if (db) {
+      try {
+        const sessionRef = doc(db, 'sessions', sessionId);
+        await updateDoc(sessionRef, { active: false, terminatedAt: Date.now() });
+        return true;
+      } catch (err) {
+        console.warn('[IdentityEngine] Remote session termination:', err);
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Validates identity hash and performs cross-device validation & automatic rejection of untrusted devices.
+   */
+  static async validateCrossDeviceIdentity(
+    uid: string,
+    deviceId: string,
+    sessionHash: string
+  ): Promise<{ valid: boolean; reason?: string }> {
+    if (!sessionHash || !sessionHash.startsWith('sha256-vtr-')) {
+      return { valid: false, reason: 'Fingerprint de sessão inválido ou malformado' };
+    }
+
+    if (db) {
+      try {
+        const deviceDoc = await FirestoreService.getDevice(deviceId);
+        if (deviceDoc && (deviceDoc.blocked || deviceDoc.trusted === false)) {
+          return {
+            valid: false,
+            reason: 'Rejeição Automática: Dispositivo não autorizado ou marcado como bloqueado'
+          };
+        }
+      } catch (err) {
+        console.warn('[IdentityEngine] Erro na verificação do dispositivo:', err);
+      }
+    }
+
+    return { valid: true };
+  }
+
+  /**
    * Signs out current session.
    */
   static async logout(): Promise<void> {

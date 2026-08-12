@@ -601,17 +601,18 @@ export const FounderIDEWorkspace: React.FC = () => {
                               <div className="text-[10px] text-slate-500 uppercase font-bold px-1 py-0.5">
                                 Utilizadores Ativos ({users.length})
                               </div>
-                              {users.map((usr) => {
-                                const lic = TrialEngine.getLicense(usr.userId, usr.email);
+                              {users.map((usr, uIdx) => {
+                                const usrKey = usr.userId || usr.id || usr.email || `usr-item-${uIdx}`;
+                                const lic = TrialEngine.getLicense(usrKey, usr.email);
                                 const evalState = TrialEngine.evaluateState(lic);
                                 return (
                                   <div
-                                    key={usr.userId}
+                                    key={usrKey}
                                     onClick={() => {
                                       setActiveActivity('users');
                                       openTab({
-                                        id: `user-${usr.userId}`,
-                                        title: `User: ${usr.displayName.split(' ')[0]}`,
+                                        id: `user-${usrKey}`,
+                                        title: `User: ${(usr.displayName || 'User').split(' ')[0]}`,
                                         type: 'user',
                                         data: { user: usr, license: lic }
                                       });
@@ -869,10 +870,11 @@ export const FounderIDEWorkspace: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {users.map((usr) => {
-                    const lic = TrialEngine.getLicense(usr.userId, usr.email);
+                  {users.map((usr, uIdx) => {
+                    const usrKey = usr.userId || usr.id || usr.email || `usr-grid-${uIdx}`;
+                    const lic = TrialEngine.getLicense(usrKey, usr.email);
                     return (
-                      <div key={usr.userId} className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
+                      <div key={usrKey} className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-slate-100 text-sm">{usr.displayName}</span>
                           <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[10px] rounded uppercase font-bold">
@@ -940,8 +942,8 @@ export const FounderIDEWorkspace: React.FC = () => {
                     <span>Root Operations Assistant Suggestions ({diagnostics.length})</span>
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
-                    {diagnostics.map((diag) => (
-                      <div key={diag.id} className="p-4 bg-slate-900 rounded-2xl border border-amber-500/30 space-y-2">
+                    {diagnostics.map((diag, idx) => (
+                      <div key={diag.id || `diag-${idx}`} className="p-4 bg-slate-900 rounded-2xl border border-amber-500/30 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-amber-300">{diag.title}</span>
                           <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] rounded font-bold uppercase">
@@ -975,8 +977,8 @@ export const FounderIDEWorkspace: React.FC = () => {
                     Métricas de Saúde dos Agentes Android ({healthMetrics.length})
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {healthMetrics.map((m) => (
-                      <div key={m.deviceId} className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
+                    {healthMetrics.map((m, idx) => (
+                      <div key={m.deviceId || `health-${idx}`} className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-slate-100">{m.deviceName}</span>
                           <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded">

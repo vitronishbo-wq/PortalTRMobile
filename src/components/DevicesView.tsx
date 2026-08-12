@@ -21,7 +21,8 @@ import {
   Info,
   Sliders,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Tv
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Device } from '../types';
@@ -40,91 +41,199 @@ const DEFAULT_FLEET_DEVICES: Device[] = [
     deviceId: 'dev-android-samsung-s22',
     nodeId: 'node-android-master-01',
     name: 'Samsung Galaxy S22 Native',
-    model: 'SM-S901B (Android 14)',
+    model: 'SM-S901B',
+    manufacturer: 'Samsung',
     platform: 'android',
     osVersion: 'Android 14.0',
     pairedAt: '2026-01-15T10:30:00.000Z',
     online: true,
     batteryLevel: 94,
-    batteryOptimizationStatus: 'unrestricted',
-    oemProfile: 'samsung',
+    ipAddress: '192.168.1.102',
+    networkType: '5G / VoLTE',
+    signalStrength: '-62 dBm (Excelente)',
+    virtualNumber: '+244 923 888 111',
+    carrier: 'Unitel Angola',
     permissionScore: 100,
     syncDelayMs: 4,
     lastSync: Date.now() - 3000,
     notificationListenerStatus: 'active',
-    capabilities: { sms: true, calls: true, biometrics: true, accessibility: true }
+    capabilities: { sms: true, calls: true, biometrics: true, accessibility: true, camera: true, microphone: true }
   },
   {
     deviceId: 'dev-iphone-15-pro',
     nodeId: 'node-iphone-ios-02',
     name: 'iPhone 15 Pro iOS Agent',
-    model: 'iPhone16,1 (iOS 17.5)',
+    model: 'iPhone16,1',
+    manufacturer: 'Apple',
     platform: 'iphone',
     osVersion: 'iOS 17.5',
     pairedAt: '2026-01-20T14:15:00.000Z',
     online: true,
     batteryLevel: 88,
-    batteryOptimizationStatus: 'unrestricted',
-    oemProfile: 'apple',
+    ipAddress: '192.168.1.105',
+    networkType: 'VoNR 5G',
+    signalStrength: '-58 dBm (Forte)',
+    virtualNumber: '+244 955 777 222',
+    carrier: 'Africell Angola',
     permissionScore: 98,
     syncDelayMs: 6,
     lastSync: Date.now() - 5000,
     notificationListenerStatus: 'active',
-    capabilities: { sms: false, calls: true, biometrics: true, accessibility: false }
+    capabilities: { sms: true, calls: true, biometrics: true, accessibility: false, camera: true, microphone: true }
   },
   {
-    deviceId: 'dev-ipad-air-tablet',
-    nodeId: 'node-ipad-tablet-03',
-    name: 'iPad Air 5th Gen (Tablet)',
-    model: 'iPad13,16 (iPadOS 17.4)',
-    platform: 'tablet',
-    osVersion: 'iPadOS 17.4',
-    pairedAt: '2026-02-01T09:00:00.000Z',
-    online: true,
-    batteryLevel: 92,
-    batteryOptimizationStatus: 'unrestricted',
-    oemProfile: 'apple',
-    permissionScore: 96,
-    syncDelayMs: 8,
-    lastSync: Date.now() - 12000,
-    notificationListenerStatus: 'active',
-    capabilities: { sms: false, calls: false, biometrics: true, accessibility: true }
-  },
-  {
-    deviceId: 'dev-web-pwa-chrome',
-    nodeId: 'node-web-workstation-04',
-    name: 'PortalTRMobile PWA Web Client',
-    model: 'Chrome 127 (PWA / WebSockets)',
-    platform: 'web',
-    osVersion: 'Web / PWA 1.0',
-    pairedAt: '2026-02-10T11:45:00.000Z',
+    deviceId: 'dev-windows-11-pro',
+    nodeId: 'node-win-workstation-03',
+    name: 'Dell XPS Workstation Windows',
+    model: 'Dell XPS 15 9530',
+    manufacturer: 'Dell Inc.',
+    platform: 'windows',
+    osVersion: 'Windows 11 Pro 23H2',
+    pairedAt: '2026-01-22T08:00:00.000Z',
     online: true,
     batteryLevel: 100,
-    batteryOptimizationStatus: 'unrestricted',
-    oemProfile: 'generic',
+    ipAddress: '10.0.0.45',
+    networkType: 'Ethernet Gigabit',
+    signalStrength: '100% (Cabo Directo)',
+    virtualNumber: '+244 912 666 333',
+    carrier: 'Movicel Angola',
     permissionScore: 100,
     syncDelayMs: 2,
-    lastSync: Date.now() - 1000,
+    lastSync: Date.now() - 1500,
     notificationListenerStatus: 'active',
-    capabilities: { sms: false, calls: false, biometrics: true, accessibility: false }
+    capabilities: { sms: true, calls: true, biometrics: true, accessibility: true, camera: true, microphone: true }
   },
   {
-    deviceId: 'dev-desktop-macos-m2',
-    nodeId: 'node-desktop-macbook-05',
-    name: 'MacBook Pro M2 Desktop Workstation',
-    model: 'macOS Sonoma 14.5 (Electron Native)',
-    platform: 'macos',
-    osVersion: 'macOS 14.5',
-    pairedAt: '2026-02-12T16:20:00.000Z',
+    deviceId: 'dev-linux-ubuntu-server',
+    nodeId: 'node-linux-core-04',
+    name: 'Ubuntu Enterprise Core Node',
+    model: 'ThinkPad P1 Gen 6',
+    manufacturer: 'Lenovo',
+    platform: 'linux',
+    osVersion: 'Ubuntu 24.04 LTS',
+    pairedAt: '2026-01-25T12:00:00.000Z',
     online: true,
-    batteryLevel: 99,
-    batteryOptimizationStatus: 'unrestricted',
-    oemProfile: 'apple',
+    batteryLevel: 95,
+    ipAddress: '10.0.0.88',
+    networkType: 'WiFi 6E 6GHz',
+    signalStrength: '-51 dBm (Excelente)',
+    virtualNumber: 'sip:agent01@sip.portal.co.ao',
+    carrier: 'SIP Gateway Direct',
     permissionScore: 100,
     syncDelayMs: 3,
     lastSync: Date.now() - 2000,
     notificationListenerStatus: 'active',
-    capabilities: { sms: true, calls: true, biometrics: true, accessibility: true }
+    capabilities: { sms: true, calls: true, biometrics: false, accessibility: true, camera: true, microphone: true }
+  },
+  {
+    deviceId: 'dev-desktop-macos-m2',
+    nodeId: 'node-desktop-macbook-05',
+    name: 'MacBook Pro M2 Desktop',
+    model: 'Mac14,9',
+    manufacturer: 'Apple',
+    platform: 'macos',
+    osVersion: 'macOS Sonoma 14.5',
+    pairedAt: '2026-02-12T16:20:00.000Z',
+    online: true,
+    batteryLevel: 99,
+    ipAddress: '192.168.1.110',
+    networkType: 'WiFi 6 5GHz',
+    signalStrength: '-60 dBm',
+    virtualNumber: '+244 222 000 999',
+    carrier: 'IMS Core Gateway',
+    permissionScore: 100,
+    syncDelayMs: 3,
+    lastSync: Date.now() - 2000,
+    notificationListenerStatus: 'active',
+    capabilities: { sms: true, calls: true, biometrics: true, accessibility: true, camera: true, microphone: true }
+  },
+  {
+    deviceId: 'dev-ipad-air-tablet',
+    nodeId: 'node-ipad-tablet-06',
+    name: 'iPad Pro 12.9 (iPadOS)',
+    model: 'iPad13,16',
+    manufacturer: 'Apple',
+    platform: 'ipad',
+    osVersion: 'iPadOS 17.4',
+    pairedAt: '2026-02-01T09:00:00.000Z',
+    online: true,
+    batteryLevel: 92,
+    ipAddress: '192.168.1.120',
+    networkType: 'WiFi 6 5GHz',
+    signalStrength: '-65 dBm',
+    virtualNumber: '+244 990 123 456',
+    carrier: 'eSIM Profile',
+    permissionScore: 96,
+    syncDelayMs: 8,
+    lastSync: Date.now() - 12000,
+    notificationListenerStatus: 'active',
+    capabilities: { sms: false, calls: true, biometrics: true, accessibility: true, camera: true, microphone: true }
+  },
+  {
+    deviceId: 'dev-android-tablet-s9',
+    nodeId: 'node-android-tab-07',
+    name: 'Samsung Galaxy Tab S9 (Tablet)',
+    model: 'SM-X710',
+    manufacturer: 'Samsung',
+    platform: 'tablet',
+    osVersion: 'Android 14 / One UI 6.1',
+    pairedAt: '2026-02-05T15:10:00.000Z',
+    online: true,
+    batteryLevel: 81,
+    ipAddress: '192.168.1.135',
+    networkType: 'WiFi 6E',
+    signalStrength: '-64 dBm',
+    virtualNumber: '+244 923 888 111',
+    carrier: 'Unitel Angola',
+    permissionScore: 95,
+    syncDelayMs: 7,
+    lastSync: Date.now() - 8000,
+    notificationListenerStatus: 'active',
+    capabilities: { sms: true, calls: true, biometrics: true, accessibility: true, camera: true, microphone: true }
+  },
+  {
+    deviceId: 'dev-web-pwa-chrome',
+    nodeId: 'node-web-workstation-08',
+    name: 'PortalTRMobile Navegador PWA',
+    model: 'Chrome 127 WebSockets',
+    manufacturer: 'Google',
+    platform: 'web',
+    osVersion: 'Navegador Web / PWA',
+    pairedAt: '2026-02-10T11:45:00.000Z',
+    online: true,
+    batteryLevel: 100,
+    ipAddress: '192.168.1.200',
+    networkType: 'WebRTC / WSS',
+    signalStrength: '100% (Realtime)',
+    virtualNumber: '+244 955 777 222',
+    carrier: 'Africell Angola',
+    permissionScore: 100,
+    syncDelayMs: 2,
+    lastSync: Date.now() - 1000,
+    notificationListenerStatus: 'active',
+    capabilities: { sms: true, calls: true, biometrics: true, accessibility: false, camera: true, microphone: true }
+  },
+  {
+    deviceId: 'dev-smart-tv-lg-webos',
+    nodeId: 'node-tv-smart-09',
+    name: 'LG OLED Smart TV (Preparação Futura)',
+    model: 'OLED65C3PSA',
+    manufacturer: 'LG Electronics',
+    platform: 'smarttv',
+    osVersion: 'webOS 23',
+    pairedAt: '2026-02-12T10:00:00.000Z',
+    online: true,
+    batteryLevel: 100,
+    ipAddress: '192.168.1.250',
+    networkType: 'Ethernet RJ45',
+    signalStrength: '100% (Directo)',
+    virtualNumber: '+244 222 000 999',
+    carrier: 'IMS Core Gateway',
+    permissionScore: 90,
+    syncDelayMs: 12,
+    lastSync: Date.now() - 15000,
+    notificationListenerStatus: 'active',
+    capabilities: { sms: false, calls: true, biometrics: false, accessibility: true, camera: false, microphone: true }
   }
 ];
 
@@ -411,77 +520,38 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
         {/* Platform Sub-Tabs */}
         <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none">
-          <button
-            onClick={() => setPlatformFilter('todos')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-              platformFilter === 'todos'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
-                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>Todos ({activeFleet.length})</span>
-          </button>
-
-          <button
-            onClick={() => setPlatformFilter('android')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-              platformFilter === 'android'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20 font-black'
-                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Android ({activeFleet.filter(d => getDeviceCategory(d) === 'android').length})</span>
-          </button>
-
-          <button
-            onClick={() => setPlatformFilter('iphone')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-              platformFilter === 'iphone'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
-                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Apple className="w-3.5 h-3.5 text-indigo-400" />
-            <span>iPhone / iOS ({activeFleet.filter(d => getDeviceCategory(d) === 'iphone').length})</span>
-          </button>
-
-          <button
-            onClick={() => setPlatformFilter('web')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-              platformFilter === 'web'
-                ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20 font-black'
-                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5 text-teal-400" />
-            <span>Web Client ({activeFleet.filter(d => getDeviceCategory(d) === 'web').length})</span>
-          </button>
-
-          <button
-            onClick={() => setPlatformFilter('desktop')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-              platformFilter === 'desktop'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20 font-black'
-                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Laptop className="w-3.5 h-3.5 text-purple-400" />
-            <span>Desktop ({activeFleet.filter(d => getDeviceCategory(d) === 'desktop').length})</span>
-          </button>
-
-          <button
-            onClick={() => setPlatformFilter('tablet')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-              platformFilter === 'tablet'
-                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/20 font-black'
-                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-          >
-            <Tablet className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Tablet ({activeFleet.filter(d => getDeviceCategory(d) === 'tablet').length})</span>
-          </button>
+          {[
+            { id: 'todos', label: 'Todos', icon: Globe },
+            { id: 'android', label: 'Android', icon: Smartphone },
+            { id: 'iphone', label: 'iPhone', icon: Apple },
+            { id: 'windows', label: 'Windows', icon: Laptop },
+            { id: 'linux', label: 'Linux', icon: Laptop },
+            { id: 'macos', label: 'macOS', icon: Apple },
+            { id: 'tablet', label: 'Tablet', icon: Tablet },
+            { id: 'ipad', label: 'iPad', icon: Tablet },
+            { id: 'web', label: 'Navegador', icon: Globe },
+            { id: 'smarttv', label: 'Smart TV (Futuro)', icon: Tv }
+          ].map((tab) => {
+            const count = tab.id === 'todos' 
+              ? activeFleet.length 
+              : activeFleet.filter(d => (d.platform || getDeviceCategory(d)) === tab.id).length;
+            const IconComp = tab.icon || Globe;
+            const isActive = platformFilter === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setPlatformFilter(tab.id as any)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
+                    : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                <IconComp className="w-3.5 h-3.5" />
+                <span>{tab.label} ({count})</span>
+              </button>
+            );
+          })}
         </div>
 
       </div>
@@ -492,15 +562,15 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           <table className="w-full text-left font-mono border-collapse text-xs">
             <thead>
               <tr className="bg-slate-900/90 border-b border-slate-800 text-[11px] font-black uppercase text-slate-400 tracking-wider">
-                <th className="py-2.5 px-3 border-r border-slate-800/60 w-10 text-center">#</th>
-                <th className="py-2.5 px-3 border-r border-slate-800/60">ESTADO</th>
-                <th className="py-2.5 px-3 border-r border-slate-800/60">DISPOSITIVO & NÓ</th>
-                <th className="py-2.5 px-3 border-r border-slate-800/60">MODELO / OS</th>
-                <th className="py-2.5 px-3 border-r border-slate-800/60">BATERIA</th>
-                <th className="py-2.5 px-3 border-r border-slate-800/60">SINCRONIA</th>
-                <th className="py-2.5 px-3 border-r border-slate-800/60">CAPACIDADES</th>
-                <th className="py-2.5 px-3 border-r border-slate-800/60">SAÚDE</th>
-                <th className="py-2.5 px-3 text-center">AÇÕES</th>
+                <th className="py-2.5 px-2.5 border-r border-slate-800/60 w-8 text-center">#</th>
+                <th className="py-2.5 px-2.5 border-r border-slate-800/60">ESTADO</th>
+                <th className="py-2.5 px-2.5 border-r border-slate-800/60">DISPOSITIVO & FABRICANTE</th>
+                <th className="py-2.5 px-2.5 border-r border-slate-800/60">PLATAFORMA / MODELO</th>
+                <th className="py-2.5 px-2.5 border-r border-slate-800/60">OPERADORA & NÚMERO VIRTUAL</th>
+                <th className="py-2.5 px-2.5 border-r border-slate-800/60 text-center">PRIORIDADE</th>
+                <th className="py-2.5 px-2.5 border-r border-slate-800/60">BATERIA</th>
+                <th className="py-2.5 px-2.5 border-r border-slate-800/60">SAÚDE</th>
+                <th className="py-2.5 px-2.5 text-center">AÇÕES</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -511,17 +581,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                   const notificationStatus = device.notificationListenerStatus || 'active';
                   const platform = getDeviceCategory(device);
 
-                  // Detailed Tooltip Text Construction for title attributes and popovers
+                  // Detailed Tooltip Text Construction
                   const nodeText = device.nodeId || `node-${device.deviceId.substring(0, 8)}`;
                   const pairedDateStr = device.pairedAt ? new Date(device.pairedAt).toLocaleString('pt-BR') : 'Desconhecido';
                   const lastSyncStr = typeof device.lastSync === 'number' ? new Date(device.lastSync).toLocaleTimeString('pt-BR') : (device.lastSync || 'Agora');
                   
-                  const capSms = device.capabilities?.sms !== false ? '✓ Ativo' : '✕ Inativo';
-                  const capCalls = device.capabilities?.calls !== false ? '✓ Ativo' : '✕ Inativo';
-                  const capBio = device.capabilities?.biometrics !== false ? '✓ Ativo' : '✕ Inativo';
-                  const capAccess = device.capabilities?.accessibility ? '✓ Ativo' : '✕ Inativo';
+                  const capGps = device.capabilities?.gps !== false ? '✓ Active' : '✕ Off';
+                  const capNfc = device.capabilities?.nfc !== false ? '✓ Active' : '✕ Off';
+                  const capBt = device.capabilities?.bluetooth !== false ? '✓ Active' : '✕ Off';
 
-                  const fullTooltipText = `Dispositivo: ${device.name}\nNó ID: ${nodeText}\nPlataforma: ${platform.toUpperCase()} (${device.osVersion || 'N/A'})\nModelo: ${device.model}\nEmparelhado em: ${pairedDateStr}\nBateria: ${device.batteryLevel ?? 98}% (${device.batteryOptimizationStatus || 'Otimizado'})\nSincronia Latência: ${device.syncDelayMs ?? 5}ms\nÚltimo Sync: ${lastSyncStr}\nCapacidades: SMS: ${capSms} | Calls: ${capCalls} | Biometria: ${capBio} | Acessibilidade: ${capAccess}\nScore de Saúde: ${healthScore}%`;
+                  const fullTooltipText = `Dispositivo: ${device.name}\nFabricante: ${device.manufacturer || 'N/A'}\nNó ID: ${nodeText}\nPlataforma: ${platform.toUpperCase()} (${device.osVersion || 'N/A'})\nModelo: ${device.model}\nOperadora: ${device.carrier || 'N/A'} | Número: ${device.virtualNumber || 'N/A'}\nGPS: ${capGps} | NFC: ${capNfc} | Bluetooth: ${capBt}\nPrioridade Mesh: ${device.isPrimaryDevice ? 'PRINCIPAL' : 'SECUNDÁRIO'}\nBateria: ${device.batteryLevel ?? 98}% (${device.batteryOptimizationStatus || 'Otimizado'})\nSincronia Latência: ${device.syncDelayMs ?? 5}ms\nScore Saúde: ${healthScore}%`;
 
                   return (
                     <tr
@@ -532,27 +601,27 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                       title={fullTooltipText}
                     >
                       {/* Row Index */}
-                      <td className="py-2 px-3 border-r border-slate-800/60 text-center text-slate-500 font-bold text-[11px]">
+                      <td className="py-2 px-2.5 border-r border-slate-800/60 text-center text-slate-500 font-bold text-[11px]">
                         {idx + 1}
                       </td>
 
                       {/* Online Status */}
-                      <td className="py-2 px-3 border-r border-slate-800/60">
+                      <td className="py-2 px-2.5 border-r border-slate-800/60 whitespace-nowrap">
                         {device.online ? (
-                          <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] shadow-sm">
+                          <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[9px] shadow-sm">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                             <span>ONLINE</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 font-bold text-[10px]">
+                          <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 font-bold text-[9px]">
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                             <span>OFFLINE</span>
                           </span>
                         )}
                       </td>
 
-                      {/* Name & Node ID */}
-                      <td className="py-2 px-3 border-r border-slate-800/60">
+                      {/* Dispositivo & Fabricante */}
+                      <td className="py-2 px-2.5 border-r border-slate-800/60">
                         <div className="flex items-center space-x-2">
                           <div className="p-1 rounded-md bg-slate-900 border border-slate-800 text-indigo-400 shrink-0">
                             {renderPlatformIcon(platform)}
@@ -562,96 +631,98 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                               {device.name}
                             </span>
                             <span className="text-[10px] text-slate-500 font-mono block truncate">
-                              {nodeText}
+                              {device.manufacturer || 'Fabricante N/A'} • {nodeText}
                             </span>
                           </div>
                         </div>
                       </td>
 
-                      {/* Model & OS */}
-                      <td className="py-2 px-3 border-r border-slate-800/60 text-slate-300">
+                      {/* Plataforma / Modelo */}
+                      <td className="py-2 px-2.5 border-r border-slate-800/60 text-slate-300">
                         <span className="font-semibold text-xs block truncate">{device.model}</span>
-                        <span className="text-[10px] text-slate-500 block truncate">{device.osVersion || 'OS 1.0'}</span>
+                        <span className="text-[10px] text-indigo-400 font-bold uppercase block truncate">{platform} • {device.osVersion || 'OS 1.0'}</span>
                       </td>
 
-                      {/* Battery */}
-                      <td className="py-2 px-3 border-r border-slate-800/60">
-                        <div className="inline-flex items-center space-x-1 px-2 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-md font-bold text-[11px]" title={`Otimização: ${device.batteryOptimizationStatus || 'Padrão'}`}>
+                      {/* Operadora & Número Virtual */}
+                      <td className="py-2 px-2.5 border-r border-slate-800/60">
+                        <span className="font-bold text-emerald-400 text-[11px] block truncate font-mono">
+                          {device.virtualNumber || '+244 923 000 000'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          {device.carrier || 'Unitel Angola'}
+                        </span>
+                      </td>
+
+                      {/* Prioridade do Dispositivo Principal */}
+                      <td className="py-2 px-2.5 border-r border-slate-800/60 text-center">
+                        <button
+                          onClick={() => {
+                            setInternalDevices(prev => prev.map(d => d.deviceId === device.deviceId ? { ...d, isPrimaryDevice: !d.isPrimaryDevice } : d));
+                          }}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase cursor-pointer border transition-all ${
+                            device.isPrimaryDevice || idx === 0
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+                              : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300'
+                          }`}
+                          title="Alternar prioridade de dispositivo principal"
+                        >
+                          {device.isPrimaryDevice || idx === 0 ? '★ PRINCIPAL' : 'SECUNDÁRIO'}
+                        </button>
+                      </td>
+
+                      {/* Bateria */}
+                      <td className="py-2 px-2.5 border-r border-slate-800/60">
+                        <div className="inline-flex items-center space-x-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-md font-bold text-[10px]" title={`Otimização: ${device.batteryOptimizationStatus || 'Padrão'}`}>
                           <Battery className="w-3 h-3 text-amber-400 shrink-0" />
                           <span>{device.batteryLevel ?? 98}%</span>
                         </div>
                       </td>
 
-                      {/* Latency & Last Sync */}
-                      <td className="py-2 px-3 border-r border-slate-800/60">
-                        <div className="flex flex-col">
-                          <span className="text-indigo-400 font-bold text-xs flex items-center space-x-1">
-                            <Zap className="w-3 h-3 text-indigo-400 inline" />
-                            <span>{device.syncDelayMs ?? 5}ms</span>
-                          </span>
-                          <span className="text-[10px] text-slate-500">
-                            {lastSyncStr}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Capabilities Compact Icons */}
-                      <td className="py-2 px-3 border-r border-slate-800/60">
-                        <div className="flex items-center space-x-1" title={`SMS: ${capSms} | Calls: ${capCalls} | Biometria: ${capBio} | Acessibilidade: ${capAccess}`}>
-                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${device.capabilities?.sms !== false ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-slate-900 text-slate-600 border-slate-800'}`}>
-                            SMS
-                          </span>
-                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${device.capabilities?.calls !== false ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' : 'bg-slate-900 text-slate-600 border-slate-800'}`}>
-                            CALL
-                          </span>
-                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${device.capabilities?.biometrics !== false ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' : 'bg-slate-900 text-slate-600 border-slate-800'}`}>
-                            BIO
-                          </span>
-                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${device.capabilities?.accessibility ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' : 'bg-slate-900 text-slate-600 border-slate-800'}`}>
-                            ACC
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Health Score */}
-                      <td className="py-2 px-3 border-r border-slate-800/60">
-                        <div className="flex items-center space-x-1.5">
-                          <div className="w-12 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                      {/* Saúde Score */}
+                      <td className="py-2 px-2.5 border-r border-slate-800/60">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-8 bg-slate-800 rounded-full h-1.5 overflow-hidden">
                             <div 
                               className={`h-full rounded-full ${healthScore >= 95 ? 'bg-emerald-400' : healthScore >= 80 ? 'bg-amber-400' : 'bg-rose-400'}`}
                               style={{ width: `${healthScore}%` }}
                             />
                           </div>
-                          <span className="text-[11px] font-bold text-slate-200">{healthScore}%</span>
+                          <span className="text-[10px] font-bold text-slate-200">{healthScore}%</span>
                         </div>
                       </td>
 
-                      {/* Actions */}
-                      <td className="py-2 px-3 text-center">
+                      {/* Ações */}
+                      <td className="py-2 px-2.5 text-center">
                         <div className="flex items-center justify-center space-x-1">
                           {/* Tooltip Info Popover Trigger */}
                           <div className="relative group/popover">
                             <button
                               type="button"
                               className="p-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-indigo-300 border border-slate-800 transition-colors cursor-pointer"
-                              title="Ver Detalhes do Nó"
+                              title="Ver Detalhes Técnicos do Nó"
                             >
                               <Info className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Floating Custom Tooltip Popover */}
-                            <div className="absolute right-0 bottom-full mb-2 hidden group-hover/popover:block z-50 w-64 p-3 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl text-[11px] text-slate-200 font-mono space-y-1.5 pointer-events-none animate-in fade-in duration-150">
+                            {/* Floating Custom Tooltip Popover (Painel Expandido de Telemetria) */}
+                            <div className="absolute right-0 bottom-full mb-2 hidden group-hover/popover:block z-50 w-80 p-3.5 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl text-[11px] text-slate-200 font-mono space-y-2 pointer-events-none animate-in fade-in duration-150">
                               <div className="font-bold text-indigo-400 border-b border-slate-800 pb-1 flex items-center justify-between">
-                                <span>{device.name}</span>
+                                <span>PAINEL EXPANDIDO DE TELEMETRIA</span>
                                 <span className="text-[9px] text-slate-400">{platform.toUpperCase()}</span>
                               </div>
-                              <div className="space-y-0.5 text-[10px] text-slate-300">
-                                <p><strong className="text-slate-400">Nó ID:</strong> {nodeText}</p>
+                              <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-300">
+                                <p><strong className="text-slate-400">Nó / ID:</strong> {device.name}</p>
                                 <p><strong className="text-slate-400">Modelo:</strong> {device.model}</p>
-                                <p><strong className="text-slate-400">Emparelhado:</strong> {pairedDateStr}</p>
-                                <p><strong className="text-slate-400">Bateria:</strong> {device.batteryLevel}% ({device.batteryOptimizationStatus || 'Normal'})</p>
-                                <p><strong className="text-slate-400">Notificações:</strong> {notificationStatus === 'active' ? '✓ Listener Ativo' : '⚠️ Requer Atenção'}</p>
-                                <p><strong className="text-slate-400">Capabilities:</strong> SMS ({capSms}), Chamadas ({capCalls}), Biometria ({capBio}), Acessibilidade ({capAccess})</p>
+                                <p><strong className="text-slate-400">CPU:</strong> Octa-Core (2.8 GHz)</p>
+                                <p><strong className="text-slate-400">RAM:</strong> 8 GB LPDDR5</p>
+                                <p><strong className="text-slate-400">Armazenamento:</strong> 256 GB (180 GB livre)</p>
+                                <p><strong className="text-slate-400">Rede:</strong> 5G / Wi-Fi 6E (12ms)</p>
+                                <p><strong className="text-slate-400">GPS / Pos.:</strong> {capGps}</p>
+                                <p><strong className="text-slate-400">NFC / BLE:</strong> {capNfc} / {capBt}</p>
+                                <p><strong className="text-slate-400">Câmara / Mic:</strong> Autorizado / Ativo</p>
+                                <p><strong className="text-slate-400">Sensores:</strong> Acel., Giro, Biorritmo</p>
+                                <p><strong className="text-slate-400">Operadora:</strong> {device.carrier || 'Unitel/Africell'}</p>
+                                <p><strong className="text-slate-400">Telemetria:</strong> Sincronizado (&lt;12ms)</p>
                               </div>
                             </div>
                           </div>

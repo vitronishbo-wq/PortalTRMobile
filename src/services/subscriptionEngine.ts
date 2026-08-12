@@ -245,7 +245,8 @@ export class SubscriptionEngine {
    * Evaluates dynamic status and days remaining for any user
    */
   static getSubscription(userId: string, email: string = 'utilizador@portal.ao', displayName: string = 'Utilizador PortalTR'): SubscriptionRecord {
-    const trialLic = TrialEngine.getLicense(userId, email);
+    const safeUserId = userId || (email && email !== 'utilizador@portal.ao' ? email.replace(/[^a-zA-Z0-9]/g, '_') : `usr-${Math.random().toString(36).substring(2, 8)}`);
+    const trialLic = TrialEngine.getLicense(safeUserId, email);
     const now = Date.now();
 
     const isFounder = email.toLowerCase().includes('deusfundador') || email.toLowerCase().includes('silajaneiro9') || trialLic.plan === 'founder';
@@ -263,8 +264,8 @@ export class SubscriptionEngine {
     const matchedPlan = SubscriptionEngine.PLANS.find((p) => p.code === trialLic.plan) || SubscriptionEngine.PLANS[0];
 
     const record: SubscriptionRecord = {
-      id: `sub-${userId}`,
-      userId,
+      id: `sub-${safeUserId}`,
+      userId: safeUserId,
       userEmail: email,
       userName: displayName,
       planId: matchedPlan.id,

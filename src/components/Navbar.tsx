@@ -125,6 +125,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       color: 'text-purple-400',
       items: [
         { id: 'dispositivos', label: 'Devices / Dispositivos', icon: Smartphone, color: 'text-purple-400' },
+        { id: 'banking', label: 'Banking Hub & Carteiras', icon: CreditCard, color: 'text-emerald-400' },
+        { id: 'app_center', label: 'App Center & Aplicações', icon: Grid, color: 'text-cyan-400' },
         { id: 'favoritos', label: 'Favorites / Favoritos', icon: Sparkles, color: 'text-amber-400' },
         { id: 'pesquisa', label: 'Search / Pesquisa Universal', icon: Search, color: 'text-cyan-400' },
         { id: 'definicoes', label: 'Settings / Configurações', icon: Settings, color: 'text-rose-400' },

@@ -1,7 +1,8 @@
 import { db } from '../firebase/firebase';
 import { collection, doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { TelecomRegistry, TelecomProvider } from '../telecom/TelecomProvider';
 
-export type TelecomProviderType = 'unitel' | 'africell' | 'movicel' | 'sip_ims' | 'twilio' | 'local_agent';
+export type TelecomProviderType = 'unitel' | 'africell' | 'movicel' | 'sip' | 'ims' | 'thirdparty';
 
 export interface VirtualPhoneVoiceState {
   activeCallId?: string;
@@ -13,6 +14,7 @@ export interface VirtualPhoneVoiceState {
   isRecording: boolean;
   audioInputDevice: string;
   audioOutputDevice: string;
+  mediaStreamActive?: boolean;
 }
 
 export interface VirtualPhoneContact {
@@ -287,9 +289,17 @@ class VirtualPhoneEngine {
     this.notify();
   }
 
+  private activeAudioStream: MediaStream | null = null;
+
   // --- 2. TELECOM & NUMBER LAYER ---
   public setProvider(provider: TelecomProviderType) {
-    this.state = { ...this.state, provider, providerModalOpen: false };
+    const providerInstance = TelecomRegistry.getProvider(provider);
+    this.state = {
+      ...this.state,
+      provider,
+      msisdn: providerInstance.activeMsisdn,
+      providerModalOpen: false
+    };
     this.notify();
   }
 
@@ -304,8 +314,20 @@ class VirtualPhoneEngine {
   }
 
   // --- 3. CLOUD PHONE VOIP CALL ENGINE ---
-  public startCall(peerNumber: string) {
+  public async startCall(peerNumber: string) {
     if (!peerNumber) return;
+
+    // Acquire real audio media stream (Microphone) if available
+    try {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        this.activeAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+    } catch (e) {
+      console.warn('[VirtualPhoneEngine] Microfone real indisponível ou permissão negada, usando canal sintetizado de voz:', e);
+    }
+
+    const providerObj = TelecomRegistry.getProvider(this.state.provider);
+
     this.state = {
       ...this.state,
       voice: {
@@ -315,7 +337,8 @@ class VirtualPhoneEngine {
         durationSeconds: 0,
         isMuted: false,
         isHeld: false,
-        isRecording: false
+        isRecording: false,
+        mediaStreamActive: !!this.activeAudioStream
       }
     };
     this.notify();
@@ -347,6 +370,11 @@ class VirtualPhoneEngine {
   }
 
   public endCall() {
+    if (this.activeAudioStream) {
+      this.activeAudioStream.getTracks().forEach((track) => track.stop());
+      this.activeAudioStream = null;
+    }
+
     const voice = this.state.voice;
     if (voice.remoteNumber && voice.state !== 'idle') {
       const newLog: VirtualPhoneCallLog = {
@@ -367,7 +395,8 @@ class VirtualPhoneEngine {
           durationSeconds: 0,
           isMuted: false,
           isHeld: false,
-          isRecording: false
+          isRecording: false,
+          mediaStreamActive: false
         }
       };
     } else {
@@ -377,7 +406,8 @@ class VirtualPhoneEngine {
           ...this.state.voice,
           state: 'idle',
           remoteNumber: undefined,
-          durationSeconds: 0
+          durationSeconds: 0,
+          mediaStreamActive: false
         }
       };
     }
