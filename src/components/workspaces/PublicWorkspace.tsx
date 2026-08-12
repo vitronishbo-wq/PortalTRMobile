@@ -42,6 +42,8 @@ import {
   UserCheck,
   AlertTriangle
 } from 'lucide-react';
+import { db } from '../../firebase/firebase';
+import { collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { useIdentity } from '../../engine/identityEngine';
 import { useOnlineStatus } from '../../lib/offlineCache';
 import { TrialEngine } from '../../services/trialEngine';
@@ -175,6 +177,7 @@ export type PublicTabType =
   | 'notificacoes'
   | 'contactos'
   | 'dispositivos'
+  | 'utilizadores'
   | 'atividade'
   | 'favoritos'
   | 'pesquisa'
@@ -186,6 +189,15 @@ export type PublicTabType =
   | 'sessoes'
   | 'aparencia'
   | 'definicoes';
+
+export interface UserIdentity {
+  id: string;
+  name: string;
+  email: string;
+  role: 'founder' | 'admin' | 'user';
+  status: 'Active' | 'Suspended';
+  lastAuthTimestamp: number;
+}
 
 export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
   onOpenAuthModal,
@@ -334,6 +346,144 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
     { id: 'c-4', name: 'Suporte Técnico', phone: '+244 923 888 999', category: 'Serviço' }
   ]);
 
+  // User Identities RBAC State
+  const [userIdentities, setUserIdentities] = useState<UserIdentity[]>([
+    {
+      id: 'usr-root-001',
+      name: 'Deus Fundador',
+      email: 'silajaneiro9@gmail.com',
+      role: 'founder',
+      status: 'Active',
+      lastAuthTimestamp: Date.now() - 2 * 60 * 1000
+    },
+    {
+      id: 'usr-admin-002',
+      name: 'Carlos Santos',
+      email: 'carlos.santos@portal.co.ao',
+      role: 'admin',
+      status: 'Active',
+      lastAuthTimestamp: Date.now() - 45 * 60 * 1000
+    },
+    {
+      id: 'usr-client-003',
+      name: 'Maria Silva',
+      email: 'maria.silva@unitel.co.ao',
+      role: 'user',
+      status: 'Active',
+      lastAuthTimestamp: Date.now() - 3 * 3600 * 1000
+    },
+    {
+      id: 'usr-client-004',
+      name: 'Lucas Pereira',
+      email: 'lucas.dev@africell.co.ao',
+      role: 'user',
+      status: 'Suspended',
+      lastAuthTimestamp: Date.now() - 24 * 3600 * 1000
+    },
+    {
+      id: 'usr-client-005',
+      name: 'Ana Beatriz',
+      email: 'ana.beatriz@bai.co.ao',
+      role: 'user',
+      status: 'Active',
+      lastAuthTimestamp: Date.now() - 12 * 60 * 1000
+    }
+  ]);
+
+  const [roleModalUser, setRoleModalUser] = useState<UserIdentity | null>(null);
+  const [selectedRoleInput, setSelectedRoleInput] = useState<'founder' | 'admin' | 'user'>('user');
+  const [identitySearchQuery, setIdentitySearchQuery] = useState<string>('');
+
+  // Fetch real-time user identities from Firestore 'users' collection
+  useEffect(() => {
+    if (!db) return;
+    try {
+      const usersRef = collection(db, 'users');
+      const unsubscribe = onSnapshot(
+        usersRef,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const fetchedUsers: UserIdentity[] = snapshot.docs.map((docSnap) => {
+              const data = docSnap.data();
+              return {
+                id: docSnap.id,
+                name: data.displayName || data.name || data.email?.split('@')[0] || docSnap.id,
+                email: data.email || `${docSnap.id}@portal.co.ao`,
+                role: (data.role as 'founder' | 'admin' | 'user') || 'user',
+                status: (data.status as 'Active' | 'Suspended') || 'Active',
+                lastAuthTimestamp: data.lastAuthTimestamp || data.lastLogin || data.updatedAt || Date.now()
+              };
+            });
+            setUserIdentities(fetchedUsers);
+          } else {
+            // Seed initial records to Firestore 'users' collection
+            const initialSeeds: UserIdentity[] = [
+              { id: 'usr-root-001', name: 'Deus Fundador', email: 'silajaneiro9@gmail.com', role: 'founder', status: 'Active', lastAuthTimestamp: Date.now() - 2 * 60 * 1000 },
+              { id: 'usr-admin-002', name: 'Carlos Santos', email: 'carlos.santos@portal.co.ao', role: 'admin', status: 'Active', lastAuthTimestamp: Date.now() - 45 * 60 * 1000 },
+              { id: 'usr-client-003', name: 'Maria Silva', email: 'maria.silva@unitel.co.ao', role: 'user', status: 'Active', lastAuthTimestamp: Date.now() - 3 * 3600 * 1000 },
+              { id: 'usr-client-004', name: 'Lucas Pereira', email: 'lucas.dev@africell.co.ao', role: 'user', status: 'Suspended', lastAuthTimestamp: Date.now() - 24 * 3600 * 1000 },
+              { id: 'usr-client-005', name: 'Ana Beatriz', email: 'ana.beatriz@bai.co.ao', role: 'user', status: 'Active', lastAuthTimestamp: Date.now() - 12 * 60 * 1000 }
+            ];
+            initialSeeds.forEach((u) => {
+              setDoc(doc(db, 'users', u.id), {
+                displayName: u.name,
+                email: u.email,
+                role: u.role,
+                status: u.status,
+                lastAuthTimestamp: u.lastAuthTimestamp
+              }, { merge: true }).catch(() => {});
+            });
+          }
+        },
+        (error) => {
+          console.warn('[Firestore] Users subscription:', error);
+        }
+      );
+      return () => unsubscribe();
+    } catch (e) {
+      console.error('[Firestore] Users collection error:', e);
+    }
+  }, []);
+
+  const handleToggleStatus = async (usr: UserIdentity) => {
+    const newStatus: 'Active' | 'Suspended' = usr.status === 'Active' ? 'Suspended' : 'Active';
+    setUserIdentities((prev) => prev.map((u) => (u.id === usr.id ? { ...u, status: newStatus } : u)));
+    if (db) {
+      try {
+        await updateDoc(doc(db, 'users', usr.id), { status: newStatus });
+      } catch (err) {
+        await setDoc(doc(db, 'users', usr.id), {
+          displayName: usr.name,
+          email: usr.email,
+          role: usr.role,
+          status: newStatus,
+          lastAuthTimestamp: usr.lastAuthTimestamp
+        }, { merge: true }).catch(() => {});
+      }
+    }
+  };
+
+  const handleConfirmRoleAssignment = async () => {
+    if (!roleModalUser) return;
+    const targetId = roleModalUser.id;
+    const newRole = selectedRoleInput;
+    setUserIdentities((prev) => prev.map((u) => (u.id === targetId ? { ...u, role: newRole } : u)));
+    if (db) {
+      try {
+        await updateDoc(doc(db, 'users', targetId), { role: newRole });
+      } catch (err) {
+        await setDoc(doc(db, 'users', targetId), {
+          displayName: roleModalUser.name,
+          email: roleModalUser.email,
+          role: newRole,
+          status: roleModalUser.status,
+          lastAuthTimestamp: roleModalUser.lastAuthTimestamp
+        }, { merge: true }).catch(() => {});
+      }
+    }
+    setRoleModalUser(null);
+  };
+
   const primaryDevice = activeDevices[0] || defaultDevicesList[0];
 
   const displayEmail = userProfile?.email || authUser?.email || 'utilizador@portal.co.ao';
@@ -342,13 +492,14 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
 
   const navCategories = [
     {
-      group: 'Public Portal (8 Domínios)',
+      group: 'Public Portal (9 Domínios)',
       items: [
         { id: 'inicio', label: 'Home', icon: Home },
         { id: 'chamadas', label: 'Phone', icon: PhoneCall, badge: calls.length },
         { id: 'mensagens', label: 'Messages', icon: MessageSquare, badge: messages.length },
         { id: 'notificacoes', label: 'Notifications', icon: Bell, badge: notifications.length },
         { id: 'dispositivos', label: 'Devices', icon: Grid, badge: activeDevices.length },
+        { id: 'utilizadores', label: 'Users', icon: Users, badge: userIdentities.length },
         { id: 'favoritos', label: 'Favorites', icon: Star },
         { id: 'pesquisa', label: 'Search', icon: Search },
         { id: 'definicoes', label: 'Settings', icon: Settings }
@@ -381,177 +532,87 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
         <div className="bg-slate-900/80 border border-slate-800/80 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4">
           {/* TAB: MEU DISPOSITIVO */}
           {activeTab === 'meu_dispositivo' && (
-              <div className="space-y-6">
-                
-                {/* Header / Action Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                      <Smartphone className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-black text-white">{primaryDevice.name}</h3>
-                      <p className="text-xs font-mono text-slate-400">{primaryDevice.model}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <button 
-                      onClick={() => {
-                        const now = Date.now();
-                        primaryDevice.lastSync = now;
-                        onSimulateEvent?.();
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center space-x-1.5 cursor-pointer active:scale-95"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Forçar Sincronização</span>
-                    </button>
-                  </div>
+            <div className="space-y-3 font-mono text-xs">
+              {/* Dense Header Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <Smartphone className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span className="font-bold text-white text-xs">{primaryDevice.name} ({primaryDevice.model})</span>
                 </div>
-
-                {/* Grid 1: Online Status, Bateria e Última Sincronização */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  
-                  {/* Estado Online / Offline */}
-                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
-                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Estado de Conexão</span>
-                    <div className="flex items-center justify-between pt-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span className="text-sm font-black text-emerald-400">ONLINE</span>
-                      </div>
-                      <Wifi className="w-4 h-4 text-emerald-400" />
-                    </div>
-                    <p className="text-[11px] text-slate-500 font-mono">Conectado via Wi-Fi / LTE</p>
-                  </div>
-
-                  {/* Bateria */}
-                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
-                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Nível de Bateria</span>
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-sm font-black text-amber-400">{primaryDevice.batteryLevel ?? 98}%</span>
-                      <Battery className="w-4 h-4 text-amber-400" />
-                    </div>
-                    {/* Visual Battery Bar */}
-                    <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
-                      <div className="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full" style={{ width: `${primaryDevice.batteryLevel ?? 98}%` }}></div>
-                    </div>
-                  </div>
-
-                  {/* Última Sincronização */}
-                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
-                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Última Sincronização</span>
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-xs font-mono font-black text-indigo-300">
-                        {new Date(primaryDevice.lastSync).toLocaleTimeString('pt-BR')}
-                      </span>
-                      <RefreshCw className="w-4 h-4 text-indigo-400" />
-                    </div>
-                    <p className="text-[11px] text-emerald-400 font-mono font-bold">● Sync em Tempo Real Ativo</p>
-                  </div>
-
-                </div>
-
-                {/* Seção 2: Permissões do Agente Android */}
-                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3.5">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <div className="flex items-center space-x-2">
-                      <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                      <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">Permissões do Agente Móvel</h4>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                      4/4 CONCEDIDAS
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-                      <span className="font-bold text-slate-300">Leitura de SMS</span>
-                      <span className="text-emerald-400 font-mono font-extrabold flex items-center space-x-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>ATIVO</span>
-                      </span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-                      <span className="font-bold text-slate-300">Captura de Notificações</span>
-                      <span className="text-emerald-400 font-mono font-extrabold flex items-center space-x-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>ATIVO</span>
-                      </span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-                      <span className="font-bold text-slate-300">Registo de Chamadas</span>
-                      <span className="text-emerald-400 font-mono font-extrabold flex items-center space-x-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>ATIVO</span>
-                      </span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-                      <span className="font-bold text-slate-300">Serviço de Acessibilidade</span>
-                      <span className="text-emerald-400 font-mono font-extrabold flex items-center space-x-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>ATIVO</span>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Seção 3: Diagnóstico do Dispositivo */}
-                <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3.5">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <div className="flex items-center space-x-2">
-                      <Activity className="w-4 h-4 text-indigo-400" />
-                      <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">Diagnóstico e Saúde do Sistema</h4>
-                    </div>
-                    <span className="text-[11px] font-mono text-emerald-400 font-bold">
-                      100% OPERACIONAL
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
-                      <span className="text-slate-400 font-medium">Latência da Rede WebSocket:</span>
-                      <span className="font-mono text-emerald-400 font-bold">18 ms</span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
-                      <span className="text-slate-400 font-medium">Conexão Firestore Realtime:</span>
-                      <span className="font-mono text-emerald-400 font-bold">Estável (Sincronizado)</span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800/80">
-                      <span className="text-slate-400 font-medium">Motor de Camuflagem (Calculadora):</span>
-                      <span className="font-mono text-indigo-300 font-bold">Pronto / Ativo</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Seção 4: Ação de Sincronização Forçada */}
-                <div className="bg-gradient-to-r from-indigo-950/60 to-slate-950 p-5 rounded-2xl border border-indigo-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="space-y-1 text-center sm:text-left">
-                    <h4 className="text-xs font-black text-white uppercase tracking-wider">Sincronização Manual Forçada</h4>
-                    <p className="text-[11px] text-slate-400">Solicita ao agente Android a transmissão imediata de novos logs e estados.</p>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      const now = Date.now();
-                      primaryDevice.lastSync = now;
-                      onSimulateEvent?.();
-                    }}
-                    className="w-full sm:w-auto py-2.5 px-5 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center space-x-2 cursor-pointer active:scale-95 shrink-0"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    <span>Sincronizar Agora</span>
-                  </button>
-                </div>
-
+                <button 
+                  onClick={() => {
+                    const now = Date.now();
+                    primaryDevice.lastSync = now;
+                    onSimulateEvent?.();
+                  }}
+                  className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[11px] transition-all flex items-center justify-center space-x-1 cursor-pointer active:scale-95 shrink-0"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>FORÇAR SYNC</span>
+                </button>
               </div>
-            )}
+
+              {/* Dense Table Layout for Telemetry & Diagnostics */}
+              <div className="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-900 text-slate-400 border-b border-slate-800 uppercase text-[10px]">
+                      <th className="p-2">METRICA / MÓDULO</th>
+                      <th className="p-2">VALOR / PARÂMETRO</th>
+                      <th className="p-2">ESTADO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-slate-800/60">
+                      <td className="p-2 text-slate-300 font-bold">Estado da Conexão</td>
+                      <td className="p-2 text-slate-400">Wi-Fi / LTE (WebSocket Node)</td>
+                      <td className="p-2 text-emerald-400 font-bold">● ONLINE</td>
+                    </tr>
+                    <tr className="border-b border-slate-800/60">
+                      <td className="p-2 text-slate-300 font-bold">Nível de Bateria</td>
+                      <td className="p-2 text-amber-400 font-bold">{primaryDevice.batteryLevel ?? 98}%</td>
+                      <td className="p-2 text-emerald-400 font-bold">CARREGANDO</td>
+                    </tr>
+                    <tr className="border-b border-slate-800/60">
+                      <td className="p-2 text-slate-300 font-bold">Última Sincronização</td>
+                      <td className="p-2 text-indigo-300">{new Date(primaryDevice.lastSync).toLocaleTimeString('pt-BR')}</td>
+                      <td className="p-2 text-emerald-400 font-bold">REALTIME ACTIVE</td>
+                    </tr>
+                    <tr className="border-b border-slate-800/60">
+                      <td className="p-2 text-slate-300 font-bold">Permissão: SMS</td>
+                      <td className="p-2 text-slate-400">Telephony Receiver</td>
+                      <td className="p-2 text-emerald-400 font-bold">CONCEDIDA</td>
+                    </tr>
+                    <tr className="border-b border-slate-800/60">
+                      <td className="p-2 text-slate-300 font-bold">Permissão: Notificações</td>
+                      <td className="p-2 text-slate-400">NotificationListenerService</td>
+                      <td className="p-2 text-emerald-400 font-bold">CONCEDIDA</td>
+                    </tr>
+                    <tr className="border-b border-slate-800/60">
+                      <td className="p-2 text-slate-300 font-bold">Permissão: Registo Chamadas</td>
+                      <td className="p-2 text-slate-400">Call Log Manager</td>
+                      <td className="p-2 text-emerald-400 font-bold">CONCEDIDA</td>
+                    </tr>
+                    <tr className="border-b border-slate-800/60">
+                      <td className="p-2 text-slate-300 font-bold">Permissão: Acessibilidade</td>
+                      <td className="p-2 text-slate-400">AccessibilityService Engine</td>
+                      <td className="p-2 text-emerald-400 font-bold">CONCEDIDA</td>
+                    </tr>
+                    <tr className="border-b border-slate-800/60">
+                      <td className="p-2 text-slate-300 font-bold">Latência WebSocket</td>
+                      <td className="p-2 text-slate-400">Node Relay Router</td>
+                      <td className="p-2 text-emerald-400 font-bold">18 ms</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 text-slate-300 font-bold">Motor Camuflagem</td>
+                      <td className="p-2 text-slate-400">Calculadora Disfarçada</td>
+                      <td className="p-2 text-indigo-400 font-bold">PRONTO</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
             {/* TAB: MENSAGENS */}
             {activeTab === 'mensagens' && (() => {
@@ -973,32 +1034,48 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
 
             {/* TAB: CONTACTOS */}
             {activeTab === 'contactos' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="space-y-3 font-mono text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                   <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
                     <Users className="w-4 h-4 text-emerald-400" />
                     <span>Lista de Contactos Sincronizados ({contacts.length})</span>
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {contacts.map((contact) => (
-                    <div key={contact.id} className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs">
-                          {contact.name.charAt(0)}
-                        </div>
-                        <div>
-                          <span className="block text-xs font-extrabold text-white">{contact.name}</span>
-                          <span className="block text-[11px] font-mono text-slate-400">{contact.phone}</span>
-                        </div>
-                      </div>
-
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-slate-800 text-slate-400">
-                        {contact.category}
-                      </span>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-900 text-slate-400 border-b border-slate-800 uppercase text-[10px]">
+                        <th className="p-2">CONTACTO</th>
+                        <th className="p-2">NÚMERO TELEFÓMICO</th>
+                        <th className="p-2">CATEGORIA</th>
+                        <th className="p-2 text-right">AÇÕES</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contacts.map((contact) => (
+                        <tr key={contact.id} className="border-b border-slate-800/60 hover:bg-slate-900/40 transition-colors">
+                          <td className="p-2 font-bold text-slate-200">{contact.name}</td>
+                          <td className="p-2 text-cyan-400 font-bold">{contact.phone}</td>
+                          <td className="p-2">
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-900 text-slate-400 border border-slate-800">
+                              {contact.category}
+                            </span>
+                          </td>
+                          <td className="p-2 text-right">
+                            <button
+                              onClick={() => {
+                                handleTabChange('chamadas');
+                              }}
+                              className="px-2 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 hover:bg-emerald-900 rounded text-[10px] font-bold uppercase cursor-pointer transition-all"
+                            >
+                              CHAMAR
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -1483,10 +1560,200 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
               <SystemArchitectureDiagram />
             )}
 
+            {/* TAB: UTILIZADORES / IDENTIDADES (USER IDENTITIES DENSE TABLE) */}
+            {(activeTab === 'utilizadores' || activeTab === 'conta') && (
+              <div className="space-y-4 border-t border-slate-800/80 pt-4 mt-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-4 h-4 text-emerald-400" />
+                    <h3 className="text-xs font-black text-white uppercase tracking-wider">Gestão de Identidades de Utilizadores (RBAC)</h3>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={identitySearchQuery}
+                        onChange={(e) => setIdentitySearchQuery(e.target.value)}
+                        placeholder="Filtrar por nome, email ou UID..."
+                        className="pl-8 pr-3 py-1 bg-black border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* DENSE TABLE FOR USER IDENTITIES */}
+                <div className="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950 font-mono text-xs">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-900 text-slate-400 border-b border-slate-800 uppercase text-[10px] tracking-wider">
+                        <th className="p-2.5">USER UID</th>
+                        <th className="p-2.5">NAME & EMAIL</th>
+                        <th className="p-2.5">ROLE (RBAC)</th>
+                        <th className="p-2.5">STATUS</th>
+                        <th className="p-2.5">LAST AUTH</th>
+                        <th className="p-2.5 text-right">ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {userIdentities
+                        .filter(u => {
+                          if (!identitySearchQuery) return true;
+                          const q = identitySearchQuery.toLowerCase();
+                          return (
+                            u.id.toLowerCase().includes(q) ||
+                            u.name.toLowerCase().includes(q) ||
+                            u.email.toLowerCase().includes(q) ||
+                            u.role.toLowerCase().includes(q) ||
+                            u.status.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((usr) => (
+                          <tr key={usr.id} className="border-b border-slate-800/80 hover:bg-slate-900/50 transition-colors">
+                            <td className="p-2.5 text-cyan-400 font-bold text-[11px]">{usr.id}</td>
+                            <td className="p-2.5">
+                              <span className="block font-sans font-bold text-slate-100">{usr.name}</span>
+                              <span className="block text-[10px] text-slate-400">{usr.email}</span>
+                            </td>
+                            <td className="p-2.5">
+                              <button
+                                onClick={() => {
+                                  setRoleModalUser(usr);
+                                  setSelectedRoleInput(usr.role);
+                                }}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer border hover:opacity-80 transition-opacity ${
+                                  usr.role === 'founder'
+                                    ? 'bg-amber-950 text-amber-400 border-amber-700'
+                                    : usr.role === 'admin'
+                                    ? 'bg-indigo-950 text-indigo-400 border-indigo-700'
+                                    : 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                                }`}
+                              >
+                                {usr.role}
+                              </button>
+                            </td>
+                            <td className="p-2.5">
+                              <button
+                                onClick={() => handleToggleStatus(usr)}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase cursor-pointer border hover:opacity-80 transition-opacity ${
+                                  usr.status === 'Active'
+                                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-600'
+                                    : 'bg-rose-950/80 text-rose-400 border-rose-600'
+                                }`}
+                              >
+                                {usr.status}
+                              </button>
+                            </td>
+                            <td className="p-2.5 text-slate-400 text-[10px]">
+                              {new Date(usr.lastAuthTimestamp).toISOString().replace('T', ' ').substring(0, 19)}
+                            </td>
+                            <td className="p-2.5 text-right">
+                              <div className="flex items-center justify-end space-x-1.5">
+                                <button
+                                  onClick={() => {
+                                    setRoleModalUser(usr);
+                                    setSelectedRoleInput(usr.role);
+                                  }}
+                                  className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-slate-700 rounded text-[10px] font-bold uppercase cursor-pointer active:scale-95 transition-all"
+                                >
+                                  ASSIGN ROLE
+                                </button>
+                                <button
+                                  onClick={() => handleToggleStatus(usr)}
+                                  className={`px-2 py-1 rounded text-[10px] font-bold uppercase cursor-pointer border active:scale-95 transition-all ${
+                                    usr.status === 'Active'
+                                      ? 'bg-rose-950 text-rose-400 border-rose-800 hover:bg-rose-900'
+                                      : 'bg-emerald-950 text-emerald-400 border-emerald-800 hover:bg-emerald-900'
+                                  }`}
+                                >
+                                  {usr.status === 'Active' ? 'SUSPEND' : 'ACTIVATE'}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* TAB: DEFINIÇÕES */}
             {activeTab === 'definicoes' && (
               <SettingsView />
             )}
+        </div>
+      )}
+
+      {/* SELECT MODAL FOR ROLE ASSIGNMENT (FOUNDER / ADMIN / USER) */}
+      {roleModalUser && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-3 z-50">
+          <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl w-full max-w-md font-mono text-xs space-y-3 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div className="flex items-center space-x-2">
+                <Users className="w-4 h-4 text-emerald-400" />
+                <span className="text-emerald-400 font-bold uppercase tracking-wider">SELECT ROLE ASSIGNMENT</span>
+              </div>
+              <button
+                onClick={() => setRoleModalUser(null)}
+                className="text-slate-500 hover:text-slate-200 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 space-y-1">
+              <span className="text-[10px] text-slate-500 uppercase block">TARGET USER IDENTITY</span>
+              <span className="block font-bold text-white text-xs">{roleModalUser.name} ({roleModalUser.id})</span>
+              <span className="block text-[11px] text-cyan-400 font-mono">{roleModalUser.email}</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] text-slate-400 uppercase font-bold block">ASSIGN ROLE LEVEL</label>
+              <div className="grid grid-cols-1 gap-1.5">
+                {(
+                  [
+                    ['founder', 'FOUNDER (Deus Fundador / Root Authority)', 'Full Infrastructure, RBAC & Secret Access'],
+                    ['admin', 'ADMINISTRATOR (System Admin)', 'System-wide configuration, Users & Automation'],
+                    ['user', 'USER (Standard Operational User)', 'Public portal access, devices & telemetry']
+                  ] as const
+                ).map(([rKey, rLabel, rDesc]) => (
+                  <button
+                    key={rKey}
+                    type="button"
+                    onClick={() => setSelectedRoleInput(rKey)}
+                    className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                      selectedRoleInput === rKey
+                        ? 'bg-emerald-950 border-emerald-500 text-emerald-300 shadow'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs uppercase">{rLabel}</span>
+                      {selectedRoleInput === rKey && <CheckCheck className="w-4 h-4 text-emerald-400" />}
+                    </div>
+                    <span className="block text-[10px] text-slate-500 mt-0.5">{rDesc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setRoleModalUser(null)}
+                className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 rounded-xl text-xs font-bold uppercase cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={handleConfirmRoleAssignment}
+                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider shadow cursor-pointer active:scale-95 transition-all"
+              >
+                CONFIRM ROLE ASSIGNMENT
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
