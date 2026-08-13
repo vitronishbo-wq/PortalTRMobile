@@ -48,14 +48,12 @@ import '../telecom/ImsGatewayProvider';
 import '../telecom/EsimProvider';
 
 import { ZeroTouchProvisioningPipelineModal } from './ZeroTouchProvisioningPipelineModal';
-import { BankingHubView } from './BankingHubView';
 import { AppCenterView } from './AppCenterView';
 import { CloudMobileOSView } from './CloudMobileOSView';
-import { Landmark } from 'lucide-react';
 
 export const VirtualPhoneCloudWorkspace: React.FC = () => {
   const [showZeroTouchPipeline, setShowZeroTouchPipeline] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'teclado' | 'numeros_virtuais' | 'mesh_sessions' | 'historico' | 'contactos' | 'sms' | 'voicemail' | 'banking' | 'app_center' | 'cloud_os'>('teclado');
+  const [activeTab, setActiveTab] = useState<'teclado' | 'numeros_virtuais' | 'mesh_sessions' | 'historico' | 'contactos' | 'sms' | 'voicemail' | 'app_center' | 'cloud_os'>('teclado');
   const [selectedProviderId, setSelectedProviderId] = useState<string>('unitel-primary');
   const [phoneNumber, setPhoneNumber] = useState<string>('');
   const [inCall, setInCall] = useState<boolean>(false);
@@ -517,7 +515,6 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
           { id: 'contactos', label: `Contactos (${contactsList.length})`, icon: Users },
           { id: 'sms', label: `SMS (${smsHistory.length})`, icon: MessageSquare },
           { id: 'voicemail', label: `Correio Voz (${voicemails.filter(v => !v.isRead).length})`, icon: Voicemail },
-          { id: 'banking', label: 'Banking Hub', icon: Landmark },
           { id: 'app_center', label: 'App Center', icon: Grid },
           { id: 'cloud_os', label: 'Cloud Mobile OS', icon: Smartphone }
         ].map((tab) => {
@@ -1308,10 +1305,7 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
         </div>
       )}
 
-      {/* 8. BANKING HUB */}
-      {activeTab === 'banking' && <BankingHubView />}
-
-      {/* 9. APP CENTER */}
+      {/* 8. APP CENTER */}
       {activeTab === 'app_center' && <AppCenterView />}
 
       {/* 10. CLOUD MOBILE OS */}

@@ -26,6 +26,7 @@ import { UserSettings } from '../types/Settings';
 import { FirestoreService } from '../services/firestore';
 import { useIdentity } from '../engine/identityEngine';
 import { SecurityConsole } from './SecurityConsole';
+import { updateEngine, UpdateState } from '../engine/updateEngine';
 
 const DEFAULT_SETTINGS: UserSettings = {
   userId: 'usr-default',
@@ -70,6 +71,16 @@ const DEFAULT_SETTINGS: UserSettings = {
 
 export const SettingsView: React.FC = () => {
   const { user } = useIdentity();
+  const [updateState, setUpdateState] = useState<UpdateState>(() => updateEngine.getState());
+
+  useEffect(() => {
+    updateEngine.init();
+    const unsubscribe = updateEngine.subscribe((state) => {
+      setUpdateState(state);
+    });
+    return unsubscribe;
+  }, []);
+
   const [settings, setSettings] = useState<UserSettings>(() => {
     try {
       const saved = localStorage.getItem('portal_user_settings');
@@ -314,6 +325,110 @@ export const SettingsView: React.FC = () => {
               <p className="text-xs text-slate-400 mt-0.5">
                 Ajuste o comportamento do barramento de eventos, boot inicial e emparelhamento Zero-Touch.
               </p>
+            </div>
+
+            {/* BLOCK: SYSTEM KERNEL UPDATE */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-amber-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950/20 space-y-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+                    <Zap className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-100 flex items-center gap-2">
+                      <span>System Kernel Update</span>
+                      <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-bold">
+                        PWA Execution Layer
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      Monitorização de versão do Service Worker e mecanismo auto-healing de atualização
+                    </p>
+                  </div>
+                </div>
+
+                {/* Version badge */}
+                <div className="sm:text-right shrink-0">
+                  <span className="text-[10px] text-slate-500 block uppercase tracking-wider font-mono">Versão Ativa</span>
+                  <span className="text-xs font-mono font-black text-amber-400">{updateState.currentVersion}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+                <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-slate-500 block uppercase">Estado do Runtime</span>
+                  <span className={`font-bold flex items-center space-x-1.5 mt-0.5 ${
+                    updateState.status === 'update-available'
+                      ? 'text-amber-400'
+                      : updateState.status === 'updating'
+                      ? 'text-indigo-400'
+                      : updateState.status === 'failed'
+                      ? 'text-rose-400'
+                      : 'text-emerald-400'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${
+                      updateState.status === 'update-available'
+                        ? 'bg-amber-400 animate-ping'
+                        : updateState.status === 'updating'
+                        ? 'bg-indigo-400 animate-pulse'
+                        : updateState.status === 'failed'
+                        ? 'bg-rose-400'
+                        : 'bg-emerald-400'
+                    }`} />
+                    <span>
+                      {updateState.status === 'current' && 'Versão Atualizada (Current)'}
+                      {updateState.status === 'update-available' && 'Nova Versão Encontrada!'}
+                      {updateState.status === 'updating' && 'A Aplicar Atualização...'}
+                      {updateState.status === 'failed' && 'Falha na Atualização'}
+                    </span>
+                  </span>
+                </div>
+
+                <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-slate-500 block uppercase">Última Verificação</span>
+                  <span className="text-slate-200 font-bold mt-0.5 block">
+                    {updateState.lastCheckedAt
+                      ? new Date(updateState.lastCheckedAt).toLocaleTimeString()
+                      : 'Instante de Boot'}
+                  </span>
+                </div>
+
+                <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-slate-500 block uppercase">Versão Detetada</span>
+                  <span className="text-amber-300 font-bold mt-0.5 block">
+                    {updateState.detectedVersion || updateState.currentVersion}
+                  </span>
+                </div>
+              </div>
+
+              {updateState.error && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono">
+                  ⚠ Erro: {updateState.error}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                <button
+                  onClick={() => updateEngine.checkForUpdates()}
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex items-center space-x-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Verificar Atualizações</span>
+                </button>
+
+                <button
+                  onClick={() => updateEngine.forceSystemUpdate()}
+                  disabled={updateState.status === 'updating'}
+                  className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg transition-all cursor-pointer flex items-center space-x-2 border ${
+                    updateState.status === 'update-available'
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-400 shadow-amber-500/20 active:scale-95'
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400/30 shadow-indigo-600/20'
+                  }`}
+                >
+                  <RefreshCw className={`w-4 h-4 ${updateState.status === 'updating' ? 'animate-spin' : ''}`} />
+                  <span>{updateState.status === 'updating' ? 'A Atualizar...' : 'Atualizar Agora'}</span>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

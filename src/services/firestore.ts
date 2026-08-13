@@ -112,7 +112,13 @@ export class FirestoreService {
               oemProfile: data.oemProfile || 'generic',
               permissionScore: data.permissionScore ?? 98,
               notificationListenerStatus: data.notificationListenerStatus || 'active',
-              syncDelayMs: data.syncDelayMs ?? 12
+              syncDelayMs: data.syncDelayMs ?? 12,
+              isPrimaryDevice: data.isPrimaryDevice ?? false,
+              ipAddress: data.ipAddress || '192.168.1.100',
+              networkType: data.networkType || 'Wi-Fi / 5G',
+              carrier: data.carrier || 'Unitel Angola',
+              virtualNumber: data.virtualNumber || '+244 923 000 000',
+              platform: data.platform || 'android'
             };
           });
           onData(devices);

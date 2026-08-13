@@ -65,6 +65,11 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('message', (event) => {
   if (!event.data) return;
 
+  if (event.data === 'SKIP_WAITING' || (typeof event.data === 'object' && event.data.type === 'SKIP_WAITING')) {
+    self.skipWaiting();
+    return;
+  }
+
   if (event.data.type === 'SHOW_NOTIFICATION') {
     const { title, body, icon, tag, data, priority, type } = event.data.payload || {};
 

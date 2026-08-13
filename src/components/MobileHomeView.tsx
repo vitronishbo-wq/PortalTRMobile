@@ -46,6 +46,7 @@ interface MobileHomeViewProps {
   isOnline?: boolean;
   daysRemaining?: number;
   onOpenMenu?: () => void;
+  onOpenLicenseModal?: () => void;
 }
 
 export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
@@ -57,7 +58,8 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
   batteryLevel = 98,
   isOnline = true,
   daysRemaining,
-  onOpenMenu
+  onOpenMenu,
+  onOpenLicenseModal
 }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
@@ -415,26 +417,42 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
                 </div>
                 <ChevronRight className="w-4 h-4 text-rose-400 group-hover:translate-x-0.5 transition-transform" />
               </button>
-            ) : daysRemaining !== undefined && daysRemaining <= 7 ? (
-              /* CASO 3: 7 dias restantes */
+            ) : daysRemaining !== undefined ? (
+              /* CASO 3: Licença / avaliação */
               <button
-                onClick={() => onNavigateTab('conta')}
-                className="w-full p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/90 via-slate-900/90 to-slate-900 border border-amber-500/40 text-left flex items-center justify-between transition-all cursor-pointer hover:border-amber-400 active:scale-98 shadow-xl shadow-amber-950/50 group"
+                onClick={() => {
+                  if (onOpenLicenseModal) {
+                    onOpenLicenseModal();
+                  } else {
+                    onNavigateTab('conta');
+                  }
+                }}
+                className={`w-full p-3.5 rounded-2xl bg-gradient-to-r text-left flex items-center justify-between transition-all cursor-pointer active:scale-98 shadow-xl group ${
+                  daysRemaining <= 7
+                    ? 'from-amber-950/90 via-slate-900/90 to-slate-900 border border-amber-500/40 hover:border-amber-400 shadow-amber-950/50'
+                    : 'from-slate-950/90 via-slate-900/90 to-slate-900 border border-slate-800 hover:border-emerald-500/40'
+                }`}
               >
                 <div className="flex items-center space-x-3">
-                  <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                  <div className={`p-2.5 rounded-xl border shrink-0 ${
+                    daysRemaining <= 7 ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                  }`}>
                     <Clock className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="block text-xs font-black text-amber-300 uppercase tracking-wide">
-                      {daysRemaining === 7 ? '7 dias restantes' : `${daysRemaining} dia${daysRemaining !== 1 ? 's' : ''} restante${daysRemaining !== 1 ? 's' : ''}`}
+                    <span className={`block text-xs font-black uppercase tracking-wide ${
+                      daysRemaining <= 7 ? 'text-amber-300' : 'text-emerald-300'
+                    }`}>
+                      {daysRemaining === 9999 ? 'Licença Vitalícia' : `${daysRemaining} dia${daysRemaining !== 1 ? 's' : ''} restante${daysRemaining !== 1 ? 's' : ''}`}
                     </span>
                     <span className="block text-[11px] text-slate-300 font-medium mt-0.5">
-                      Licença / avaliação a terminar
+                      {daysRemaining <= 7 ? 'Licença / avaliação a terminar' : 'Licença ativa — clique para gerir'}
                     </span>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight className={`w-4 h-4 group-hover:translate-x-0.5 transition-transform ${
+                  daysRemaining <= 7 ? 'text-amber-400' : 'text-emerald-400'
+                }`} />
               </button>
             ) : null}
           </div>

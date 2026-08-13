@@ -243,7 +243,7 @@ export const CloudMobileOSView: React.FC = () => {
             </div>
 
             <div className="relative z-10 grid grid-cols-4 gap-2">
-              {['SMS', 'Chamadas', 'Bancos', 'Central'].map((app, i) => (
+              {['SMS', 'Chamadas', 'Contactos', 'Central'].map((app, i) => (
                 <div key={i} className="p-2 bg-slate-900/90 border border-slate-800 rounded-xl text-center text-[9px] font-bold text-white">
                   {app}
                 </div>

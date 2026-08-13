@@ -1,5 +1,5 @@
 import { db } from '../firebase/firebase';
-import { collection, doc, setDoc, getDocs, addDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, addDoc, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { FIRESTORE_COLLECTIONS } from '../services/firestoreCollections';
 
 export interface BankAccount {
@@ -30,7 +30,7 @@ export interface BankTransaction {
 export interface DigitalWallet {
   id: string;
   walletName: string;
-  provider: 'Multicaixa Express' | 'AppyPay' | 'PayPal' | 'M-Pesa' | 'Unitel Money' | 'KwanzaPay';
+  provider: string;
   phoneNumber: string;
   balance: number;
   currency: string;
@@ -43,98 +43,181 @@ export interface PaymentMethod {
   type: 'card' | 'bank_account' | 'qr' | 'digital_wallet';
   cardLast4?: string;
   cardExpiry?: string;
-  brand?: 'Multicaixa' | 'Visa' | 'Mastercard';
+  brand?: string;
   isDefault: boolean;
 }
 
+export interface DynamicTelecomOperator {
+  id: string;
+  name: string;
+  code: string;
+  country: string;
+  type: 'mobile' | 'landline' | 'voip' | 'satellite';
+  status: 'active' | 'maintenance' | 'offline';
+}
+
 export class BankingHubEngine {
-  static async getAccounts(uid: string): Promise<BankAccount[]> {
-    const defaults: BankAccount[] = [
-      {
-        id: 'acc-bfa-01',
-        bankName: 'Banco Fomento Angola (BFA)',
-        accountNumber: '12345678901',
-        iban: 'AO06.0006.0000.1234.5678.9010.1',
-        balance: 2450000.00,
-        currency: 'AOA',
-        accountType: 'corrente',
-        status: 'active',
-        ownerUid: uid
-      },
-      {
-        id: 'acc-[#111]-02',
-        bankName: 'Banco BAI',
-        accountNumber: '98765432101',
-        iban: 'AO06.0040.0000.9876.5432.1010.2',
-        balance: 1820500.50,
-        currency: 'AOA',
-        accountType: 'empresarial',
-        status: 'active',
-        ownerUid: uid
-      }
-    ];
-
-    if (!db) return defaults;
+  /**
+   * Listen to Bank Accounts dynamically from Firestore
+   */
+  static listenAccounts(uid: string, callback: (accounts: BankAccount[]) => void) {
+    if (!db) {
+      callback([]);
+      return () => {};
+    }
     try {
-      const q = query(collection(db, FIRESTORE_COLLECTIONS.BANK_ACCOUNTS), where('ownerUid', '==', uid));
-      const snap = await getDocs(q);
-      if (snap.empty) return defaults;
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as BankAccount));
+      const q = query(collection(db, FIRESTORE_COLLECTIONS.BANK_ACCOUNTS));
+      return onSnapshot(q, (snap) => {
+        const accs = snap.docs.map(d => ({ id: d.id, ...d.data() } as BankAccount));
+        callback(accs);
+      }, (err) => {
+        console.warn('[BankingHubEngine] Error listening accounts:', err);
+        callback([]);
+      });
     } catch {
-      return defaults;
+      callback([]);
+      return () => {};
     }
   }
 
-  static async getTransactions(accountId: string): Promise<BankTransaction[]> {
-    const defaults: BankTransaction[] = [
-      {
-        id: 'tx-001',
-        accountId,
-        type: 'transfer',
-        amount: 45000,
-        currency: 'AOA',
-        recipientName: 'Unitel Angola Telecom',
-        recipientIbanOrPhone: 'AO06.0006.0000.9999.8888.7777.1',
-        referenceNumber: 'REF-2026-9912',
-        status: 'completed',
-        timestamp: Date.now() - 3600000
-      },
-      {
-        id: 'tx-002',
-        accountId,
-        type: 'qr_code',
-        amount: 12500,
-        currency: 'AOA',
-        recipientName: 'Pagamento Multicaixa Express QR',
-        recipientIbanOrPhone: '+244923888111',
-        referenceNumber: 'QR-MCX-88219',
-        status: 'completed',
-        timestamp: Date.now() - 86400000
-      }
-    ];
-
-    if (!db) return defaults;
+  /**
+   * Listen to Transactions dynamically from Firestore
+   */
+  static listenTransactions(accountId: string, callback: (txs: BankTransaction[]) => void) {
+    if (!db) {
+      callback([]);
+      return () => {};
+    }
     try {
-      const q = query(collection(db, FIRESTORE_COLLECTIONS.TRANSACTIONS), where('accountId', '==', accountId));
-      const snap = await getDocs(q);
-      if (snap.empty) return defaults;
-      return snap.docs.map(d => ({ id: d.id, ...d.data() } as BankTransaction));
+      const q = query(collection(db, FIRESTORE_COLLECTIONS.TRANSACTIONS));
+      return onSnapshot(q, (snap) => {
+        const allTxs = snap.docs.map(d => ({ id: d.id, ...d.data() } as BankTransaction));
+        const filtered = accountId ? allTxs.filter(t => t.accountId === accountId || !t.accountId) : allTxs;
+        callback(filtered.sort((a, b) => b.timestamp - a.timestamp));
+      }, (err) => {
+        console.warn('[BankingHubEngine] Error listening transactions:', err);
+        callback([]);
+      });
     } catch {
-      return defaults;
+      callback([]);
+      return () => {};
     }
   }
 
-  static async getWallets(): Promise<DigitalWallet[]> {
-    return [
-      { id: 'wal-1', walletName: 'Multicaixa Express', provider: 'Multicaixa Express', phoneNumber: '+244 923 888 111', balance: 350000.00, currency: 'AOA', isDefault: true },
-      { id: 'wal-2', walletName: 'Unitel Money', provider: 'Unitel Money', phoneNumber: '+244 923 888 111', balance: 120000.00, currency: 'AOA', isDefault: false }
-    ];
+  /**
+   * Listen to Digital Wallets dynamically from Firestore
+   */
+  static listenWallets(callback: (wallets: DigitalWallet[]) => void) {
+    if (!db) {
+      callback([]);
+      return () => {};
+    }
+    try {
+      const q = query(collection(db, FIRESTORE_COLLECTIONS.WALLETS));
+      return onSnapshot(q, (snap) => {
+        const wals = snap.docs.map(d => ({ id: d.id, ...d.data() } as DigitalWallet));
+        callback(wals);
+      }, (err) => {
+        console.warn('[BankingHubEngine] Error listening wallets:', err);
+        callback([]);
+      });
+    } catch {
+      callback([]);
+      return () => {};
+    }
   }
 
-  static async getPaymentMethods(): Promise<PaymentMethod[]> {
-    return [
-      { id: 'pm-1', title: 'Cartão Multicaixa Debito', type: 'card', cardLast4: '4821', cardExpiry: '08/28', brand: 'Multicaixa', isDefault: true },
-      { id: 'pm-2', title: 'Cartão Visa Internacional', type: 'card', cardLast4: '9901', cardExpiry: '12/29', brand: 'Visa', isDefault: false }
-    ];
+  /**
+   * Listen to Payment Methods dynamically from Firestore
+   */
+  static listenPaymentMethods(callback: (methods: PaymentMethod[]) => void) {
+    if (!db) {
+      callback([]);
+      return () => {};
+    }
+    try {
+      const q = query(collection(db, FIRESTORE_COLLECTIONS.PAYMENT_METHODS));
+      return onSnapshot(q, (snap) => {
+        const pms = snap.docs.map(d => ({ id: d.id, ...d.data() } as PaymentMethod));
+        callback(pms);
+      }, (err) => {
+        console.warn('[BankingHubEngine] Error listening payment methods:', err);
+        callback([]);
+      });
+    } catch {
+      callback([]);
+      return () => {};
+    }
+  }
+
+  /**
+   * Listen to Telecom Operators dynamically from Firestore
+   */
+  static listenTelecomOperators(callback: (operators: DynamicTelecomOperator[]) => void) {
+    if (!db) {
+      callback([]);
+      return () => {};
+    }
+    try {
+      const q = query(collection(db, FIRESTORE_COLLECTIONS.TELECOM_PROVIDERS));
+      return onSnapshot(q, (snap) => {
+        const ops = snap.docs.map(d => ({ id: d.id, ...d.data() } as DynamicTelecomOperator));
+        callback(ops);
+      }, (err) => {
+        console.warn('[BankingHubEngine] Error listening telecom operators:', err);
+        callback([]);
+      });
+    } catch {
+      callback([]);
+      return () => {};
+    }
+  }
+
+  /**
+   * Add a new dynamic Bank Account to Firestore
+   */
+  static async addBankAccount(acc: Omit<BankAccount, 'id'>): Promise<string> {
+    const id = `acc-${Date.now()}`;
+    const newAcc: BankAccount = { ...acc, id };
+    if (db) {
+      try {
+        await setDoc(doc(db, FIRESTORE_COLLECTIONS.BANK_ACCOUNTS, id), newAcc);
+      } catch (err) {
+        console.warn('[BankingHubEngine] Error saving bank account to Firestore:', err);
+      }
+    }
+    return id;
+  }
+
+  /**
+   * Add a new dynamic Digital Wallet to Firestore
+   */
+  static async addDigitalWallet(wal: Omit<DigitalWallet, 'id'>): Promise<string> {
+    const id = `wal-${Date.now()}`;
+    const newWal: DigitalWallet = { ...wal, id };
+    if (db) {
+      try {
+        await setDoc(doc(db, FIRESTORE_COLLECTIONS.WALLETS, id), newWal);
+      } catch (err) {
+        console.warn('[BankingHubEngine] Error saving wallet to Firestore:', err);
+      }
+    }
+    return id;
+  }
+
+  /**
+   * Add a new dynamic Transaction to Firestore
+   */
+  static async addTransaction(tx: Omit<BankTransaction, 'id'>): Promise<string> {
+    const id = `tx-${Date.now()}`;
+    const newTx: BankTransaction = { ...tx, id };
+    if (db) {
+      try {
+        await setDoc(doc(db, FIRESTORE_COLLECTIONS.TRANSACTIONS, id), newTx);
+      } catch (err) {
+        console.warn('[BankingHubEngine] Error saving transaction to Firestore:', err);
+      }
+    }
+    return id;
   }
 }

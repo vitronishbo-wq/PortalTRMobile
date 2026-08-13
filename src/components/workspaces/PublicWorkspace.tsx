@@ -55,6 +55,7 @@ import { DevicesView } from '../DevicesView';
 import { SettingsView } from '../SettingsView';
 import { SystemArchitectureDiagram } from '../SystemArchitectureDiagram';
 import { MobileHomeView } from '../MobileHomeView';
+import { LicenseManagementModal } from '../LicenseManagementModal';
 import { QRCodePairing } from '../QRCodePairing';
 import { InputEngine } from '../../engine/inputEngine';
 import { InteractionEngine, NavigationEngine, MultiDeviceMeshEngine } from '../../engine';
@@ -179,7 +180,8 @@ export type PublicTabType =
   | 'notificacoes'
   | 'favoritos'
   | 'pesquisa'
-  | 'definicoes';
+  | 'definicoes'
+  | 'conta';
 
 export interface UserIdentity {
   id: string;
@@ -211,6 +213,8 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
   const hasDevice = isAuthenticated ? activeDevices.length > 0 : false;
 
   const [activeTab, setActiveTab] = useState<PublicTabType>('inicio');
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
+  const [licenseRefreshKey, setLicenseRefreshKey] = useState<number>(0);
 
   const normalizeTab = (tab: string): PublicTabType => {
     if (!tab) return 'inicio';
@@ -224,6 +228,7 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
     if (t === 'favoritos' || t === 'favorites') return 'favoritos';
     if (t === 'pesquisa' || t === 'search') return 'pesquisa';
     if (t === 'definicoes' || t === 'settings') return 'definicoes';
+    if (t === 'conta' || t === 'licenca' || t === 'plano' || t === 'billing' || t === 'subscricao') return 'conta';
     return 'inicio';
   };
 
@@ -470,6 +475,7 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
             isOnline={isOnline}
             daysRemaining={evalState.daysRemaining}
             onOpenMenu={onSimulateEvent}
+            onOpenLicenseModal={() => setIsLicenseModalOpen(true)}
           />
         </div>
       )}
@@ -1160,8 +1166,40 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
             {activeTab === 'definicoes' && (
               <SettingsView />
             )}
+
+            {/* TAB: CONTA / LICENÇA / SUBSCRIÇÃO */}
+            {activeTab === 'conta' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-3 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-xl">
+                      <CreditCard className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white uppercase tracking-wider">Gestão e Renovação de Licença</h4>
+                      <p className="text-xs text-slate-400 font-mono">
+                        {evalState.daysRemaining === 9999 ? 'Licença Vitalícia Ativa' : `${evalState.daysRemaining} dias restantes no período experimental / piloto`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsLicenseModalOpen(true)}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-all cursor-pointer"
+                  >
+                    Abrir Painel de Renovação
+                  </button>
+                </div>
+              </div>
+            )}
         </div>
       )}
+
+      {/* MODAL DE GESTÃO E RENOVAÇÃO DE LICENÇA */}
+      <LicenseManagementModal
+        isOpen={isLicenseModalOpen}
+        onClose={() => setIsLicenseModalOpen(false)}
+        onLicenseUpdated={() => setLicenseRefreshKey(prev => prev + 1)}
+      />
     </div>
   );
 };

@@ -322,9 +322,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                   <button
                     type="button"
                     onClick={() => {
-                      TrialEngine.modifyLicense(userId, '+30d', 'Renovação Efetuada no Perfil');
-                      setAccountPlan('Premium (Ativo - 30 Dias Restantes)');
-                      window.location.reload();
+                      const updated = TrialEngine.modifyLicense(userId, '+30d', 'Renovação Efetuada no Perfil');
+                      setAccountPlan(`Premium (Ativo - ${updated.daysLeft} Dias Restantes)`);
                     }}
                     className="w-full py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-md uppercase tracking-wider flex items-center justify-center space-x-1.5 cursor-pointer active:scale-95"
                   >

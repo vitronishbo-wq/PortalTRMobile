@@ -23,3 +23,4 @@ export * from './multiDeviceMeshEngine';
 export * from './CapabilityEngine';
 export * from './masterIdentityEngine';
 export * from './securityEngine';
+export * from './updateEngine';

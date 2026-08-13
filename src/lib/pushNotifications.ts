@@ -1,6 +1,7 @@
 import { PortalEvent } from '../types';
 import { getFirebaseInstance } from './firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
+import { updateEngine } from '../engine/updateEngine';
 
 export interface SwRegistrationStatus {
   supported: boolean;
@@ -147,6 +148,7 @@ export async function registerServiceWorker(): Promise<SwRegistrationStatus> {
       reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
     }
     swRegistration = reg;
+    updateEngine.attachRegistration(reg);
 
     console.log('[SW] Service Worker registrado no escopo:', reg.scope);
     await navigator.serviceWorker.ready;

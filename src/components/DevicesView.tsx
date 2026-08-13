@@ -22,12 +22,20 @@ import {
   Sliders,
   Check,
   AlertTriangle,
-  Tv
+  Tv,
+  Star,
+  Cpu,
+  HardDrive,
+  Database,
+  Navigation,
+  Radio,
+  SlidersHorizontal
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Device } from '../types';
 import { ZeroTouchIdentity } from '../engine/provisioningEngine';
 import { BatteryUsageMonitor } from './BatteryUsageMonitor';
+import { FirestoreService } from '../services/firestore';
 
 interface DevicesViewProps {
   devices?: Device[];
@@ -57,6 +65,7 @@ const DEFAULT_FLEET_DEVICES: Device[] = [
     syncDelayMs: 4,
     lastSync: Date.now() - 3000,
     notificationListenerStatus: 'active',
+    isPrimaryDevice: true,
     capabilities: { sms: true, calls: true, biometrics: true, accessibility: true, camera: true, microphone: true }
   },
   {
@@ -237,6 +246,65 @@ const DEFAULT_FLEET_DEVICES: Device[] = [
   }
 ];
 
+export interface VisibleMetrics {
+  cpu: boolean;
+  ram: boolean;
+  storage: boolean;
+  gps: boolean;
+  nfc: boolean;
+  battery: boolean;
+  ip: boolean;
+  carrier: boolean;
+}
+
+const getHardwareSpecs = (device: Device) => {
+  const platform = (device.platform || '').toLowerCase();
+  
+  if (platform === 'iphone' || platform === 'ipad') {
+    return {
+      cpu: 'Apple A17 Pro / M2',
+      ram: '8 GB Unified',
+      storage: '256 GB (190 GB livre)',
+      gps: device.capabilities?.gps !== false ? 'Ativo (GPS/GNSS)' : 'Inativo',
+      nfc: device.capabilities?.nfc !== false ? 'Ativo (Apple Pay)' : 'Inativo',
+    };
+  }
+  if (platform === 'macos' || platform === 'windows' || platform === 'linux') {
+    return {
+      cpu: platform === 'macos' ? 'Apple M3 Max' : 'Intel i9-14900HX',
+      ram: '32 GB DDR5',
+      storage: '1 TB NVMe (620 GB livre)',
+      gps: device.capabilities?.gps !== false ? 'Ativo (Location API)' : 'Inativo',
+      nfc: device.capabilities?.nfc !== false ? 'Ativo (WebNFC)' : 'Inativo',
+    };
+  }
+  if (platform === 'web') {
+    return {
+      cpu: 'V8 WASM Engine',
+      ram: '16 GB (Browser Heap)',
+      storage: 'IndexedDB (50 GB Quota)',
+      gps: device.capabilities?.gps !== false ? 'Ativo (Geoloc API)' : 'Inativo',
+      nfc: device.capabilities?.nfc !== false ? 'Ativo (WebNFC API)' : 'Inativo',
+    };
+  }
+  if (platform === 'smarttv') {
+    return {
+      cpu: 'Quad-Core Cortex-A55',
+      ram: '4 GB DDR4',
+      storage: '16 GB eMMC (10 GB livre)',
+      gps: 'N/A (Estático)',
+      nfc: 'Inativo',
+    };
+  }
+  return {
+    cpu: 'Snapdragon 8 Gen 3',
+    ram: '12 GB LPDDR5X',
+    storage: '256 GB UFS 4.0 (185 GB livre)',
+    gps: device.capabilities?.gps !== false ? 'Ativo (L1+L5 Dual)' : 'Inativo',
+    nfc: device.capabilities?.nfc !== false ? 'Ativo (13.56 MHz)' : 'Inativo',
+  };
+};
+
 export const DevicesView: React.FC<DevicesViewProps> = ({
   devices: initialDevices,
   onAddDevice,
@@ -247,11 +315,87 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     initialDevices && initialDevices.length > 0 ? initialDevices : DEFAULT_FLEET_DEVICES
   );
 
+  // State for Advanced Technical Metrics Visibility Selector
+  const [visibleMetrics, setVisibleMetrics] = useState<VisibleMetrics>(() => {
+    try {
+      const saved = localStorage.getItem('devices_visible_metrics');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      cpu: false,
+      ram: false,
+      storage: false,
+      gps: false,
+      nfc: false,
+      battery: true,
+      ip: true,
+      carrier: true,
+    };
+  });
+
+  const [showMetricsModal, setShowMetricsModal] = useState(false);
+
+  const toggleMetric = (key: keyof VisibleMetrics) => {
+    setVisibleMetrics((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem('devices_visible_metrics', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (initialDevices && initialDevices.length > 0) {
       setInternalDevices(initialDevices);
     }
   }, [initialDevices]);
+
+  // Real-time Firestore sync listener
+  useEffect(() => {
+    const unsub = FirestoreService.listenToDevices((remoteDevs) => {
+      if (remoteDevs && remoteDevs.length > 0) {
+        const storedPrimaryId = localStorage.getItem('primary_device_id');
+        const hasPrimary = remoteDevs.some((d) => d.isPrimaryDevice);
+
+        const mapped = remoteDevs.map((d, idx) => {
+          let isPrimary = d.isPrimaryDevice;
+          if (!hasPrimary) {
+            isPrimary = storedPrimaryId ? d.deviceId === storedPrimaryId : idx === 0;
+          }
+          return { ...d, isPrimaryDevice: isPrimary };
+        });
+
+        setInternalDevices(mapped);
+      }
+    });
+
+    return () => unsub();
+  }, []);
+
+  // Persistent handler to set Primary Device in Firestore & local state
+  const handleSetPrimaryDevice = async (targetDeviceId: string) => {
+    localStorage.setItem('primary_device_id', targetDeviceId);
+
+    const updatedDevices = internalDevices.map((d) => {
+      const isPrimary = d.deviceId === targetDeviceId;
+      return {
+        ...d,
+        isPrimaryDevice: isPrimary,
+        primaryPriority: isPrimary ? 1 : 10
+      };
+    });
+
+    setInternalDevices(updatedDevices);
+
+    try {
+      for (const dev of updatedDevices) {
+        await FirestoreService.saveDevice(dev);
+      }
+    } catch (err) {
+      console.warn('[DevicesView] Erro ao gravar Dispositivo Principal no Firestore:', err);
+    }
+  };
 
   const activeFleet = internalDevices.length > 0 ? internalDevices : DEFAULT_FLEET_DEVICES;
 
@@ -407,13 +551,30 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => setShowPairModal(true)}
-          className="flex items-center justify-center space-x-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20 transition-all cursor-pointer shrink-0 active:scale-95 border border-indigo-400/30"
-        >
-          <QrCode className="w-4 h-4" />
-          <span>Emparelhar Dispositivo</span>
-        </button>
+        <div className="flex items-center space-x-2 shrink-0">
+          <button
+            onClick={() => setShowMetricsModal(true)}
+            className="flex items-center justify-center space-x-2 px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-indigo-400 font-bold text-xs uppercase tracking-wider border border-slate-800 hover:border-slate-700 transition-all cursor-pointer active:scale-95 shadow-md"
+            title="Abrir Seletor de Métricas Técnicas Avançadas (.devices-view-modal)"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
+            <span className="hidden sm:inline">Métricas Avançadas</span>
+            <span className="sm:hidden">Métricas</span>
+            {Object.values(visibleMetrics).filter(Boolean).length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-extrabold">
+                {Object.values(visibleMetrics).filter(Boolean).length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setShowPairModal(true)}
+            className="flex items-center justify-center space-x-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20 transition-all cursor-pointer shrink-0 active:scale-95 border border-indigo-400/30"
+          >
+            <QrCode className="w-4 h-4" />
+            <span>Emparelhar Dispositivo</span>
+          </button>
+        </div>
       </div>
 
       {/* 4 STRATEGIC OPERATIONAL DIMENSIONS (Estado, Pairing, Health, Sincronização) */}
@@ -562,15 +723,19 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           <table className="w-full text-left font-mono border-collapse text-xs">
             <thead>
               <tr className="bg-slate-900/90 border-b border-slate-800 text-[11px] font-black uppercase text-slate-400 tracking-wider">
-                <th className="py-2.5 px-2.5 border-r border-slate-800/60 w-8 text-center">#</th>
-                <th className="py-2.5 px-2.5 border-r border-slate-800/60">ESTADO</th>
-                <th className="py-2.5 px-2.5 border-r border-slate-800/60">DISPOSITIVO & FABRICANTE</th>
-                <th className="py-2.5 px-2.5 border-r border-slate-800/60">PLATAFORMA / MODELO</th>
-                <th className="py-2.5 px-2.5 border-r border-slate-800/60">OPERADORA & NÚMERO VIRTUAL</th>
-                <th className="py-2.5 px-2.5 border-r border-slate-800/60 text-center">PRIORIDADE</th>
-                <th className="py-2.5 px-2.5 border-r border-slate-800/60">BATERIA</th>
-                <th className="py-2.5 px-2.5 border-r border-slate-800/60">SAÚDE</th>
-                <th className="py-2.5 px-2.5 text-center">AÇÕES</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60 w-8 text-center">#</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60">ESTADO</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60">DISPOSITIVO & MODELO</th>
+                <th className="py-2.5 px-3 border-r border-slate-800/60 text-center">DISPOSITIVO PRINCIPAL</th>
+                {visibleMetrics.cpu && <th className="py-2.5 px-3 border-r border-slate-800/60">CPU</th>}
+                {visibleMetrics.ram && <th className="py-2.5 px-3 border-r border-slate-800/60">RAM</th>}
+                {visibleMetrics.storage && <th className="py-2.5 px-3 border-r border-slate-800/60">ARMAZENAMENTO</th>}
+                {visibleMetrics.gps && <th className="py-2.5 px-3 border-r border-slate-800/60">GPS</th>}
+                {visibleMetrics.nfc && <th className="py-2.5 px-3 border-r border-slate-800/60">NFC</th>}
+                {visibleMetrics.battery && <th className="py-2.5 px-3 border-r border-slate-800/60">BATERIA</th>}
+                {visibleMetrics.carrier && <th className="py-2.5 px-3 border-r border-slate-800/60">OPERADORA</th>}
+                {visibleMetrics.ip && <th className="py-2.5 px-3 border-r border-slate-800/60">IP & REDE</th>}
+                <th className="py-2.5 px-3 text-center">AÇÕES</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -578,151 +743,227 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 filteredDevices.map((device, idx) => {
                   const isRepairing = repairingMap[device.deviceId];
                   const healthScore = device.permissionScore ?? 98;
-                  const notificationStatus = device.notificationListenerStatus || 'active';
                   const platform = getDeviceCategory(device);
+                  const isPrimary = device.isPrimaryDevice || (idx === 0 && !filteredDevices.some(d => d.isPrimaryDevice));
+                  const specs = getHardwareSpecs(device);
 
-                  // Detailed Tooltip Text Construction
                   const nodeText = device.nodeId || `node-${device.deviceId.substring(0, 8)}`;
-                  const pairedDateStr = device.pairedAt ? new Date(device.pairedAt).toLocaleString('pt-BR') : 'Desconhecido';
-                  const lastSyncStr = typeof device.lastSync === 'number' ? new Date(device.lastSync).toLocaleTimeString('pt-BR') : (device.lastSync || 'Agora');
-                  
                   const capGps = device.capabilities?.gps !== false ? '✓ Active' : '✕ Off';
                   const capNfc = device.capabilities?.nfc !== false ? '✓ Active' : '✕ Off';
                   const capBt = device.capabilities?.bluetooth !== false ? '✓ Active' : '✕ Off';
 
-                  const fullTooltipText = `Dispositivo: ${device.name}\nFabricante: ${device.manufacturer || 'N/A'}\nNó ID: ${nodeText}\nPlataforma: ${platform.toUpperCase()} (${device.osVersion || 'N/A'})\nModelo: ${device.model}\nOperadora: ${device.carrier || 'N/A'} | Número: ${device.virtualNumber || 'N/A'}\nGPS: ${capGps} | NFC: ${capNfc} | Bluetooth: ${capBt}\nPrioridade Mesh: ${device.isPrimaryDevice ? 'PRINCIPAL' : 'SECUNDÁRIO'}\nBateria: ${device.batteryLevel ?? 98}% (${device.batteryOptimizationStatus || 'Otimizado'})\nSincronia Latência: ${device.syncDelayMs ?? 5}ms\nScore Saúde: ${healthScore}%`;
+                  const fullTooltipText = `Dispositivo: ${device.name}\nFabricante: ${device.manufacturer || 'N/A'}\nNó ID: ${nodeText}\nPlataforma: ${platform.toUpperCase()} (${device.osVersion || 'N/A'})\nModelo: ${device.model}\nCPU: ${specs.cpu}\nRAM: ${specs.ram}\nArmazenamento: ${specs.storage}\nOperadora: ${device.carrier || 'N/A'} | Número: ${device.virtualNumber || 'N/A'}\nIP Address: ${device.ipAddress || '192.168.1.100'}\nGPS: ${specs.gps} | NFC: ${specs.nfc} | Bluetooth: ${capBt}\nDispositivo Principal: ${isPrimary ? 'SIM (PERSISTENTE)' : 'NÃO'}\nBateria: ${device.batteryLevel ?? 98}% (${device.batteryOptimizationStatus || 'Otimizado'})\nSincronia Latência: ${device.syncDelayMs ?? 5}ms`;
 
                   return (
                     <tr
                       key={device.deviceId}
-                      className="hover:bg-slate-900/60 transition-colors group relative border-b border-slate-800/40"
+                      className={`transition-colors group relative border-b border-slate-800/40 ${
+                        isPrimary
+                          ? 'bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/40'
+                          : 'hover:bg-slate-900/60'
+                      }`}
                       onMouseEnter={() => setHoveredTooltipId(device.deviceId)}
                       onMouseLeave={() => setHoveredTooltipId(null)}
                       title={fullTooltipText}
                     >
                       {/* Row Index */}
-                      <td className="py-2 px-2.5 border-r border-slate-800/60 text-center text-slate-500 font-bold text-[11px]">
+                      <td className="py-2.5 px-3 border-r border-slate-800/60 text-center text-slate-500 font-bold text-[11px]">
                         {idx + 1}
                       </td>
 
-                      {/* Online Status */}
-                      <td className="py-2 px-2.5 border-r border-slate-800/60 whitespace-nowrap">
-                        {device.online ? (
-                          <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[9px] shadow-sm">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                            <span>ONLINE</span>
+                      {/* ESTADO */}
+                      <td className="py-2.5 px-3 border-r border-slate-800/60 whitespace-nowrap">
+                        <div className="flex flex-col space-y-0.5">
+                          {device.online ? (
+                            <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-[10px] w-fit shadow-sm">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                              <span>ONLINE</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 font-bold text-[10px] w-fit">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                              <span>OFFLINE</span>
+                            </span>
+                          )}
+                          <span className="text-[9px] text-slate-500 font-mono">
+                            Latência: {device.syncDelayMs ?? 4}ms
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 font-bold text-[9px]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-                            <span>OFFLINE</span>
-                          </span>
-                        )}
+                        </div>
                       </td>
 
-                      {/* Dispositivo & Fabricante */}
-                      <td className="py-2 px-2.5 border-r border-slate-800/60">
-                        <div className="flex items-center space-x-2">
-                          <div className="p-1 rounded-md bg-slate-900 border border-slate-800 text-indigo-400 shrink-0">
+                      {/* DISPOSITIVO & MODELO */}
+                      <td className="py-2.5 px-3 border-r border-slate-800/60">
+                        <div className="flex items-center space-x-2.5">
+                          <div className={`p-1.5 rounded-lg border shrink-0 ${
+                            isPrimary
+                              ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                              : 'bg-slate-900 border-slate-800 text-indigo-400'
+                          }`}>
                             {renderPlatformIcon(platform)}
                           </div>
                           <div className="min-w-0">
-                            <span className="font-bold text-slate-100 text-xs truncate block group-hover:text-indigo-300 transition-colors">
+                            <span className={`font-bold text-xs truncate block ${
+                              isPrimary ? 'text-amber-200' : 'text-slate-100 group-hover:text-indigo-300'
+                            }`}>
                               {device.name}
                             </span>
-                            <span className="text-[10px] text-slate-500 font-mono block truncate">
-                              {device.manufacturer || 'Fabricante N/A'} • {nodeText}
+                            <span className="text-[10px] text-slate-400 font-mono block truncate">
+                              {device.manufacturer || 'Fabricante'} {device.model} • <span className="text-indigo-400 font-semibold">{device.osVersion || 'OS'}</span>
                             </span>
                           </div>
                         </div>
                       </td>
 
-                      {/* Plataforma / Modelo */}
-                      <td className="py-2 px-2.5 border-r border-slate-800/60 text-slate-300">
-                        <span className="font-semibold text-xs block truncate">{device.model}</span>
-                        <span className="text-[10px] text-indigo-400 font-bold uppercase block truncate">{platform} • {device.osVersion || 'OS 1.0'}</span>
-                      </td>
-
-                      {/* Operadora & Número Virtual */}
-                      <td className="py-2 px-2.5 border-r border-slate-800/60">
-                        <span className="font-bold text-emerald-400 text-[11px] block truncate font-mono">
-                          {device.virtualNumber || '+244 923 000 000'}
-                        </span>
-                        <span className="text-[10px] text-slate-400 block truncate">
-                          {device.carrier || 'Unitel Angola'}
-                        </span>
-                      </td>
-
-                      {/* Prioridade do Dispositivo Principal */}
-                      <td className="py-2 px-2.5 border-r border-slate-800/60 text-center">
+                      {/* DISPOSITIVO PRINCIPAL */}
+                      <td className="py-2.5 px-3 border-r border-slate-800/60 text-center whitespace-nowrap">
                         <button
-                          onClick={() => {
-                            setInternalDevices(prev => prev.map(d => d.deviceId === device.deviceId ? { ...d, isPrimaryDevice: !d.isPrimaryDevice } : d));
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase cursor-pointer border transition-all ${
-                            device.isPrimaryDevice || idx === 0
-                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
-                              : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300'
+                          onClick={() => handleSetPrimaryDevice(device.deviceId)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase cursor-pointer border transition-all flex items-center space-x-1.5 mx-auto ${
+                            isPrimary
+                              ? 'bg-amber-500/25 text-amber-300 border-amber-500/60 shadow-md shadow-amber-500/20 ring-1 ring-amber-500/40'
+                              : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700 hover:bg-slate-800'
                           }`}
-                          title="Alternar prioridade de dispositivo principal"
+                          title="Clique para definir no Firestore como Dispositivo Principal"
                         >
-                          {device.isPrimaryDevice || idx === 0 ? '★ PRINCIPAL' : 'SECUNDÁRIO'}
+                          <Star className={`w-3.5 h-3.5 ${isPrimary ? 'fill-amber-400 text-amber-400' : 'text-slate-500'}`} />
+                          <span>{isPrimary ? 'PRINCIPAL (FIRESTORE)' : 'TORNAR PRINCIPAL'}</span>
                         </button>
                       </td>
 
-                      {/* Bateria */}
-                      <td className="py-2 px-2.5 border-r border-slate-800/60">
-                        <div className="inline-flex items-center space-x-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-md font-bold text-[10px]" title={`Otimização: ${device.batteryOptimizationStatus || 'Padrão'}`}>
-                          <Battery className="w-3 h-3 text-amber-400 shrink-0" />
-                          <span>{device.batteryLevel ?? 98}%</span>
-                        </div>
-                      </td>
-
-                      {/* Saúde Score */}
-                      <td className="py-2 px-2.5 border-r border-slate-800/60">
-                        <div className="flex items-center space-x-1">
-                          <div className="w-8 bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full ${healthScore >= 95 ? 'bg-emerald-400' : healthScore >= 80 ? 'bg-amber-400' : 'bg-rose-400'}`}
-                              style={{ width: `${healthScore}%` }}
-                            />
+                      {/* CPU */}
+                      {visibleMetrics.cpu && (
+                        <td className="py-2.5 px-3 border-r border-slate-800/60 whitespace-nowrap">
+                          <div className="flex items-center space-x-1.5">
+                            <Cpu className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span className="font-mono text-[11px] text-slate-200">{specs.cpu}</span>
                           </div>
-                          <span className="text-[10px] font-bold text-slate-200">{healthScore}%</span>
-                        </div>
-                      </td>
+                        </td>
+                      )}
 
-                      {/* Ações */}
-                      <td className="py-2 px-2.5 text-center">
+                      {/* RAM */}
+                      {visibleMetrics.ram && (
+                        <td className="py-2.5 px-3 border-r border-slate-800/60 whitespace-nowrap">
+                          <div className="flex items-center space-x-1.5">
+                            <Database className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                            <span className="font-mono text-[11px] text-slate-200">{specs.ram}</span>
+                          </div>
+                        </td>
+                      )}
+
+                      {/* ARMAZENAMENTO */}
+                      {visibleMetrics.storage && (
+                        <td className="py-2.5 px-3 border-r border-slate-800/60 whitespace-nowrap">
+                          <div className="flex items-center space-x-1.5">
+                            <HardDrive className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span className="font-mono text-[11px] text-slate-200">{specs.storage}</span>
+                          </div>
+                        </td>
+                      )}
+
+                      {/* GPS */}
+                      {visibleMetrics.gps && (
+                        <td className="py-2.5 px-3 border-r border-slate-800/60 whitespace-nowrap">
+                          <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            specs.gps.includes('Ativo')
+                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                              : 'bg-slate-900 text-slate-500 border-slate-800'
+                          }`}>
+                            <Navigation className="w-3 h-3 shrink-0" />
+                            <span>{specs.gps}</span>
+                          </span>
+                        </td>
+                      )}
+
+                      {/* NFC */}
+                      {visibleMetrics.nfc && (
+                        <td className="py-2.5 px-3 border-r border-slate-800/60 whitespace-nowrap">
+                          <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            specs.nfc.includes('Ativo')
+                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                              : 'bg-slate-900 text-slate-500 border-slate-800'
+                          }`}>
+                            <Radio className="w-3 h-3 shrink-0" />
+                            <span>{specs.nfc}</span>
+                          </span>
+                        </td>
+                      )}
+
+                      {/* BATERIA */}
+                      {visibleMetrics.battery && (
+                        <td className="py-2.5 px-3 border-r border-slate-800/60 whitespace-nowrap">
+                          <div className="flex flex-col space-y-0.5">
+                            <div className={`inline-flex items-center space-x-1.5 px-2 py-0.5 border rounded-md font-bold text-[10px] w-fit ${
+                              (device.batteryLevel ?? 98) >= 70
+                                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                                : (device.batteryLevel ?? 98) >= 30
+                                ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                                : 'bg-rose-500/10 text-rose-300 border-rose-500/20'
+                            }`}>
+                              <Battery className="w-3.5 h-3.5 shrink-0" />
+                              <span>{device.batteryLevel ?? 98}%</span>
+                            </div>
+                            <span className="text-[9px] text-slate-500 font-mono">
+                              {device.batteryOptimizationStatus || 'Otimizado'}
+                            </span>
+                          </div>
+                        </td>
+                      )}
+
+                      {/* OPERADORA */}
+                      {visibleMetrics.carrier && (
+                        <td className="py-2.5 px-3 border-r border-slate-800/60 whitespace-nowrap">
+                          <div className="flex flex-col space-y-0.5">
+                            <span className="font-bold text-slate-200 text-[11px] block truncate">
+                              {device.carrier || 'Unitel Angola'}
+                            </span>
+                            <span className="text-[10px] text-emerald-400 font-mono font-semibold block truncate">
+                              {device.virtualNumber || '+244 923 000 000'}
+                            </span>
+                          </div>
+                        </td>
+                      )}
+
+                      {/* IP & REDE */}
+                      {visibleMetrics.ip && (
+                        <td className="py-2.5 px-3 border-r border-slate-800/60 whitespace-nowrap">
+                          <div className="flex flex-col space-y-0.5">
+                            <span className="font-mono font-bold text-indigo-300 text-[11px] block truncate">
+                              {device.ipAddress || '192.168.1.100'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono block truncate">
+                              {device.networkType || '5G / VoLTE'}
+                            </span>
+                          </div>
+                        </td>
+                      )}
+
+                      {/* AÇÕES */}
+                      <td className="py-2.5 px-3 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center space-x-1">
-                          {/* Tooltip Info Popover Trigger */}
                           <div className="relative group/popover">
                             <button
                               type="button"
-                              className="p-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-indigo-300 border border-slate-800 transition-colors cursor-pointer"
-                              title="Ver Detalhes Técnicos do Nó"
+                              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-indigo-300 border border-slate-800 transition-colors cursor-pointer"
+                              title="Ver Detalhes de Telemetria"
                             >
                               <Info className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Floating Custom Tooltip Popover (Painel Expandido de Telemetria) */}
+                            {/* Custom Telemetry Popover */}
                             <div className="absolute right-0 bottom-full mb-2 hidden group-hover/popover:block z-50 w-80 p-3.5 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl text-[11px] text-slate-200 font-mono space-y-2 pointer-events-none animate-in fade-in duration-150">
                               <div className="font-bold text-indigo-400 border-b border-slate-800 pb-1 flex items-center justify-between">
-                                <span>PAINEL EXPANDIDO DE TELEMETRIA</span>
+                                <span>TELEMETRIA AVANÇADA</span>
                                 <span className="text-[9px] text-slate-400">{platform.toUpperCase()}</span>
                               </div>
                               <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-300">
-                                <p><strong className="text-slate-400">Nó / ID:</strong> {device.name}</p>
-                                <p><strong className="text-slate-400">Modelo:</strong> {device.model}</p>
-                                <p><strong className="text-slate-400">CPU:</strong> Octa-Core (2.8 GHz)</p>
-                                <p><strong className="text-slate-400">RAM:</strong> 8 GB LPDDR5</p>
-                                <p><strong className="text-slate-400">Armazenamento:</strong> 256 GB (180 GB livre)</p>
-                                <p><strong className="text-slate-400">Rede:</strong> 5G / Wi-Fi 6E (12ms)</p>
-                                <p><strong className="text-slate-400">GPS / Pos.:</strong> {capGps}</p>
-                                <p><strong className="text-slate-400">NFC / BLE:</strong> {capNfc} / {capBt}</p>
-                                <p><strong className="text-slate-400">Câmara / Mic:</strong> Autorizado / Ativo</p>
-                                <p><strong className="text-slate-400">Sensores:</strong> Acel., Giro, Biorritmo</p>
-                                <p><strong className="text-slate-400">Operadora:</strong> {device.carrier || 'Unitel/Africell'}</p>
-                                <p><strong className="text-slate-400">Telemetria:</strong> Sincronizado (&lt;12ms)</p>
+                                <p><strong className="text-slate-400">Nó ID:</strong> {nodeText}</p>
+                                <p><strong className="text-slate-400">IP:</strong> {device.ipAddress || '192.168.1.100'}</p>
+                                <p><strong className="text-slate-400">Operadora:</strong> {device.carrier || 'Unitel'}</p>
+                                <p><strong className="text-slate-400">Número:</strong> {device.virtualNumber || '+244 923 000 000'}</p>
+                                <p><strong className="text-slate-400">Bateria:</strong> {device.batteryLevel ?? 98}%</p>
+                                <p><strong className="text-slate-400">Status:</strong> {device.online ? 'Online' : 'Offline'}</p>
+                                <p><strong className="text-slate-400">Dispositivo:</strong> {isPrimary ? 'Principal' : 'Secundário'}</p>
+                                <p><strong className="text-slate-400">GPS/BLE:</strong> {capGps} / {capBt}</p>
                               </div>
                             </div>
                           </div>
@@ -730,7 +971,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                           <button
                             onClick={() => handleAutoRepair(device.deviceId)}
                             disabled={isRepairing}
-                            className="p-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all cursor-pointer"
+                            className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all cursor-pointer"
                             title="Auto-Repair (Reativar Listener)"
                           >
                             <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
@@ -738,7 +979,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
                           <button
                             onClick={onSimulateEvent}
-                            className="p-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all cursor-pointer"
+                            className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all cursor-pointer"
                             title="Simular Evento"
                           >
                             <Send className="w-3.5 h-3.5" />
@@ -746,7 +987,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
                           <button
                             onClick={() => handleRemove(device.deviceId)}
-                            className="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all cursor-pointer"
+                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all cursor-pointer"
                             title="Desconectar Dispositivo"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -758,7 +999,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center bg-slate-950 text-slate-500">
+                  <td colSpan={12} className="py-8 text-center bg-slate-950 text-slate-500">
                     <div className="max-w-sm mx-auto space-y-2">
                       <Globe className="w-6 h-6 mx-auto text-slate-600" />
                       <span className="block text-xs font-bold text-slate-300">Nenhum dispositivo encontrado</span>
@@ -802,6 +1043,235 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         isExpanded={isBatteryExpanded}
         onToggleExpand={() => setIsBatteryExpanded((prev) => !prev)}
       />
+
+      {/* MODAL SELETOR DE MÉTRICAS TÉCNICAS AVANÇADAS (.devices-view-modal) */}
+      {showMetricsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="devices-view-modal bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                  <SlidersHorizontal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-100 text-sm sm:text-base tracking-tight flex items-center gap-2">
+                    Seletor de Métricas Técnicas Avançadas
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Exiba ou oculte métricas técnicas por dispositivo sem sobrecarregar o layout principal
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMetricsModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Presets Bar */}
+            <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800/80 text-xs font-mono">
+              <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Modos de Exibição Rápidos:</span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    setVisibleMetrics({
+                      cpu: false,
+                      ram: false,
+                      storage: false,
+                      gps: false,
+                      nfc: false,
+                      battery: true,
+                      ip: true,
+                      carrier: true
+                    });
+                  }}
+                  className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg text-[10px] font-bold border border-slate-800 transition-all cursor-pointer"
+                >
+                  Layout Essencial
+                </button>
+                <button
+                  onClick={() => {
+                    setVisibleMetrics({
+                      cpu: true,
+                      ram: true,
+                      storage: true,
+                      gps: true,
+                      nfc: true,
+                      battery: true,
+                      ip: true,
+                      carrier: true
+                    });
+                  }}
+                  className="px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded-lg text-[10px] font-bold border border-indigo-500/30 transition-all cursor-pointer"
+                >
+                  Exibir Todas as Métricas
+                </button>
+              </div>
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-1">
+              
+              {/* CPU */}
+              <div
+                onClick={() => toggleMetric('cpu')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  visibleMetrics.cpu
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-slate-100 shadow-md ring-1 ring-indigo-500/20'
+                    : 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg border ${visibleMetrics.cpu ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                    <Cpu className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold block">Processador (CPU)</span>
+                    <span className="text-[10px] text-slate-500 font-mono block">Arquitetura, núcleos e frequência</span>
+                  </div>
+                </div>
+                <div className={`w-8 h-4 rounded-full transition-colors relative ${visibleMetrics.cpu ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                  <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${visibleMetrics.cpu ? 'left-4.5' : 'left-0.5'}`} />
+                </div>
+              </div>
+
+              {/* RAM */}
+              <div
+                onClick={() => toggleMetric('ram')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  visibleMetrics.ram
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-slate-100 shadow-md ring-1 ring-indigo-500/20'
+                    : 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg border ${visibleMetrics.ram ? 'bg-indigo-500/20 border-indigo-500/40 text-cyan-300' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                    <Database className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold block">Memória RAM</span>
+                    <span className="text-[10px] text-slate-500 font-mono block">Capacidade total e alocação</span>
+                  </div>
+                </div>
+                <div className={`w-8 h-4 rounded-full transition-colors relative ${visibleMetrics.ram ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                  <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${visibleMetrics.ram ? 'left-4.5' : 'left-0.5'}`} />
+                </div>
+              </div>
+
+              {/* ARMAZENAMENTO */}
+              <div
+                onClick={() => toggleMetric('storage')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  visibleMetrics.storage
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-slate-100 shadow-md ring-1 ring-indigo-500/20'
+                    : 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg border ${visibleMetrics.storage ? 'bg-indigo-500/20 border-indigo-500/40 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                    <HardDrive className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold block">Armazenamento</span>
+                    <span className="text-[10px] text-slate-500 font-mono block">Espaço total e espaço livre</span>
+                  </div>
+                </div>
+                <div className={`w-8 h-4 rounded-full transition-colors relative ${visibleMetrics.storage ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                  <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${visibleMetrics.storage ? 'left-4.5' : 'left-0.5'}`} />
+                </div>
+              </div>
+
+              {/* GPS */}
+              <div
+                onClick={() => toggleMetric('gps')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  visibleMetrics.gps
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-slate-100 shadow-md ring-1 ring-indigo-500/20'
+                    : 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg border ${visibleMetrics.gps ? 'bg-indigo-500/20 border-indigo-500/40 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                    <Navigation className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold block">GPS / Geolocalização</span>
+                    <span className="text-[10px] text-slate-500 font-mono block">Módulo de posicionamento global</span>
+                  </div>
+                </div>
+                <div className={`w-8 h-4 rounded-full transition-colors relative ${visibleMetrics.gps ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                  <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${visibleMetrics.gps ? 'left-4.5' : 'left-0.5'}`} />
+                </div>
+              </div>
+
+              {/* NFC */}
+              <div
+                onClick={() => toggleMetric('nfc')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  visibleMetrics.nfc
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-slate-100 shadow-md ring-1 ring-indigo-500/20'
+                    : 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg border ${visibleMetrics.nfc ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                    <Radio className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold block">Sensor NFC / Proximidade</span>
+                    <span className="text-[10px] text-slate-500 font-mono block">Tagging e pagamentos sem contato</span>
+                  </div>
+                </div>
+                <div className={`w-8 h-4 rounded-full transition-colors relative ${visibleMetrics.nfc ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                  <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${visibleMetrics.nfc ? 'left-4.5' : 'left-0.5'}`} />
+                </div>
+              </div>
+
+              {/* BATERIA */}
+              <div
+                onClick={() => toggleMetric('battery')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                  visibleMetrics.battery
+                    ? 'bg-indigo-500/10 border-indigo-500/50 text-slate-100 shadow-md ring-1 ring-indigo-500/20'
+                    : 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg border ${visibleMetrics.battery ? 'bg-indigo-500/20 border-indigo-500/40 text-amber-300' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                    <Battery className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold block">Bateria & Otimização</span>
+                    <span className="text-[10px] text-slate-500 font-mono block">Carga, saúde e estado de economia</span>
+                  </div>
+                </div>
+                <div className={`w-8 h-4 rounded-full transition-colors relative ${visibleMetrics.battery ? 'bg-indigo-600' : 'bg-slate-800'}`}>
+                  <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-transform ${visibleMetrics.battery ? 'left-4.5' : 'left-0.5'}`} />
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-400 font-mono">
+                <strong className="text-indigo-400">{Object.values(visibleMetrics).filter(Boolean).length}</strong> de 8 métricas ativas na visão principal
+              </span>
+              <button
+                onClick={() => setShowMetricsModal(false)}
+                className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+              >
+                Aplicar e Salvar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* QR Code Pair Modal */}
       {showPairModal && (
