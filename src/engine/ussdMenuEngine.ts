@@ -61,6 +61,28 @@ export class USSDMenuEngine {
    * Definição de Menus USSD Hierárquicos
    */
   private static readonly MENUS: Record<string, USSDMenu> = {
+    '110': {
+      id: '110',
+      title: 'Hardware Diagnostics [*110#]',
+      header: 'SUBSISTEMAS & VALIDAÇÃO DE HARDWARE (CAMADA 48):',
+      items: [
+        { key: '1', label: 'Testar Energia & Power Circuit', actionId: 'HARDWARE_TEST_POWER' },
+        { key: '2', label: 'Testar Volume Rocker (0-100%)', actionId: 'HARDWARE_TEST_VOLUME' },
+        { key: '3', label: 'Testar Lockscreen & Display', actionId: 'HARDWARE_TEST_LOCK' },
+        { key: '4', label: 'Testar DTMF & Audio Mesh', actionId: 'HARDWARE_TEST_AUDIO' },
+        { key: '0', label: 'Sair', actionId: 'CLOSE_USSD' }
+      ]
+    },
+    '111': {
+      id: '111',
+      title: 'Emergency Lockdown SOS [*111#]',
+      header: 'BLOQUEIO DE EMERGÊNCIA & ISOLAMENTO IMEDIATO:',
+      items: [
+        { key: '1', label: 'Bloquear Imediatamente', actionId: 'HARDWARE_EMERGENCY_LOCK' },
+        { key: '2', label: 'Desligar Dispositivo', actionId: 'HARDWARE_POWER_OFF' },
+        { key: '0', label: 'Cancelar', actionId: 'CLOSE_USSD' }
+      ]
+    },
     '100': {
       id: '100',
       title: 'Portal COS — Founder Core [*100#]',

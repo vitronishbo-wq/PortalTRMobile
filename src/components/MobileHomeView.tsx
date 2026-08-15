@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare,
   PhoneCall,
@@ -22,7 +22,14 @@ import {
   Plus,
   Sliders,
   Users,
-  ShieldCheck
+  ShieldCheck,
+  Power,
+  Volume2,
+  VolumeX,
+  Volume1,
+  Cpu,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 import { HomeWidget, WidgetType } from './HomeWidget';
@@ -31,6 +38,13 @@ import {
   HomeCustomizationConfig,
   DEFAULT_CLEAN_CONFIG
 } from './HomePersonalizationWidget';
+import { HardwareEngine, HardwareState } from '../engine/hardwareEngine';
+import { HapticEngine } from '../engine/hapticEngine';
+import { VolumeHud } from './hardware/VolumeHud';
+import { PowerMenuModal } from './hardware/PowerMenuModal';
+import { LockscreenView } from './hardware/LockscreenView';
+import { BootSequenceView } from './hardware/BootSequenceView';
+import { HardwareTestModal } from './hardware/HardwareTestModal';
 
 export type { HomeCustomizationConfig };
 
@@ -64,6 +78,40 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
   const [isCustomizeOpen, setIsCustomizeOpen] = useState<boolean>(false);
+  const [isHardwareTestOpen, setIsHardwareTestOpen] = useState<boolean>(false);
+
+  // Hardware Engine Emulation State (Camadas 41-48)
+  const [hwState, setHwState] = useState<HardwareState>(HardwareEngine.getState());
+
+  const powerPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const unsubscribe = HardwareEngine.subscribe((state) => {
+      setHwState(state);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handlePowerMouseDown = () => {
+    isLongPressRef.current = false;
+    if (powerPressTimerRef.current) clearTimeout(powerPressTimerRef.current);
+    powerPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      HardwareEngine.handlePowerLongPress();
+    }, 1500);
+  };
+
+  const handlePowerMouseUp = () => {
+    if (powerPressTimerRef.current) {
+      clearTimeout(powerPressTimerRef.current);
+      powerPressTimerRef.current = null;
+    }
+    if (!isLongPressRef.current) {
+      HardwareEngine.handlePowerShortClick();
+    }
+    isLongPressRef.current = false;
+  };
 
   // Home Customization State with LocalStorage Persistence
   const [config, setConfig] = useState<HomeCustomizationConfig>(() => {
