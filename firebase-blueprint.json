@@ -69,6 +69,26 @@
         "active": { "type": "boolean" }
       },
       "required": ["sessionId", "userId"]
+    },
+    "UpdateLifecycleLog": {
+      "title": "Update Lifecycle Log",
+      "description": "PWA service worker version lifecycle event tracking in the field",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "eventType": { "type": "string", "enum": ["update-detected", "update-initiated", "update-applied", "update-failed", "update-check"] },
+        "currentVersion": { "type": "string" },
+        "detectedVersion": { "type": "string" },
+        "status": { "type": "string", "enum": ["current", "update-available", "updating", "failed"] },
+        "timestamp": { "type": "number" },
+        "userId": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "platform": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "error": { "type": "string" },
+        "durationMs": { "type": "number" }
+      },
+      "required": ["id", "eventType", "currentVersion", "status", "timestamp", "userId", "deviceId"]
     }
   },
   "firestore": {
@@ -91,6 +111,14 @@
     "/sessions/{sessionId}": {
       "schema": { "$ref": "#/entities/AppSession" },
       "description": "Active Portal sessions"
+    },
+    "/update_logs/{logId}": {
+      "schema": { "$ref": "#/entities/UpdateLifecycleLog" },
+      "description": "Centralized PWA version lifecycle update telemetry"
+    },
+    "/system_logs/{logId}": {
+      "schema": { "$ref": "#/entities/UpdateLifecycleLog" },
+      "description": "System-wide audit and update lifecycle events in the field"
     }
   }
 }

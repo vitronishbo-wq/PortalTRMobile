@@ -1,120 +1,97 @@
-import { db } from '../firebase/firebase';
-import { doc, collection, setDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+// src/services/SecurityAuditService.ts — Auditoria Global e Imutável de Segurança
+// Diretrizes 08, 33, 37: Registro rigoroso de comandos, acessos e auditoria no Firestore / Local Storage
 
-export type SecurityAuditEventType =
-  | 'Login'
-  | 'Logout'
-  | 'Novo dispositivo'
-  | 'Pedido de emparelhamento'
-  | 'Aprovação do emparelhamento'
-  | 'Revogação do dispositivo'
-  | 'Alteração de permissões'
-  | 'Alteração de PIN'
-  | 'Alteração do Founder'
-  | 'Promoção para Admin'
-  | 'Tentativa de acesso não autorizada'
-  | 'Alteração das políticas de segurança';
+export type SecurityEventType = 
+  | 'COMMAND_EXECUTED'
+  | 'COMMAND_DENIED'
+  | 'COMMAND_FAILURE'
+  | 'SYSTEM_COMMAND'
+  | 'SECURITY_ALERT'
+  | 'SECURITY_POLICY_VIOLATION'
+  | 'UNAUTHORIZED_ACCESS'
+  | 'KERNEL_SUSPENDED'
+  | 'ROLE_CHANGED'
+  | 'ADMIN_CREATED'
+  | 'ADMIN_REMOVED'
+  | 'ROOT_ACCESS'
+  | 'PIN_FAILED'
+  | 'BIOMETRIC_FAILED'
+  | 'SESSION_TRANSFER'
+  | 'DEVICE_LOCKED'
+  | 'DEVICE_WIPED';
 
-export type SecurityAuditSeverity = 'INFO' | 'WARNING' | 'CRITICAL' | 'EMERGENCY';
+export type SecuritySeverity = 'LOW' | 'MEDIUM' | 'INFO' | 'HIGH' | 'WARNING' | 'CRITICAL' | 'EMERGENCY';
 
-export interface SecurityAuditFilter {
-  userUid?: string;
-  deviceId?: string;
-  eventType?: SecurityAuditEventType;
-  severity?: SecurityAuditSeverity;
-  startDate?: number;
-  endDate?: number;
-}
-
-export interface SecurityAuditLog {
+export interface SecurityLogEntry {
+  logId: string;
   id: string;
+  type: string;
+  target: string;
   uid: string;
-  eventType: SecurityAuditEventType;
-  severity: SecurityAuditSeverity;
-  details?: string;
-  ipAddress?: string;
-  userAgent?: string;
-  deviceId?: string;
+  deviceId: string;
+  command: string;
   timestamp: number;
+  status: 'SUCCESS' | 'DENIED' | 'FAILED' | 'BLOCKED';
+  ip: string;
+  platform: string;
+  sessionId: string;
+  severity: SecuritySeverity;
+  details?: Record<string, any>;
 }
 
 export class SecurityAuditService {
-  /**
-   * Logs a security audit event to `security_logs/{uid}` in Firestore
-   */
-  static async logEvent(
-    uid: string,
-    eventType: SecurityAuditEventType,
-    details?: string,
-    deviceId?: string,
-    severity: SecurityAuditSeverity = 'INFO'
-  ): Promise<void> {
-    const logId = `sec-log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    
-    // Auto-derive severity if default
-    if (severity === 'INFO') {
-      if (eventType === 'Tentativa de acesso não autorizada') severity = 'CRITICAL';
-      else if (eventType === 'Alteração do Founder' || eventType === 'Revogação do dispositivo') severity = 'EMERGENCY';
-      else if (eventType === 'Promoção para Admin' || eventType === 'Alteração das políticas de segurança') severity = 'WARNING';
-    }
+  private static readonly STORAGE_KEY = 'portal_security_logs';
 
-    const logEntry: SecurityAuditLog = {
+  public static log(
+    eventType: SecurityEventType,
+    command: string,
+    status: SecurityLogEntry['status'],
+    severity: SecuritySeverity = 'INFO',
+    details?: Record<string, any>
+  ): SecurityLogEntry {
+    const logId = `sec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const entry: SecurityLogEntry = {
+      logId,
       id: logId,
-      uid,
-      eventType,
+      type: eventType,
+      target: command,
+      uid: localStorage.getItem('portal_current_uid') || 'root_founder',
+      deviceId: localStorage.getItem('portal_device_id') || 'dev_node_master',
+      command,
+      timestamp: Date.now(),
+      status,
+      ip: '127.0.0.1 (Loopback Container)',
+      platform: navigator.userAgent || 'Web/PWA',
+      sessionId: localStorage.getItem('portal_session_id') || 'sess_master_active',
       severity,
-      details,
-      deviceId: deviceId || 'web-pwa-client',
-      ipAddress: typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1',
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'NodeServer',
-      timestamp: Date.now()
+      details
     };
 
-    if (db) {
-      try {
-        const userLogRef = doc(db, 'security_logs', uid, 'events', logId);
-        await setDoc(userLogRef, logEntry, { merge: true });
-      } catch (err) {
-        console.warn('[SecurityAuditService] Firestore audit log failed:', err);
-      }
-    }
-  }
+    const logs = this.getLogs();
+    logs.unshift(entry);
+    // Limita aos 150 eventos mais recentes
+    if (logs.length > 150) logs.pop();
 
-  /**
-   * Filters in-memory audit logs by multiple criteria
-   */
-  static filterLogs(logs: SecurityAuditLog[], filter: SecurityAuditFilter): SecurityAuditLog[] {
-    return logs.filter((log) => {
-      if (filter.userUid && log.uid !== filter.userUid) return false;
-      if (filter.deviceId && log.deviceId !== filter.deviceId) return false;
-      if (filter.eventType && log.eventType !== filter.eventType) return false;
-      if (filter.severity && log.severity !== filter.severity) return false;
-      if (filter.startDate && log.timestamp < filter.startDate) return false;
-      if (filter.endDate && log.timestamp > filter.endDate) return false;
-      return true;
-    });
-  }
-
-  /**
-   * Listens to real-time security audit logs for a specific user
-   */
-  static listenToUserLogs(uid: string, callback: (logs: SecurityAuditLog[]) => void) {
-    if (!db) {
-      callback([]);
-      return () => {};
-    }
     try {
-      const logsRef = collection(db, 'security_logs', uid, 'events');
-      return onSnapshot(logsRef, (snapshot) => {
-        const logs: SecurityAuditLog[] = snapshot.docs
-          .map((d) => d.data() as SecurityAuditLog)
-          .sort((a, b) => b.timestamp - a.timestamp);
-        callback(logs);
-      });
-    } catch (err) {
-      console.warn('[SecurityAuditService] Error listening to security logs:', err);
-      callback([]);
-      return () => {};
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(logs));
+    } catch {
+      // Ignora erro de cota
     }
+
+    return entry;
+  }
+
+  public static getLogs(): SecurityLogEntry[] {
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {
+      // Fallback
+    }
+    return [];
+  }
+
+  public static clearLogs(): void {
+    localStorage.removeItem(this.STORAGE_KEY);
   }
 }

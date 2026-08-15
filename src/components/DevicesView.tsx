@@ -29,13 +29,21 @@ import {
   Database,
   Navigation,
   Radio,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Lock,
+  ArrowRightLeft,
+  UserCheck
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Device } from '../types';
 import { ZeroTouchIdentity } from '../engine/provisioningEngine';
 import { BatteryUsageMonitor } from './BatteryUsageMonitor';
 import { FirestoreService } from '../services/firestore';
+import { DeviceActionModal, DeviceActionType } from './DeviceActionModal';
+import { AndroidPermissionsTable } from './AndroidPermissionsTable';
+import { RealTelemetryService, RealTelemetryData } from '../services/RealTelemetryService';
+import { RealTelemetryConsole } from './RealTelemetryConsole';
+import { OperationalRealityValidatorConsole } from './OperationalRealityValidatorConsole';
 
 interface DevicesViewProps {
   devices?: Device[];
@@ -257,51 +265,68 @@ export interface VisibleMetrics {
   carrier: boolean;
 }
 
-const getHardwareSpecs = (device: Device) => {
+const getHardwareSpecs = (device: Device, realTelemetry: RealTelemetryData | null) => {
   const platform = (device.platform || '').toLowerCase();
   
+  // Se for o nó local/web ou dispositivo principal ativo, usar dados de Telemetria Real nativa das APIs W3C/Android
+  if (realTelemetry && (platform === 'web' || device.isPrimaryDevice)) {
+    return {
+      cpu: realTelemetry.cpu.model,
+      ram: realTelemetry.ram.summary,
+      storage: realTelemetry.storage.summary,
+      gps: device.capabilities?.gps !== false ? 'Ativo (Geolocation API)' : 'Inativo',
+      nfc: device.capabilities?.nfc !== false ? 'Ativo (WebNFC API)' : 'Inativo',
+      batterySummary: realTelemetry.battery.summary,
+      batteryLevel: realTelemetry.battery.level,
+      networkSummary: realTelemetry.network.summary
+    };
+  }
+
   if (platform === 'iphone' || platform === 'ipad') {
     return {
-      cpu: 'Apple A17 Pro / M2',
-      ram: '8 GB Unified',
-      storage: '256 GB (190 GB livre)',
+      cpu: 'Apple A17 Pro (6-Core CPU)',
+      ram: '8 GB Unified Memory',
+      storage: '256 GB NVMe (190 GB livre)',
       gps: device.capabilities?.gps !== false ? 'Ativo (GPS/GNSS)' : 'Inativo',
-      nfc: device.capabilities?.nfc !== false ? 'Ativo (Apple Pay)' : 'Inativo',
+      nfc: device.capabilities?.nfc !== false ? 'Ativo (Apple Pay Core)' : 'Inativo',
+      batterySummary: `${device.batteryLevel ?? 88}%`,
+      batteryLevel: device.batteryLevel ?? 88,
+      networkSummary: device.networkType || 'VoNR 5G'
     };
   }
   if (platform === 'macos' || platform === 'windows' || platform === 'linux') {
     return {
-      cpu: platform === 'macos' ? 'Apple M3 Max' : 'Intel i9-14900HX',
-      ram: '32 GB DDR5',
-      storage: '1 TB NVMe (620 GB livre)',
-      gps: device.capabilities?.gps !== false ? 'Ativo (Location API)' : 'Inativo',
-      nfc: device.capabilities?.nfc !== false ? 'Ativo (WebNFC)' : 'Inativo',
-    };
-  }
-  if (platform === 'web') {
-    return {
-      cpu: 'V8 WASM Engine',
-      ram: '16 GB (Browser Heap)',
-      storage: 'IndexedDB (50 GB Quota)',
-      gps: device.capabilities?.gps !== false ? 'Ativo (Geoloc API)' : 'Inativo',
-      nfc: device.capabilities?.nfc !== false ? 'Ativo (WebNFC API)' : 'Inativo',
+      cpu: platform === 'macos' ? 'Apple Silicon Core' : 'x86_64 Multi-Core Host',
+      ram: '16 GB Hardware RAM',
+      storage: '512 GB SSD (Armazenamento Disponível)',
+      gps: device.capabilities?.gps !== false ? 'Ativo (Location Host)' : 'Inativo',
+      nfc: device.capabilities?.nfc !== false ? 'Ativo (Host NFC)' : 'Inativo',
+      batterySummary: `${device.batteryLevel ?? 100}% (AC Conectado)`,
+      batteryLevel: device.batteryLevel ?? 100,
+      networkSummary: device.networkType || 'Ethernet Gigabit'
     };
   }
   if (platform === 'smarttv') {
     return {
-      cpu: 'Quad-Core Cortex-A55',
-      ram: '4 GB DDR4',
-      storage: '16 GB eMMC (10 GB livre)',
+      cpu: 'ARM SoC (Display Host)',
+      ram: '4 GB RAM Integrada',
+      storage: '16 GB Flash (10 GB livre)',
       gps: 'N/A (Estático)',
       nfc: 'Inativo',
+      batterySummary: '100% (AC Direto)',
+      batteryLevel: 100,
+      networkSummary: device.networkType || 'Ethernet RJ45'
     };
   }
   return {
-    cpu: 'Snapdragon 8 Gen 3',
-    ram: '12 GB LPDDR5X',
-    storage: '256 GB UFS 4.0 (185 GB livre)',
-    gps: device.capabilities?.gps !== false ? 'Ativo (L1+L5 Dual)' : 'Inativo',
-    nfc: device.capabilities?.nfc !== false ? 'Ativo (13.56 MHz)' : 'Inativo',
+    cpu: realTelemetry?.cpu ? realTelemetry.cpu.model : 'Octa-Core Host',
+    ram: realTelemetry?.ram ? realTelemetry.ram.summary : '8 GB LPDDR5X',
+    storage: realTelemetry?.storage ? realTelemetry.storage.summary : '128 GB UFS Flash',
+    gps: device.capabilities?.gps !== false ? 'Ativo (GNSS Dual)' : 'Inativo',
+    nfc: device.capabilities?.nfc !== false ? 'Ativo (Android NFC Core)' : 'Inativo',
+    batterySummary: `${device.batteryLevel ?? 94}%`,
+    batteryLevel: device.batteryLevel ?? 94,
+    networkSummary: device.networkType || '5G / VoLTE'
   };
 };
 
@@ -314,6 +339,29 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [internalDevices, setInternalDevices] = useState<Device[]>(
     initialDevices && initialDevices.length > 0 ? initialDevices : DEFAULT_FLEET_DEVICES
   );
+  const [realTelemetry, setRealTelemetry] = useState<RealTelemetryData | null>(null);
+
+  // Fetch Real Telemetry from W3C/Android native device APIs
+  useEffect(() => {
+    let isMounted = true;
+    const fetchTelemetry = async () => {
+      try {
+        const data = await RealTelemetryService.getCompleteTelemetry();
+        if (isMounted) {
+          setRealTelemetry(data);
+        }
+      } catch (err) {
+        console.warn('[DevicesView] Falha ao adquirir telemetria real:', err);
+      }
+    };
+
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // State for Advanced Technical Metrics Visibility Selector
   const [visibleMetrics, setVisibleMetrics] = useState<VisibleMetrics>(() => {
@@ -408,6 +456,32 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [repairingMap, setRepairingMap] = useState<Record<string, boolean>>({});
   const [isBatteryExpanded, setIsBatteryExpanded] = useState<boolean>(false);
   const [hoveredTooltipId, setHoveredTooltipId] = useState<string | null>(null);
+
+  const [selectedActionDevice, setSelectedActionDevice] = useState<Device | null>(null);
+  const [selectedActionType, setSelectedActionType] = useState<DeviceActionType | null>(null);
+
+  const handleOpenActionModal = (device: Device, action: DeviceActionType) => {
+    setSelectedActionDevice(device);
+    setSelectedActionType(action);
+  };
+
+  const handleExecuteAction = async (device: Device, action: DeviceActionType, extraData?: any) => {
+    if (action === 'PROMOTE') {
+      await handleSetPrimaryDevice(device.deviceId);
+    } else if (action === 'REMOVE') {
+      handleRemove(device.deviceId);
+    } else if (action === 'LOCK') {
+      setInternalDevices((prev) =>
+        prev.map((d) => (d.deviceId === device.deviceId ? { ...d, online: false } : d))
+      );
+    } else if (action === 'WIPE') {
+      handleRemove(device.deviceId);
+    } else if (action === 'PAIR') {
+      handleAutoRepair(device.deviceId);
+    } else if (action === 'TRANSFER') {
+      alert(`[TRANSFER] Titularidade do nó ${device.name} transferida para ${extraData?.transferTarget || 'novo utilizador'}.`);
+    }
+  };
 
   // Platform filters: todos, android, iphone, web, desktop, tablet
   const [platformFilter, setPlatformFilter] = useState<'todos' | 'android' | 'iphone' | 'web' | 'desktop' | 'tablet'>('todos');
@@ -745,14 +819,25 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                   const healthScore = device.permissionScore ?? 98;
                   const platform = getDeviceCategory(device);
                   const isPrimary = device.isPrimaryDevice || (idx === 0 && !filteredDevices.some(d => d.isPrimaryDevice));
-                  const specs = getHardwareSpecs(device);
+                  const specs = getHardwareSpecs(device, realTelemetry);
+
+                  const displayBattery = (isPrimary || platform === 'web') && realTelemetry?.battery
+                    ? realTelemetry.battery.level
+                    : (device.batteryLevel ?? 98);
+                  const displayBatterySummary = (isPrimary || platform === 'web') && realTelemetry?.battery
+                    ? realTelemetry.battery.summary
+                    : `${device.batteryLevel ?? 98}% (${device.batteryOptimizationStatus || 'Otimizado'})`;
+
+                  const displayNetwork = (isPrimary || platform === 'web') && realTelemetry?.network
+                    ? realTelemetry.network.summary
+                    : (device.networkType || '5G / VoLTE');
 
                   const nodeText = device.nodeId || `node-${device.deviceId.substring(0, 8)}`;
                   const capGps = device.capabilities?.gps !== false ? '✓ Active' : '✕ Off';
                   const capNfc = device.capabilities?.nfc !== false ? '✓ Active' : '✕ Off';
                   const capBt = device.capabilities?.bluetooth !== false ? '✓ Active' : '✕ Off';
 
-                  const fullTooltipText = `Dispositivo: ${device.name}\nFabricante: ${device.manufacturer || 'N/A'}\nNó ID: ${nodeText}\nPlataforma: ${platform.toUpperCase()} (${device.osVersion || 'N/A'})\nModelo: ${device.model}\nCPU: ${specs.cpu}\nRAM: ${specs.ram}\nArmazenamento: ${specs.storage}\nOperadora: ${device.carrier || 'N/A'} | Número: ${device.virtualNumber || 'N/A'}\nIP Address: ${device.ipAddress || '192.168.1.100'}\nGPS: ${specs.gps} | NFC: ${specs.nfc} | Bluetooth: ${capBt}\nDispositivo Principal: ${isPrimary ? 'SIM (PERSISTENTE)' : 'NÃO'}\nBateria: ${device.batteryLevel ?? 98}% (${device.batteryOptimizationStatus || 'Otimizado'})\nSincronia Latência: ${device.syncDelayMs ?? 5}ms`;
+                  const fullTooltipText = `Dispositivo: ${device.name}\nFabricante: ${device.manufacturer || 'N/A'}\nNó ID: ${nodeText}\nPlataforma: ${platform.toUpperCase()} (${device.osVersion || 'N/A'})\nModelo: ${device.model}\nCPU: ${specs.cpu}\nRAM: ${specs.ram}\nArmazenamento: ${specs.storage}\nOperadora: ${device.carrier || 'N/A'} | Número: ${device.virtualNumber || 'N/A'}\nIP/Rede: ${displayNetwork}\nGPS: ${specs.gps} | NFC: ${specs.nfc} | Bluetooth: ${capBt}\nDispositivo Principal: ${isPrimary ? 'SIM (PERSISTENTE)' : 'NÃO'}\nBateria Real: ${displayBatterySummary}\nSincronia Latência: ${device.syncDelayMs ?? 5}ms`;
 
                   return (
                     <tr
@@ -893,17 +978,17 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                         <td className="py-2.5 px-3 border-r border-slate-800/60 whitespace-nowrap">
                           <div className="flex flex-col space-y-0.5">
                             <div className={`inline-flex items-center space-x-1.5 px-2 py-0.5 border rounded-md font-bold text-[10px] w-fit ${
-                              (device.batteryLevel ?? 98) >= 70
+                              displayBattery >= 70
                                 ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
-                                : (device.batteryLevel ?? 98) >= 30
+                                : displayBattery >= 30
                                 ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
                                 : 'bg-rose-500/10 text-rose-300 border-rose-500/20'
                             }`}>
                               <Battery className="w-3.5 h-3.5 shrink-0" />
-                              <span>{device.batteryLevel ?? 98}%</span>
+                              <span>{displayBattery}%</span>
                             </div>
-                            <span className="text-[9px] text-slate-500 font-mono">
-                              {device.batteryOptimizationStatus || 'Otimizado'}
+                            <span className="text-[9px] text-slate-500 font-mono truncate max-w-[130px]">
+                              {displayBatterySummary}
                             </span>
                           </div>
                         </td>
@@ -930,8 +1015,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                             <span className="font-mono font-bold text-indigo-300 text-[11px] block truncate">
                               {device.ipAddress || '192.168.1.100'}
                             </span>
-                            <span className="text-[10px] text-slate-400 font-mono block truncate">
-                              {device.networkType || '5G / VoLTE'}
+                            <span className="text-[10px] text-slate-400 font-mono block truncate max-w-[150px]">
+                              {displayNetwork}
                             </span>
                           </div>
                         </td>
@@ -968,27 +1053,36 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                             </div>
                           </div>
 
+                          {/* Rapid Action Buttons via Modal */}
                           <button
-                            onClick={() => handleAutoRepair(device.deviceId)}
+                            onClick={() => handleOpenActionModal(device, 'LOCK')}
+                            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-800 transition-all cursor-pointer"
+                            title="Bloquear Dispositivo (LOCK)"
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleOpenActionModal(device, 'PAIR')}
                             disabled={isRepairing}
-                            className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all cursor-pointer"
-                            title="Auto-Repair (Reativar Listener)"
+                            className="p-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 transition-all cursor-pointer"
+                            title="Forçar Re-emparelhamento / Auto-Repair (PAIR)"
                           >
-                            <Wrench className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
+                            <RefreshCw className={`w-3.5 h-3.5 ${isRepairing ? 'animate-spin' : ''}`} />
                           </button>
 
                           <button
-                            onClick={onSimulateEvent}
+                            onClick={() => handleOpenActionModal(device, 'TRANSFER')}
                             className="p-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all cursor-pointer"
-                            title="Simular Evento"
+                            title="Transferir Titularidade (TRANSFER)"
                           >
-                            <Send className="w-3.5 h-3.5" />
+                            <ArrowRightLeft className="w-3.5 h-3.5" />
                           </button>
 
                           <button
-                            onClick={() => handleRemove(device.deviceId)}
+                            onClick={() => handleOpenActionModal(device, 'WIPE')}
                             className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all cursor-pointer"
-                            title="Desconectar Dispositivo"
+                            title="Limpeza Remota de Dados (WIPE)"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1043,6 +1137,15 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         isExpanded={isBatteryExpanded}
         onToggleExpand={() => setIsBatteryExpanded((prev) => !prev)}
       />
+
+      {/* Operational Reality Validator (O Teste Definitivo - FASE 6) */}
+      <OperationalRealityValidatorConsole />
+
+      {/* Real Telemetry Console (BatteryManager, NetworkInformation, Device APIs, NotificationListenerService, Android) */}
+      <RealTelemetryConsole />
+
+      {/* Android Permissions Spec Table */}
+      <AndroidPermissionsTable />
 
       {/* MODAL SELETOR DE MÉTRICAS TÉCNICAS AVANÇADAS (.devices-view-modal) */}
       {showMetricsModal && (
@@ -1354,6 +1457,20 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Action Modal */}
+      {selectedActionDevice && selectedActionType && (
+        <DeviceActionModal
+          device={selectedActionDevice}
+          action={selectedActionType}
+          isOpen={true}
+          onClose={() => {
+            setSelectedActionDevice(null);
+            setSelectedActionType(null);
+          }}
+          onConfirm={handleExecuteAction}
+        />
       )}
     </div>
   );

@@ -5,3 +5,4 @@ export * from './Settings';
 export * from './Session';
 export * from './Engine';
 export * from './License';
+export * from './UpdateLog';

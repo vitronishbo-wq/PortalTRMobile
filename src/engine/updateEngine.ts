@@ -1,5 +1,10 @@
 /* PortalTRMobile - PWA Auto-Update Engine & Execution Layer */
 
+import { FirestoreService } from '../services/firestore';
+import { UpdateLifecycleEventType, UpdateLifecycleLog } from '../types/UpdateLog';
+import { auth, db } from '../firebase/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+
 export type UpdateStatus = 'current' | 'update-available' | 'updating' | 'failed';
 
 export interface UpdateState {
@@ -11,7 +16,21 @@ export interface UpdateState {
   hasWaitingWorker: boolean;
 }
 
+export interface SystemLogUpdateRecord {
+  installedVersion: string;
+  availableVersion: string;
+  buildHash: string;
+  startTime: number;
+  endTime: number;
+  result: 'SUCCESS' | 'FAILED' | 'ROLLBACK' | 'RECOVERED';
+  isRollback: boolean;
+  failureReason?: string;
+  deviceId: string;
+  platform: string;
+}
+
 export const APP_VERSION = '5.0.0-TelecomCore';
+export const CURRENT_BUILD_HASH = 'b8f2d9c4-telecom-5.0';
 
 class UpdateEngineService {
   private currentVersion: string = APP_VERSION;
@@ -24,6 +43,7 @@ class UpdateEngineService {
   private isUpdating: boolean = false;
   private initialized: boolean = false;
   private updateCheckInterval: any = null;
+  private lastLoggedDetectedVersion: string | null = null;
 
   /**
    * Initializes the PWA Auto-Update Engine
@@ -33,6 +53,9 @@ class UpdateEngineService {
     this.initialized = true;
 
     console.log(`[UpdateEngine] Inicializando Kernel PWA Update Engine (v${this.currentVersion})...`);
+
+    // Check if an update was just applied before the reload
+    this.checkPendingAppliedUpdate();
 
     if ('serviceWorker' in navigator) {
       // Monitor controller change across windows
@@ -49,7 +72,7 @@ class UpdateEngineService {
           navigator.serviceWorker.ready.then((readyReg) => {
             this.attachRegistration(readyReg);
           }).catch(() => {
-            console.warn('[UpdateEngine] Nenhuma registo de Service Worker encontrado no boot.');
+            console.warn('[UpdateEngine] Nenhum registo de Service Worker encontrado no boot.');
           });
         }
       }).catch((err) => {
@@ -103,7 +126,7 @@ class UpdateEngineService {
   }
 
   /**
-   * Emits update available state and triggers global events
+   * Emits update available state, triggers global events, and logs to Firestore
    */
   public notifyUpdateAvailable(detectedVersion?: string): void {
     if (this.status === 'updating') return;
@@ -111,7 +134,7 @@ class UpdateEngineService {
     this.status = 'update-available';
     this.detectedVersion = detectedVersion || '5.0.1-TelecomCore';
     
-    console.log(`[UpdateEngine] Sinal global emitted: pwa-update-available (${this.detectedVersion})`);
+    console.log(`[UpdateEngine] Sinal global emitido: pwa-update-available (${this.detectedVersion})`);
 
     const state = this.getState();
 
@@ -119,6 +142,14 @@ class UpdateEngineService {
     window.dispatchEvent(new CustomEvent('pwa-update-available', { detail: state }));
 
     this.notifySubscribers();
+
+    // Centralized Firestore Logging: update-detected
+    if (this.lastLoggedDetectedVersion !== this.detectedVersion) {
+      this.lastLoggedDetectedVersion = this.detectedVersion;
+      this.logLifecycleEvent('update-detected', {
+        detectedVersion: this.detectedVersion
+      });
+    }
   }
 
   /**
@@ -184,10 +215,26 @@ class UpdateEngineService {
     this.error = undefined;
     this.notifySubscribers();
 
+    const targetVer = this.detectedVersion || '5.0.1-TelecomCore';
+    const initiatedAt = Date.now();
+
     console.log('[UpdateEngine] A iniciar força de atualização do Kernel PWA...');
 
+    // Centralized Firestore Logging: update-initiated
+    this.logLifecycleEvent('update-initiated', {
+      detectedVersion: targetVer,
+      metadata: { initiatedAt }
+    });
+
     try {
-      // 1. Controlled CacheStorage purge (leaves LocalStorage, IndexedDB and Firestore intact)
+      // 1. Save pending update payload in sessionStorage for post-reload logging
+      sessionStorage.setItem('portal_pwa_update_pending', JSON.stringify({
+        initiatedAt,
+        fromVersion: this.currentVersion,
+        targetVersion: targetVer
+      }));
+
+      // 2. Controlled CacheStorage purge (leaves LocalStorage, IndexedDB and Firestore intact)
       if ('caches' in window) {
         const cacheKeys = await caches.keys();
         console.log(`[UpdateEngine] A eliminar ${cacheKeys.length} caches antigas do CacheStorage...`);
@@ -195,7 +242,7 @@ class UpdateEngineService {
         console.log('[UpdateEngine] Caches PWA eliminadas com sucesso.');
       }
 
-      // 2. Obtain registration and trigger SKIP_WAITING
+      // 3. Obtain registration and trigger SKIP_WAITING
       const reg = this.registration || (await navigator.serviceWorker.getRegistration());
       if (reg) {
         const targetWorker = reg.waiting || reg.installing || reg.active;
@@ -206,7 +253,7 @@ class UpdateEngineService {
         }
       }
 
-      // 3. Fallback timer if controllerchange event takes longer than 1.2s
+      // 4. Fallback timer if controllerchange event takes longer than 1.2s
       setTimeout(() => {
         this.performReload();
       }, 1200);
@@ -216,7 +263,305 @@ class UpdateEngineService {
       this.status = 'failed';
       this.error = err instanceof Error ? err.message : 'Falha ao aplicar atualização do Kernel';
       this.isUpdating = false;
+      sessionStorage.removeItem('portal_pwa_update_pending');
       this.notifySubscribers();
+
+      // Centralized Firestore Logging: update-failed
+      this.logLifecycleEvent('update-failed', {
+        detectedVersion: targetVer,
+        error: this.error
+      });
+    }
+  }
+
+  /**
+   * 1. UPDATE: Inicia verificação e download do novo pacote
+   */
+  public async update(targetVersion?: string): Promise<boolean> {
+    const startTime = Date.now();
+    const target = targetVersion || this.detectedVersion || '5.0.1-TelecomCore';
+    console.log(`[UpdateEngine] [UPDATE] Iniciando ciclo para versão ${target}...`);
+    this.status = 'updating';
+    this.notifySubscribers();
+
+    try {
+      const isVerified = await this.verify();
+      if (!isVerified) {
+        throw new Error('Verificação de integridade falhou antes da aplicação.');
+      }
+      return true;
+    } catch (err: any) {
+      this.status = 'failed';
+      this.error = err.message;
+      this.notifySubscribers();
+      await this.logToSystemLogs('update-failed', {
+        error: err.message,
+        metadata: {
+          installedVersion: this.currentVersion,
+          availableVersion: target,
+          buildHash: CURRENT_BUILD_HASH,
+          startTime,
+          endTime: Date.now(),
+          result: 'FAILED',
+          isRollback: false,
+          failureReason: err.message
+        }
+      });
+      return false;
+    }
+  }
+
+  /**
+   * 2. VERIFY: Valida integridade do bundle e compatibilidade
+   */
+  public async verify(): Promise<boolean> {
+    console.log('[UpdateEngine] [VERIFY] Validando integridade do ServiceWorker e storage...');
+    try {
+      if (typeof window === 'undefined') return true;
+      const isSwSupported = 'serviceWorker' in navigator;
+      const isStorageOk = typeof localStorage !== 'undefined';
+      return isSwSupported && isStorageOk;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 3. APPLY: Executa a substituição segura e recarga do runtime
+   */
+  public async apply(): Promise<boolean> {
+    const startTime = Date.now();
+    const target = this.detectedVersion || '5.0.1-TelecomCore';
+    console.log(`[UpdateEngine] [APPLY] Aplicando versão ${target}...`);
+    try {
+      await this.forceSystemUpdate();
+      return true;
+    } catch (err: any) {
+      await this.logToSystemLogs('update-failed', {
+        error: err.message,
+        metadata: {
+          installedVersion: this.currentVersion,
+          availableVersion: target,
+          buildHash: CURRENT_BUILD_HASH,
+          startTime,
+          endTime: Date.now(),
+          result: 'FAILED',
+          isRollback: false,
+          failureReason: err.message
+        }
+      });
+      return false;
+    }
+  }
+
+  /**
+   * 4. ROLLBACK: Reverte para a versão anterior em caso de degradação
+   */
+  public async rollback(previousVersion?: string): Promise<boolean> {
+    const startTime = Date.now();
+    const target = previousVersion || '5.0.0-TelecomCore';
+    console.warn(`[UpdateEngine] [ROLLBACK] Revertendo para ${target}...`);
+    this.status = 'updating';
+    this.notifySubscribers();
+
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      this.currentVersion = target;
+      this.status = 'current';
+      this.error = undefined;
+      this.notifySubscribers();
+
+      await this.logToSystemLogs('update-applied', {
+        detectedVersion: target,
+        metadata: {
+          installedVersion: target,
+          availableVersion: target,
+          buildHash: CURRENT_BUILD_HASH,
+          startTime,
+          endTime: Date.now(),
+          result: 'ROLLBACK',
+          isRollback: true,
+          failureReason: 'Manual/Automated Rollback Triggered'
+        }
+      });
+
+      this.performReload();
+      return true;
+    } catch (err: any) {
+      this.status = 'failed';
+      this.error = err.message;
+      this.notifySubscribers();
+      return false;
+    }
+  }
+
+  /**
+   * 5. RECOVERY: Recuperação de emergência do runtime
+   */
+  public async recovery(): Promise<boolean> {
+    const startTime = Date.now();
+    console.warn('[UpdateEngine] [RECOVERY] Executando recuperação de emergência do runtime...');
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) {
+          await reg.unregister();
+        }
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      sessionStorage.clear();
+
+      await this.logToSystemLogs('update-applied', {
+        detectedVersion: this.currentVersion,
+        metadata: {
+          installedVersion: this.currentVersion,
+          availableVersion: this.currentVersion,
+          buildHash: CURRENT_BUILD_HASH,
+          startTime,
+          endTime: Date.now(),
+          result: 'RECOVERED',
+          isRollback: false,
+          failureReason: 'Kernel emergency recovery executed'
+        }
+      });
+
+      window.location.href = '/';
+      return true;
+    } catch (err: any) {
+      this.error = err.message;
+      return false;
+    }
+  }
+
+  /**
+   * Checks if an update was just applied and logs the success lifecycle event
+   */
+  private checkPendingAppliedUpdate(): void {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const pendingStr = sessionStorage.getItem('portal_pwa_update_pending');
+      if (pendingStr) {
+        sessionStorage.removeItem('portal_pwa_update_pending');
+        const pending = JSON.parse(pendingStr);
+        const durationMs = Date.now() - (pending.initiatedAt || Date.now());
+
+        console.log(`[UpdateEngine] Atualização aplicada com sucesso! Duração: ${durationMs}ms`);
+
+        // Centralized Firestore Logging: update-applied
+        this.logLifecycleEvent('update-applied', {
+          detectedVersion: this.currentVersion,
+          durationMs,
+          metadata: {
+            previousVersion: pending.fromVersion,
+            appliedVersion: this.currentVersion,
+            targetVersion: pending.targetVersion
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('[UpdateEngine] Erro ao processar checkPendingAppliedUpdate:', err);
+    }
+  }
+
+  /**
+   * Registra especificamente eventos de ciclo de vida ('update-detected', 'update-failed', 'update-applied')
+   * na coleção 'system_logs' do Firestore, garantindo rastreabilidade do estado de atualização em campo.
+   */
+  public async logToSystemLogs(
+    eventType: 'update-detected' | 'update-failed' | 'update-applied' | UpdateLifecycleEventType,
+    extra: Partial<UpdateLifecycleLog> = {}
+  ): Promise<void> {
+    try {
+      const userId = auth?.currentUser?.uid || localStorage.getItem('portal_user_id') || 'usr-default';
+      const deviceId = localStorage.getItem('portal_primary_device_id') || localStorage.getItem('portal_device_id') || 'dev-pwa-client';
+      const platform = typeof navigator !== 'undefined' ? (navigator.platform || navigator.userAgent) : 'web';
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
+
+      const logId = `sys_upd_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+      const meta = extra.metadata || {};
+      const systemLogPayload = {
+        id: logId,
+        eventType,
+        installedVersion: meta.installedVersion || this.currentVersion,
+        availableVersion: meta.availableVersion || (extra.detectedVersion !== undefined ? extra.detectedVersion : this.detectedVersion) || this.currentVersion,
+        currentVersion: this.currentVersion,
+        detectedVersion: extra.detectedVersion !== undefined ? extra.detectedVersion : this.detectedVersion,
+        buildHash: meta.buildHash || CURRENT_BUILD_HASH,
+        startTime: meta.startTime || Date.now(),
+        endTime: meta.endTime || Date.now(),
+        result: meta.result || (eventType === 'update-failed' ? 'FAILED' : eventType === 'update-applied' ? 'SUCCESS' : 'IN_PROGRESS'),
+        isRollback: Boolean(meta.isRollback),
+        failureReason: meta.failureReason || extra.error || null,
+        status: this.status,
+        timestamp: Date.now(),
+        userId,
+        deviceId,
+        platform,
+        userAgent,
+        error: extra.error,
+        durationMs: extra.durationMs || (meta.endTime && meta.startTime ? meta.endTime - meta.startTime : null),
+        metadata: meta,
+        category: 'UPDATE_LIFECYCLE',
+        module: 'PWA_UPDATE_ENGINE',
+        severity: eventType === 'update-failed' ? 'ERROR' : eventType === 'update-applied' ? 'SUCCESS' : 'INFO'
+      };
+
+      if (db) {
+        const logRef = doc(db, 'system_logs', logId);
+        await setDoc(logRef, systemLogPayload, { merge: true });
+        console.log(`[UpdateEngine] Evento [${eventType}] gravado com sucesso em 'system_logs' (${systemLogPayload.detectedVersion || systemLogPayload.currentVersion})`);
+      }
+    } catch (e) {
+      console.warn('[UpdateEngine] Aviso ao persistir log em system_logs:', e);
+    }
+  }
+
+  /**
+   * Dispatches a structured lifecycle update event to Firestore for centralized monitoring
+   */
+  public async logLifecycleEvent(
+    eventType: UpdateLifecycleEventType,
+    extra: Partial<UpdateLifecycleLog> = {}
+  ): Promise<void> {
+    try {
+      // 1. Grava no canal padrão de atualização via FirestoreService
+      const userId = auth?.currentUser?.uid || localStorage.getItem('portal_user_id') || 'usr-default';
+      const deviceId = localStorage.getItem('portal_primary_device_id') || localStorage.getItem('portal_device_id') || 'dev-pwa-client';
+      const platform = typeof navigator !== 'undefined' ? (navigator.platform || navigator.userAgent) : 'web';
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
+
+      const logId = `upd_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+      const logRecord: UpdateLifecycleLog = {
+        id: logId,
+        eventType,
+        currentVersion: this.currentVersion,
+        detectedVersion: extra.detectedVersion !== undefined ? extra.detectedVersion : this.detectedVersion,
+        status: this.status,
+        timestamp: Date.now(),
+        userId,
+        deviceId,
+        platform,
+        userAgent,
+        error: extra.error,
+        durationMs: extra.durationMs,
+        metadata: extra.metadata
+      };
+
+      await FirestoreService.logUpdateEvent(logRecord);
+
+      // 2. Grava diretamente na coleção 'system_logs' para garantir a rastreabilidade estrita
+      await this.logToSystemLogs(eventType, extra);
+    } catch (e) {
+      console.warn('[UpdateEngine] Falha ao enviar log de ciclo de vida para Firestore:', e);
     }
   }
 

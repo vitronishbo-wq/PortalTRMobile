@@ -1,31 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Navbar } from './components/Navbar';
-import { TimelineView } from './components/TimelineView';
-import { CloudStatusView } from './components/CloudStatusView';
-import { DevicesView } from './components/DevicesView';
-import { AnalyticsView } from './components/AnalyticsView';
-import { FirestoreConfigView } from './components/FirestoreConfigView';
-import { DeploymentGuideView } from './components/DeploymentGuideView';
-import { EventSimulatorModal } from './components/EventSimulatorModal';
 import { DisguisedCalculator } from './components/DisguisedCalculator';
 import { CamouflageSettingsModal } from './components/CamouflageSettingsModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { AuthModal } from './components/AuthModal';
-import { SmartInstaller } from './components/SmartInstaller';
 import { PWAInstallNotificationBanner } from './components/PWAInstallNotificationBanner';
-import { SystemKernelUpdateBanner } from './components/SystemKernelUpdateBanner';
-import { AdaptiveOnboardingView } from './components/AdaptiveOnboardingView';
-import { updateEngine } from './engine/updateEngine';
-import { RuntimeControlView } from './components/RuntimeControlView';
-import { FounderConsoleView } from './components/FounderConsoleView';
+import { EventSimulatorModal } from './components/EventSimulatorModal';
 import { FounderIDEWorkspace } from './components/workspaces/FounderIDEWorkspace';
 import { PublicWorkspace } from './components/workspaces/PublicWorkspace';
 import { useAppStateMachine } from './engine/appStateMachine';
 import { CapabilityEngine } from './engine/CapabilityEngine';
-import { useIdentity, IdentityEngine } from './engine/identityEngine';
+import { useIdentity } from './engine/identityEngine';
 import { AuthorityEngine } from './engine/authorityEngine';
 import { PortalEvent, Device, FirestoreConfig, EventStats } from './types';
-import { Bell, X, Activity, Star, Search, Smartphone, PhoneCall } from 'lucide-react';
+import { Bell, X, Activity } from 'lucide-react';
 import {
   subscribeToEvents,
   subscribeToDevices,
@@ -701,20 +688,6 @@ export default function App() {
       {/* Global Expired Subscription Banner */}
       <ExpiredSubscriptionBanner onNavigateToBilling={handleNavigateToBilling} />
 
-      {/* Top Navbar */}
-      <Navbar
-        workspaceMode={workspaceMode}
-        setWorkspaceMode={setWorkspaceMode}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        unreadCount={unreadCount}
-        onSimulateEvent={handleSimulateRandomEvent}
-        onLockCamouflage={appStateMachine.lockApp}
-        onOpenCamouflageSettings={() => setIsProfileModalOpen(true)}
-        onOpenInstallModal={() => setIsInstallModalOpen(true)}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-      />
-
       {/* Offline Mode Cache Status Banner */}
       <OfflineBanner
         isOnline={isOnline}
@@ -747,11 +720,11 @@ export default function App() {
         }}
       />
 
-      {/* Main Content Body */}
+      {/* Main Content Body — 100% Contido no Smartphone */}
       <main className={`flex-1 w-full max-w-7xl mx-auto overflow-x-hidden transition-all ${
         workspaceMode === 'public' || !isFounderUser
-          ? 'py-2 px-2 sm:px-4 my-1 sm:my-2 pb-16'
-          : 'py-4 sm:py-6 px-3 sm:px-6 lg:px-8 bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl shadow-slate-950/80 my-2 sm:my-4 pb-24'
+          ? 'py-2 px-2 sm:px-4 my-1 sm:my-2 pb-4 flex flex-col items-center justify-center'
+          : 'py-4 sm:py-6 px-3 sm:px-6 lg:px-8 bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-3xl shadow-2xl shadow-slate-950/80 my-2 sm:my-4 pb-12'
       }`}>
         {workspaceMode === 'public' || !isFounderUser ? (
           <PublicWorkspace 
@@ -763,7 +736,7 @@ export default function App() {
             onSimulateEvent={handleSimulateRandomEvent}
           />
         ) : (
-          <FounderIDEWorkspace />
+          <FounderIDEWorkspace onBackToPublic={() => setWorkspaceMode('public')} />
         )}
       </main>
 
@@ -788,63 +761,6 @@ export default function App() {
         onSaveCalcTitle={handleSaveCalcTitle}
       />
 
-
-      {/* Aesthetic Icon-Only Navigation Dock Footer */}
-      <footer className="bg-slate-900/95 border-t border-slate-800/80 py-2.5 text-center text-xs text-slate-500 mt-auto sticky bottom-0 z-30 backdrop-blur-md">
-        <div className="max-w-md mx-auto px-4 flex items-center justify-center space-x-6 sm:space-x-8">
-          <button
-            onClick={() => triggerTabSwitch('inicio')}
-            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              currentPublicTab === 'inicio' || currentPublicTab === 'home' || !currentPublicTab
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400/50'
-                : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
-            }`}
-            title="Smartphone Principal"
-            aria-label="Smartphone Principal"
-          >
-            <Smartphone className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-          </button>
-
-          <button
-            onClick={() => triggerTabSwitch('chamadas')}
-            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              currentPublicTab === 'chamadas'
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 scale-105 ring-1 ring-emerald-400/50'
-                : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
-            }`}
-            title="Tecla de Chamada (Teclado)"
-            aria-label="Tecla de Chamada (Teclado)"
-          >
-            <PhoneCall className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-          </button>
-
-          <button
-            onClick={() => triggerTabSwitch('favorites')}
-            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              currentPublicTab === 'favorites' || currentPublicTab === 'favoritos'
-                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 scale-105 ring-1 ring-amber-300/50'
-                : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
-            }`}
-            title="Favoritos"
-            aria-label="Favoritos"
-          >
-            <Star className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-          </button>
-
-          <button
-            onClick={() => triggerTabSwitch('search')}
-            className={`p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
-              currentPublicTab === 'search' || currentPublicTab === 'pesquisa'
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-105 ring-1 ring-indigo-400/50'
-                : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
-            }`}
-            title="Pesquisa"
-            aria-label="Pesquisa"
-          >
-            <Search className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-          </button>
-        </div>
-      </footer>
     </div>
     </ClipboardProvider>
     </CommandProvider>

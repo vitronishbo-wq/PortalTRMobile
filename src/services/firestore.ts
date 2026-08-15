@@ -12,7 +12,7 @@ import {
   limit,
   Unsubscribe
 } from 'firebase/firestore';
-import { AppEvent, Device, UserSettings, UserProfile, AppSession, License, resolveRootLevel, getDefaultPermissionsForRole } from '../types/index';
+import { AppEvent, Device, UserSettings, UserProfile, AppSession, License, UpdateLifecycleLog, resolveRootLevel, getDefaultPermissionsForRole } from '../types/index';
 
 export class FirestoreService {
   /**
@@ -672,4 +672,87 @@ export class FirestoreService {
       console.error('[FirestoreService] Erro ao salvar provedor de telefonia:', e);
     }
   }
+
+  /**
+   * Registra eventos de ciclo de vida de atualização nas coleções do Firestore (update_logs e system_logs)
+   */
+  static async logUpdateEvent(log: UpdateLifecycleLog): Promise<void> {
+    if (!db) return;
+    try {
+      const logId = log.id || `upd_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const logData = {
+        ...log,
+        id: logId,
+        timestamp: log.timestamp || Date.now()
+      };
+
+      // Gravação na coleção 'update_logs'
+      const updateLogRef = doc(db, 'update_logs', logId);
+      await setDoc(updateLogRef, logData, { merge: true });
+
+      // Gravação na coleção 'system_logs' para auditoria e rastreabilidade centralizada
+      const systemLogRef = doc(db, 'system_logs', logId);
+      await setDoc(systemLogRef, {
+        ...logData,
+        category: 'UPDATE_LIFECYCLE',
+        module: 'PWA_UPDATE_ENGINE',
+        severity: log.eventType === 'update-failed' ? 'ERROR' : log.eventType === 'update-applied' ? 'SUCCESS' : 'INFO'
+      }, { merge: true });
+
+      console.log(`[FirestoreService] Log de atualização registrado em system_logs e update_logs: [${log.eventType}] (${log.detectedVersion || log.currentVersion})`);
+    } catch (e) {
+      console.warn('[FirestoreService] Aviso ao gravar log de atualização no Firestore:', e);
+    }
+  }
+
+  /**
+   * Escuta em tempo real os logs de ciclo de vida de atualização em campo (update_logs)
+   */
+  static listenToUpdateLogs(
+    onData: (logs: UpdateLifecycleLog[]) => void,
+    onError?: (err: Error) => void
+  ): Unsubscribe {
+    if (!db) {
+      onData([]);
+      return () => {};
+    }
+
+    try {
+      const logsRef = collection(db, 'update_logs');
+      const q = query(logsRef, orderBy('timestamp', 'desc'), limit(100));
+
+      return onSnapshot(
+        q,
+        (snapshot) => {
+          const logs: UpdateLifecycleLog[] = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data();
+            return {
+              id: docSnap.id,
+              eventType: data.eventType || 'update-check',
+              currentVersion: data.currentVersion || '5.0.0-TelecomCore',
+              detectedVersion: data.detectedVersion || null,
+              status: data.status || 'current',
+              timestamp: data.timestamp || Date.now(),
+              userId: data.userId || 'usr-default',
+              deviceId: data.deviceId || 'dev-unknown',
+              platform: data.platform || '',
+              userAgent: data.userAgent || '',
+              error: data.error,
+              durationMs: data.durationMs,
+              metadata: data.metadata
+            };
+          });
+          onData(logs);
+        },
+        (error) => {
+          console.warn('[FirestoreService] Erro no listener de update_logs:', error.message);
+          if (onError) onError(error);
+        }
+      );
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao subscrever update_logs:', e);
+      return () => {};
+    }
+  }
 }
+

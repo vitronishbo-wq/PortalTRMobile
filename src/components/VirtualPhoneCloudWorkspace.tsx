@@ -50,10 +50,41 @@ import '../telecom/EsimProvider';
 import { ZeroTouchProvisioningPipelineModal } from './ZeroTouchProvisioningPipelineModal';
 import { AppCenterView } from './AppCenterView';
 import { CloudMobileOSView } from './CloudMobileOSView';
+import { TelecomProvisioningConsole } from './TelecomProvisioningConsole';
+import { BankingReadinessTable } from './BankingReadinessTable';
+import { InstalledAppsTable } from './InstalledAppsTable';
+import { HomeScreenManager } from './HomeScreenManager';
+import { Landmark, LayoutGrid, CheckSquare, Terminal, Command as CommandIcon } from 'lucide-react';
+import { CommandEngine } from '../engine/commandEngine';
+import { CommandRegistry } from '../engine/commandRegistry';
+import { CommandSuggestionEngine, CommandSuggestion } from '../engine/commandSuggestionEngine';
+import { CreateAdminModal } from './modals/CreateAdminModal';
+import { CommandPaletteModal } from './modals/CommandPaletteModal';
+import { USSDDialogModal } from './modals/USSDDialogModal';
+import { FounderIDEWorkspace } from './workspaces/FounderIDEWorkspace';
+import { COSCommandBar } from './modals/COSCommandBar';
+import { DTMFT9Engine } from '../engine/dtmfT9Engine';
 
 export const VirtualPhoneCloudWorkspace: React.FC = () => {
   const [showZeroTouchPipeline, setShowZeroTouchPipeline] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'teclado' | 'numeros_virtuais' | 'mesh_sessions' | 'historico' | 'contactos' | 'sms' | 'voicemail' | 'app_center' | 'cloud_os'>('teclado');
+  const [showCreateAdminModal, setShowCreateAdminModal] = useState<boolean>(false);
+  const [showCommandPalette, setShowCommandPalette] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<
+    | 'teclado'
+    | 'founder_ide'
+    | 'telecom_provisioning'
+    | 'numeros_virtuais'
+    | 'mesh_sessions'
+    | 'historico'
+    | 'contactos'
+    | 'sms'
+    | 'voicemail'
+    | 'banking_readiness'
+    | 'installed_apps'
+    | 'homescreen_mgr'
+    | 'app_center'
+    | 'cloud_os'
+  >('teclado');
   const [selectedProviderId, setSelectedProviderId] = useState<string>('unitel-primary');
   const [phoneNumber, setPhoneNumber] = useState<string>('');
   const [inCall, setInCall] = useState<boolean>(false);
@@ -259,6 +290,70 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
     };
   }, [inCall, isOnHold]);
 
+  // Command Engine Event Listener (Desacoplamento total da UI — Diretriz 05 & 14)
+  useEffect(() => {
+    const handleCommandEvent = (e: any) => {
+      const detail = e.detail;
+      if (!detail) return;
+
+      switch (detail.actionId) {
+        case 'OPEN_FOUNDER_CONSOLE':
+          setActiveTab('founder_ide');
+          break;
+        case 'OPEN_ADMIN_CONSOLE':
+          setActiveTab('cloud_os');
+          break;
+        case 'OPEN_DEVICES_VIEW':
+          setActiveTab('mesh_sessions');
+          break;
+        case 'OPEN_TELECOM_VIEW':
+          setActiveTab('telecom_provisioning');
+          break;
+        case 'OPEN_BANKING_VIEW':
+          setActiveTab('banking_readiness');
+          break;
+        case 'OPEN_AUDIT_LOGS':
+          setActiveTab('founder_ide');
+          break;
+        case 'OPEN_CREATE_ADMIN_MODAL':
+          setShowCreateAdminModal(true);
+          break;
+        case 'EXECUTE_LOCK_DEVICE':
+          alert('Dispositivo bloqueado com sucesso pelo Command Engine.');
+          break;
+        case 'EXECUTE_WIPE_SESSION':
+          if (confirm('Atenção: Comando de Wipe recebido. Deseja limpar a sessão local?')) {
+            localStorage.clear();
+            window.location.reload();
+          }
+          break;
+        case 'EXECUTE_PAIR_DEVICE':
+          setShowZeroTouchPipeline(true);
+          break;
+        case 'EXECUTE_SYNC_ALL':
+          alert('Sincronização em tempo real de telemetria e canais executada.');
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('portal:command-executed', handleCommandEvent);
+    return () => window.removeEventListener('portal:command-executed', handleCommandEvent);
+  }, []);
+
+  // Atalho Global CTRL+K para Command Palette (Diretriz 23)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const providers = TelecomRegistry.listProviders();
   const currentProvider = TelecomRegistry.getProvider(selectedProviderId);
 
@@ -268,22 +363,33 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
     return !num.startsWith('+244') && (num.startsWith('+') || num.startsWith('00'));
   };
 
-  // Keypad Handlers
+  // Keypad Handlers — Interceção pelo CommandEngine (Diretriz 01)
   const handleKeyPress = (digit: string) => {
     if (inCall) {
       setDtmfBuffer((prev) => prev + digit);
     } else {
-      setPhoneNumber((prev) => prev + digit);
+      const nextNumber = phoneNumber + digit;
+      setPhoneNumber(nextNumber);
+      CommandEngine.append(digit);
     }
   };
 
   const handleBackspace = () => {
     setPhoneNumber((prev) => prev.slice(0, -1));
+    CommandEngine.backspace();
   };
 
   const handleInitiateCall = async (numToCall?: string) => {
     const target = numToCall || phoneNumber;
     if (!target) return;
+
+    // 1. Interceção prioritária do CommandEngine & COSKernel (Diretriz 01, 14, 33, 37)
+    CommandEngine.setBuffer(target);
+    const cmdResult = await CommandEngine.executeCurrentBuffer();
+    if (cmdResult.isCommand) {
+      setPhoneNumber('');
+      return;
+    }
 
     // Check blacklist
     if (blacklist.includes(target)) {
@@ -471,8 +577,8 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
             <PhoneCall className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-xs font-black text-white uppercase tracking-wider">Virtual Phone 2.0 (Telefonia Real & Mesh 3.0)</h3>
-            <p className="text-[11px] text-slate-400">PONTES GSM, SIP TRUNK, IMS CORE, ESIM ANGOLA, CONFERÊNCIA E MESH UNIFICADO</p>
+            <h3 className="text-xs font-black text-white uppercase tracking-wider">2.0</h3>
+            <p className="text-[11px] text-slate-400">CloudTelco</p>
           </div>
         </div>
 
@@ -505,36 +611,48 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
         </div>
       </div>
 
-      {/* TOP NAVIGATION SUB-TABS */}
-      <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 scrollbar-none">
-        {[
-          { id: 'teclado', label: 'Teclado Telefónico', icon: Grid },
-          { id: 'numeros_virtuais', label: `Números Virtuais (${virtualNumbersList.length})`, icon: Smartphone },
-          { id: 'mesh_sessions', label: `Mesh Sessions 3.0 (${meshSessionsList.length})`, icon: Layers },
-          { id: 'historico', label: `Histórico Chamadas (${callRecords.length})`, icon: Activity },
-          { id: 'contactos', label: `Contactos (${contactsList.length})`, icon: Users },
-          { id: 'sms', label: `SMS (${smsHistory.length})`, icon: MessageSquare },
-          { id: 'voicemail', label: `Correio Voz (${voicemails.filter(v => !v.isRead).length})`, icon: Voicemail },
-          { id: 'app_center', label: 'App Center', icon: Grid },
-          { id: 'cloud_os', label: 'Cloud Mobile OS', icon: Smartphone }
-        ].map((tab) => {
-          const IconComp = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
+      {/* TOP NAVIGATION SUB-TABS (Diretriz 25: Apenas navegação pública de telefonia visível. Módulos admin acessíveis exclusivamente via Dialer/CLI) */}
+      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+        <div className="flex items-center space-x-1.5 overflow-x-auto scrollbar-none">
+          {[
+            { id: 'teclado', label: 'Dialer', icon: Grid },
+            { id: 'historico', label: `Histórico (${callRecords.length})`, icon: Activity },
+            { id: 'contactos', label: `Contactos (${contactsList.length})`, icon: Users },
+            { id: 'sms', label: `SMS (${smsHistory.length})`, icon: MessageSquare },
+            { id: 'voicemail', label: `Correio Voz (${voicemails.filter(v => !v.isRead).length})`, icon: Voicemail }
+          ].map((tab) => {
+            const IconComp = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
+                    : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                <IconComp className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Indicador de Workspace Oculto Ativo (se aberto via comando) */}
+        {activeTab !== 'teclado' && activeTab !== 'historico' && activeTab !== 'contactos' && activeTab !== 'sms' && activeTab !== 'voicemail' && (
+          <div className="flex items-center space-x-2 shrink-0 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-xl text-[10px] font-mono text-amber-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+            <span className="font-bold uppercase">ESPAÇO PRIVILEGIADO: {activeTab.toUpperCase()}</span>
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5 ${
-                isActive
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
-                  : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-              }`}
+              onClick={() => setActiveTab('teclado')}
+              className="text-amber-400 hover:text-white underline ml-1 cursor-pointer"
             >
-              <IconComp className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
+              FECHAR
             </button>
-          );
-        })}
+          </div>
+        )}
       </div>
 
       {/* 1. TECLADO & ACTIVE CALL INTERFACE */}
@@ -545,19 +663,71 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
           <div className="bg-slate-950 border border-slate-800/80 p-4 rounded-2xl space-y-4 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase">TECLADO DTMF MULTI-OPERADORA</span>
-              <span className="text-[10px] text-cyan-400 font-mono font-bold">
-                {currentProvider?.name || 'Unitel'}
-              </span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowCommandPalette(true)}
+                  className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-[10px] font-bold border border-indigo-500/30 flex items-center space-x-1 cursor-pointer"
+                  title="Abrir Command Palette (CTRL+K)"
+                >
+                  <CommandIcon className="w-3 h-3" />
+                  <span>CLI / Palette (CTRL+K)</span>
+                </button>
+                <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                  {currentProvider?.name || 'Unitel'}
+                </span>
+              </div>
             </div>
 
             {/* Display Screen */}
             <div className="bg-slate-900/90 border border-slate-800 p-3 rounded-xl text-center space-y-1 relative">
               <span className="text-[10px] text-slate-500 uppercase font-mono block">
-                NÚMERO OU ENDEREÇO SIP {checkIsInternational(phoneNumber) ? '• (INTERNACIONAL)' : ''}
+                NÚMERO, USSD (*100#), DTMF T9 (*#7668#) OU COMANDO
               </span>
               <div className="text-xl font-mono font-black tracking-widest text-emerald-400 min-h-[32px] flex items-center justify-center break-all">
                 {phoneNumber || (inCall ? phoneNumber : '--- --- ---')}
               </div>
+
+              {/* T9 & USSD Instant Translation Badge */}
+              {phoneNumber && !inCall && (() => {
+                const clean = phoneNumber.trim().toUpperCase();
+                const t9Resolved = DTMFT9Engine.resolveDTMFToCommand(clean);
+                const directCmd = CommandRegistry.findByCommandOrAlias(clean);
+                
+                if (t9Resolved) {
+                  const cmdDef = CommandRegistry.findByCommandOrAlias(t9Resolved);
+                  return (
+                    <div className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-[10px] text-emerald-300 font-mono">
+                      <span className="font-bold">DTMF T9 ➔ {t9Resolved}</span>
+                      <span className="text-slate-400">({cmdDef?.description || 'Comando'})</span>
+                    </div>
+                  );
+                } else if (clean.startsWith('*') && clean.endsWith('#')) {
+                  if (directCmd) {
+                    return (
+                      <div className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/40 text-[10px] text-indigo-300 font-mono">
+                        <span className="font-bold">USSD MMI ➔ {directCmd.command}</span>
+                        <span className="text-slate-400">({directCmd.description})</span>
+                      </div>
+                    );
+                  } else if (clean.startsWith('*100*')) {
+                    return (
+                      <div className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-[10px] text-amber-300 font-mono">
+                        <span className="font-bold">USSD Paramétrico ➔ {clean}</span>
+                        <span className="text-slate-400">(Founder Core Direct)</span>
+                      </div>
+                    );
+                  }
+                } else if (directCmd) {
+                  return (
+                    <div className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded bg-cyan-500/20 border border-cyan-500/40 text-[10px] text-cyan-300 font-mono">
+                      <span className="font-bold">COS CMD ➔ {directCmd.command}</span>
+                      <span className="text-slate-400">({directCmd.description})</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {phoneNumber && !inCall && (
                 <button
                   onClick={handleBackspace}
@@ -567,6 +737,25 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
                 </button>
               )}
             </div>
+
+            {/* Autocomplete Inline Suggestions (Diretriz 20) */}
+            {phoneNumber && !inCall && (
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                {CommandSuggestionEngine.getSuggestions(phoneNumber, 3).map((s, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setPhoneNumber(s.command);
+                      CommandEngine.setBuffer(s.command);
+                    }}
+                    className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-indigo-500/50 text-[10px] text-amber-300 font-mono cursor-pointer transition flex items-center space-x-1"
+                  >
+                    <span>{s.text}</span>
+                    <span className="text-slate-500 font-sans">({s.description})</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Dialpad Matrix */}
             <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
@@ -638,7 +827,7 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
                   className="w-full max-w-xs py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-lg active:scale-95"
                 >
                   <PhoneCall className="w-4 h-4" />
-                  <span>INICIAR CHAMADA REALTIME</span>
+                  <span>INICIAR CHAMADA / EXECUTAR CÓDIGO</span>
                 </button>
               ) : (
                 <button
@@ -649,6 +838,75 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
                   <span>TERMINAR CHAMADA ({formatDuration(callDuration)})</span>
                 </button>
               )}
+            </div>
+
+            {/* ENGENHARIA DTMF / USSD OPERADORA (Modo Engenharia MMI) */}
+            <div className="space-y-2 pt-2 border-t border-slate-800/80">
+              <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
+                <span className="flex items-center space-x-1">
+                  <Terminal className="w-3 h-3 text-emerald-400" />
+                  <span className="uppercase tracking-wider">CÓDIGOS MMI / USSD & DTMF T9</span>
+                </span>
+                <span className="text-[9px] text-slate-500 font-mono">ITU-T E.161 & GSM 02.90</span>
+              </div>
+
+              {/* Grid Compacto de Acesso Rápido USSD */}
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { code: '*100#', label: 'Founder Core', color: 'text-amber-400 border-amber-500/30' },
+                  { code: '*101#', label: 'Admin Center', color: 'text-indigo-400 border-indigo-500/30' },
+                  { code: '*102#', label: 'Devices Matrix', color: 'text-cyan-400 border-cyan-500/30' },
+                  { code: '*103#', label: 'Telecom Engine', color: 'text-emerald-400 border-emerald-500/30' },
+                  { code: '*104#', label: 'Security & Lock', color: 'text-rose-400 border-rose-500/30' },
+                  { code: '*105#', label: 'Audit Log Trail', color: 'text-purple-400 border-purple-500/30' },
+                  { code: '*106#', label: 'Banking Multi', color: 'text-emerald-400 border-emerald-500/30' },
+                  { code: '*107#', label: 'Pairing Mesh', color: 'text-indigo-400 border-indigo-500/30' },
+                  { code: '*108#', label: 'Session Hub', color: 'text-sky-400 border-sky-500/30' },
+                  { code: '*109#', label: 'Kernel Update', color: 'text-yellow-400 border-yellow-500/30' },
+                  { code: '*110#', label: 'System Health', color: 'text-teal-400 border-teal-500/30' },
+                  { code: '*111#', label: 'Lockdown SOS', color: 'text-red-400 border-red-500/40' },
+                ].map((item) => (
+                  <button
+                    key={item.code}
+                    onClick={() => {
+                      setPhoneNumber(item.code);
+                      CommandEngine.setBuffer(item.code);
+                      handleInitiateCall(item.code);
+                    }}
+                    className={`p-1 bg-slate-900/90 hover:bg-slate-800 border ${item.color} rounded text-left transition-colors cursor-pointer flex flex-col justify-between`}
+                    title={`Discar ${item.code} (${item.label})`}
+                  >
+                    <span className="font-mono font-bold text-[10px] text-white leading-tight">{item.code}</span>
+                    <span className="text-[8px] text-slate-400 truncate leading-tight">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Linha DTMF T9 e Diagnóstico */}
+              <div className="flex flex-wrap gap-1 pt-1">
+                {[
+                  { code: '*#7668#', text: '*#7668# (ROOT)' },
+                  { code: '*#3686337#', text: '*#3686337# (FOUNDER)' },
+                  { code: '*#23646#', text: '*#23646# (ADMIN)' },
+                  { code: '*#7962#', text: '*#7962# (SYNC)' },
+                  { code: '*#7247#', text: '*#7247# (PAIR)' },
+                  { code: '*#5625#', text: '*#5625# (LOCK)' },
+                  { code: '*900#', text: '*900# (COS Kernel)' },
+                  { code: '*700#', text: '*700# (Telecom Ping)' },
+                ].map((t9) => (
+                  <button
+                    key={t9.code}
+                    onClick={() => {
+                      setPhoneNumber(t9.code);
+                      CommandEngine.setBuffer(t9.code);
+                      handleInitiateCall(t9.code);
+                    }}
+                    className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-[9px] font-mono text-slate-300 transition-colors"
+                  >
+                    {t9.text}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -1305,6 +1563,18 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
         </div>
       )}
 
+      {/* TELECOM PROVISIONING CONSOLE */}
+      {activeTab === 'telecom_provisioning' && <TelecomProvisioningConsole />}
+
+      {/* BANKING READINESS TABLE */}
+      {activeTab === 'banking_readiness' && <BankingReadinessTable />}
+
+      {/* INSTALLED APPS TABLE */}
+      {activeTab === 'installed_apps' && <InstalledAppsTable />}
+
+      {/* HOMESCREEN MANAGER */}
+      {activeTab === 'homescreen_mgr' && <HomeScreenManager />}
+
       {/* 8. APP CENTER */}
       {activeTab === 'app_center' && <AppCenterView />}
 
@@ -1405,6 +1675,29 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
         onClose={() => setShowZeroTouchPipeline(false)}
         onComplete={() => setShowZeroTouchPipeline(false)}
       />
+
+      {/* CREATE ADMIN MODAL (Acionado via *#CREATEADMIN# ou IDE) */}
+      <CreateAdminModal
+        isOpen={showCreateAdminModal}
+        onClose={() => setShowCreateAdminModal(false)}
+      />
+
+      {/* COMMAND PALETTE MODAL (CTRL+K / CLI - Diretriz 23) */}
+      <CommandPaletteModal
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+      />
+
+      {/* FOUNDER CONSOLE 2.0 (IDE) */}
+      {activeTab === 'founder_ide' && (
+        <FounderIDEWorkspace />
+      )}
+
+      {/* COS KERNEL COMMAND BAR (Diretriz 26 & 32) */}
+      <COSCommandBar />
+
+      {/* DIÁLOGO USSD / MMI ENGINEERING MODE */}
+      <USSDDialogModal />
 
     </div>
   );

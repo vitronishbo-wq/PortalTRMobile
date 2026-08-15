@@ -1,14 +1,15 @@
 import { InputEngine, InputEngineService, InputContext, KeyboardType } from './inputEngine';
 import { KeyboardEngine, KeyboardEngineService } from './keyboardEngine';
 import { ClipboardEngine, ClipboardEngineService, ClipboardItem } from './clipboardEngine';
-import { CommandEngine, CommandEngineService, CommandDefinition } from './commandEngine';
+import { CommandEngine } from './commandEngine';
+import { CommandRegistry, CommandDefinition } from './commandRegistry';
 import { NavigationEngine, NavigationEngineService, PublicTabDomain } from './navigationEngine';
 
 export class InteractionEngineService {
   public readonly input: InputEngineService = InputEngine;
   public readonly keyboard: KeyboardEngineService = KeyboardEngine;
   public readonly clipboard: ClipboardEngineService = ClipboardEngine;
-  public readonly command: CommandEngineService = CommandEngine;
+  public readonly command = CommandEngine;
   public readonly navigation: NavigationEngineService = NavigationEngine;
 
   private listeners: Set<() => void> = new Set();
@@ -36,8 +37,9 @@ export class InteractionEngineService {
     return this.clipboard.copyText(text, sourceDevice);
   }
 
-  public async executeQuickCommand(commandId: string, args?: Record<string, any>) {
-    return this.command.executeCommand(commandId, args);
+  public async executeQuickCommand(commandCode: string) {
+    this.command.setBuffer(commandCode);
+    return this.command.executeCurrentBuffer();
   }
 
   public navigateTo(domain: PublicTabDomain, subTab?: string) {

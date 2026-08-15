@@ -33,6 +33,8 @@ import {
 } from 'recharts';
 import { Device } from '../types';
 
+import { RealTelemetryService } from '../services/RealTelemetryService';
+
 interface BatteryUsageMonitorProps {
   devices: Device[];
   onUpdateDeviceBattery?: (deviceId: string, newLevel: number) => void;
@@ -177,31 +179,19 @@ export const BatteryUsageMonitor: React.FC<BatteryUsageMonitorProps> = ({
     });
   }, [activeDevices]);
 
-  // Quick action: Simulate battery drain / charging update
-  const handleSimulateBatteryDrain = () => {
+  // Real Device Battery Sync
+  const handleSyncRealBattery = async () => {
     setSimulatingEvent(true);
-    setTimeout(() => {
+    try {
+      const realBat = await RealTelemetryService.getRealBattery();
+      if (onUpdateDeviceBattery && primaryDevice) {
+        onUpdateDeviceBattery(primaryDevice.deviceId, realBat.level);
+      }
+    } catch (e) {
+      console.warn('[BatteryUsageMonitor] Falha ao ler BatteryManager real:', e);
+    } finally {
       setSimulatingEvent(false);
-      activeDevices.forEach((dev) => {
-        const nextLevel = Math.max(5, (dev.batteryLevel ?? 80) - 5);
-        if (onUpdateDeviceBattery) {
-          onUpdateDeviceBattery(dev.deviceId, nextLevel);
-        }
-      });
-    }, 600);
-  };
-
-  const handleSimulateBatteryCharge = () => {
-    setSimulatingEvent(true);
-    setTimeout(() => {
-      setSimulatingEvent(false);
-      activeDevices.forEach((dev) => {
-        const nextLevel = Math.min(100, (dev.batteryLevel ?? 80) + 15);
-        if (onUpdateDeviceBattery) {
-          onUpdateDeviceBattery(dev.deviceId, nextLevel);
-        }
-      });
-    }, 600);
+    }
   };
 
   // Line colors for chart series
@@ -327,15 +317,15 @@ export const BatteryUsageMonitor: React.FC<BatteryUsageMonitorProps> = ({
                 ))}
               </div>
 
-              {/* Simulation trigger */}
+              {/* Real Battery Sync Trigger */}
               <button
-                onClick={handleSimulateBatteryDrain}
+                onClick={handleSyncRealBattery}
                 disabled={simulatingEvent}
-                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-bold text-xs transition-all flex items-center space-x-1 cursor-pointer"
-                title="Simular descargas de bateria"
+                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition-all flex items-center space-x-1 cursor-pointer"
+                title="Sincronizar dados reais do BatteryManager API"
               >
-                <TrendingDown className={`w-3.5 h-3.5 ${simulatingEvent ? 'animate-bounce' : ''}`} />
-                <span>Simular Descarga</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${simulatingEvent ? 'animate-spin' : ''}`} />
+                <span>Sincronizar BatteryManager</span>
               </button>
 
               {/* Collapse Button */}
@@ -454,12 +444,12 @@ export const BatteryUsageMonitor: React.FC<BatteryUsageMonitorProps> = ({
             </div>
             <div className="flex items-center space-x-2">
               <button
-                onClick={handleSimulateBatteryCharge}
+                onClick={handleSyncRealBattery}
                 className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-semibold cursor-pointer flex items-center space-x-1"
-                title="Simular Carga de Bateria"
+                title="Sincronizar BatteryManager API"
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>Simular Recarga</span>
+                <span>Atualizar BatteryManager</span>
               </button>
             </div>
           </div>

@@ -59,5 +59,68 @@ service cloud.firestore {
     match /config/push_auth {
       allow read, write: if isSignedIn();
     }
+
+    // Rules for 'update_logs' collection (PWA Version Lifecycle Telemetry in the field)
+    match /update_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if true;
+      allow update, delete: if isSignedIn();
+    }
+
+    // Rules for 'system_logs' collection (Unified Centralized Audit & Telemetry)
+    match /system_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if true;
+      allow update, delete: if isSignedIn();
+    }
+
+    // Camada 22 — Firestore 5.0 Rules
+    match /presence/{presenceId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /telemetry/{telemetryId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /call_sessions/{sessionId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /voicemail/{voicemailId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /pairing_tokens/{tokenId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /trusted_devices/{deviceId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /blocked_devices/{deviceId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /app_registry/{appId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    match /user_preferences/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    match /wallpapers/{wallpaperId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    match /themes/{themeId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
   }
 }
+

@@ -169,7 +169,7 @@ export const HomePersonalizationWidget: React.FC<HomePersonalizationWidgetProps>
                 {(config.visibleShortcuts?.length || 0) + (config.pinnedWidgets?.length || 0)} elemento(s) fixado(s) na Home
               </strong>
             ) : (
-              <span className="text-slate-400 italic">Home vazia por padrão (Espaço pessoal limpo)</span>
+              <span className="text-slate-400 italic">Home padrão</span>
             )}
           </span>
         </div>

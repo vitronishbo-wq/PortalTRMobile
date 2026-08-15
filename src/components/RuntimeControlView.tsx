@@ -24,6 +24,7 @@ import { globalRuntime, RuntimeEnvelope, ActionItem } from '../engine/runtimeEng
 import { getPlatform, isTauri, sendDesktopNotification } from '../lib/platform';
 import { useTVMode } from '../hooks/useTVMode';
 import { dispatchAPNsNotification } from '../services/apns';
+import { operationalValidation, CapabilityAuditResult } from '../engine/operationalValidationEngine';
 
 export const RuntimeControlView: React.FC = () => {
   const [runtimeState, setRuntimeState] = useState(globalRuntime.state);
@@ -33,6 +34,10 @@ export const RuntimeControlView: React.FC = () => {
   const [capabilities, setCapabilities] = useState(globalRuntime.capabilitiesGraph);
   const [pipelineQueue, setPipelineQueue] = useState<ActionItem[]>(globalRuntime.actionPipeline.getQueue());
   const [repairedCount, setRepairedCount] = useState<number | null>(null);
+
+  // Operational Validation State
+  const [auditResults, setAuditResults] = useState<CapabilityAuditResult[]>([]);
+  const [isAuditing, setIsAuditing] = useState(false);
 
   // Multi-Platform Runtime states
   const { isTV, toggleTVMode } = useTVMode();
@@ -70,6 +75,9 @@ export const RuntimeControlView: React.FC = () => {
       syncUI();
     });
 
+    // Run Operational Validation System Probe
+    runAudit();
+
     const interval = setInterval(() => {
       syncUI();
     }, 1000);
@@ -79,6 +87,18 @@ export const RuntimeControlView: React.FC = () => {
       clearInterval(interval);
     };
   }, []);
+
+  const runAudit = async () => {
+    setIsAuditing(true);
+    try {
+      const results = await operationalValidation.performSystemAudit();
+      setAuditResults(results);
+    } catch (e) {
+      console.error('[RuntimeControlView] Erro ao auditar capacidades operacionais:', e);
+    } finally {
+      setIsAuditing(false);
+    }
+  };
 
   const syncUI = () => {
     setRuntimeState(globalRuntime.state);
@@ -203,6 +223,91 @@ export const RuntimeControlView: React.FC = () => {
             <span className="text-lg font-black text-cyan-300 font-mono">{globalRuntime.plugins.size} Plugins</span>
           </div>
           <span className="text-[10px] text-slate-500 block">Interface Única Registada</span>
+        </div>
+      </div>
+
+      {/* 🟡 MATRIZ DE VALIDAÇÃO OPERACIONAL — Hardware Real vs. Abstração de Software */}
+      <div className="bg-slate-900/95 p-5 rounded-2xl border border-amber-500/40 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center space-x-2.5">
+            <span className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono font-black text-xs">
+              🟡 AUDIT
+            </span>
+            <div>
+              <h3 className="text-sm font-black text-slate-100 flex items-center space-x-2">
+                <span>Validação Operacional: Hardware Real vs. Abstração de Software</span>
+                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-[10px] font-mono font-bold">
+                  {auditResults.filter((r) => r.isRealOperational).length}/{auditResults.length} Operacionais Comprovados
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Critério estrito: nenhuma capacidade é considerada operacional apenas por possuir código, interface ou coleção Firestore.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={runAudit}
+            disabled={isAuditing}
+            className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center space-x-1.5 self-start sm:self-auto"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${isAuditing ? 'animate-spin' : ''}`} />
+            <span>{isAuditing ? 'Sondando Hardware...' : 'Revalidar Hardware & APIs'}</span>
+          </button>
+        </div>
+
+        {/* Dense Inline Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400 font-mono uppercase text-[10px]">
+                <th className="py-2.5 px-3">Domínio & Capacidade</th>
+                <th className="py-2.5 px-3">Classificação Operacional</th>
+                <th className="py-2.5 px-3">Métrica / Evidência Real</th>
+                <th className="py-2.5 px-3">Método de Verificação</th>
+                <th className="py-2.5 px-3">Diagnóstico Arquitetural</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 font-mono">
+              {auditResults.map((r) => {
+                let badgeClass = 'bg-slate-800 text-slate-400 border-slate-700';
+                if (r.level === 'HARDWARE_REAL') {
+                  badgeClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
+                } else if (r.level === 'CONNECTED_ACTIVE') {
+                  badgeClass = 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40';
+                } else if (r.level === 'CONFIGURED_ONLY') {
+                  badgeClass = 'bg-amber-500/20 text-amber-400 border-amber-500/40';
+                } else if (r.level === 'SIMULATED_MOCK') {
+                  badgeClass = 'bg-purple-500/20 text-purple-400 border-purple-500/40';
+                } else if (r.level === 'UNSUPPORTED') {
+                  badgeClass = 'bg-rose-500/20 text-rose-400 border-rose-500/40';
+                }
+
+                return (
+                  <tr key={r.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="py-2.5 px-3 font-sans font-bold text-slate-200">
+                      <div>{r.name}</div>
+                      <span className="text-[10px] text-slate-500 font-mono font-normal">[{r.category}]</span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}`}>
+                        {r.level}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-300 text-[11px]">
+                      {r.actualMetric || '—'}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-400 text-[10px]">
+                      {r.verificationMethod}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-400 font-sans text-[11px] max-w-xs">
+                      {r.details}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 

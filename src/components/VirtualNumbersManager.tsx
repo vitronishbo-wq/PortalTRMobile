@@ -1,215 +1,174 @@
-import { useState, useEffect, useCallback } from 'react';
-import { VirtualNumber } from '../types/cpaas';
-import { listVirtualNumbers, buyNumber, assignNumberToNode, deleteNumber, releaseNumber } from '../services/virtualNumberService';
-import { Phone, Plus, Trash2, Smartphone, Globe, RefreshCw, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { VirtualNumberAssignmentModal, VirtualNumberAssignmentData, VirtualNumberType } from './VirtualNumberAssignmentModal';
+import { Phone, Plus, RefreshCw, Trash2, CheckCircle2, ShieldCheck, Cpu } from 'lucide-react';
 
-interface VirtualNumbersManagerProps {
-  workspaceId?: string;
+export interface DetailedVirtualNumber {
+  id: string;
+  number: string;
+  carrier: string;
+  type: VirtualNumberType;
+  sms: boolean;
+  voice: boolean;
+  sip: boolean;
+  ims: boolean;
+  esim: boolean;
+  status: 'ACTIVE' | 'PENDING' | 'RELEASED' | 'BLOCKED';
+  expirationDate: string;
 }
 
-export function VirtualNumbersManager({ workspaceId = 'ws-vitronis-default' }: VirtualNumbersManagerProps) {
-  const [numbers, setNumbers] = useState<VirtualNumber[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [areaCode, setAreaCode] = useState('244');
-  const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [targetNodeId, setTargetNodeId] = useState('node-angola-luanda-01');
-
-  const loadNumbers = useCallback(async () => {
-    setLoading(true);
+export const VirtualNumbersManager: React.FC = () => {
+  const [numbers, setNumbers] = useState<DetailedVirtualNumber[]>(() => {
     try {
-      const data = await listVirtualNumbers(workspaceId);
-      setNumbers(data);
-    } catch (err) {
-      console.error('[VirtualNumbersManager] Erro ao carregar números:', err);
-    } finally {
-      setLoading(false);
+      const stored = localStorage.getItem('portal_assigned_virtual_numbers');
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      // ignore
     }
-  }, [workspaceId]);
+    return [];
+  });
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    loadNumbers();
-  }, [loadNumbers]);
-
-  const handleBuy = async () => {
     try {
-      await buyNumber(workspaceId, areaCode);
-      loadNumbers();
-    } catch (err) {
-      console.error('[VirtualNumbersManager] Erro ao comprar número:', err);
+      localStorage.setItem('portal_assigned_virtual_numbers', JSON.stringify(numbers));
+    } catch (e) {
+      // ignore
     }
+  }, [numbers]);
+
+  const handleAddNumber = (data: VirtualNumberAssignmentData) => {
+    const newNum: DetailedVirtualNumber = {
+      id: `vn_${Date.now()}`,
+      number: data.number,
+      carrier: data.carrier,
+      type: data.type,
+      sms: data.sms,
+      voice: data.voice,
+      sip: data.sip,
+      ims: data.ims,
+      esim: data.esim,
+      status: data.isActive ? 'ACTIVE' : 'PENDING',
+      expirationDate: data.expirationDate
+    };
+    setNumbers((prev) => [newNum, ...prev]);
   };
 
-  const handleAssign = async (numberId: string) => {
-    if (!targetNodeId.trim()) return;
-    try {
-      await assignNumberToNode(numberId, targetNodeId.trim());
-      setAssigningId(null);
-      loadNumbers();
-    } catch (err) {
-      console.error('[VirtualNumbersManager] Erro ao atribuir número:', err);
-    }
+  const handleDelete = (id: string) => {
+    setNumbers((prev) => prev.filter((n) => n.id !== id));
   };
 
-  const handleRelease = async (numberId: string) => {
-    try {
-      await releaseNumber(numberId);
-      loadNumbers();
-    } catch (err) {
-      console.error('[VirtualNumbersManager] Erro ao libertar número:', err);
-    }
-  };
-
-  const handleDelete = async (numberId: string) => {
-    try {
-      await deleteNumber(numberId);
-      loadNumbers();
-    } catch (err) {
-      console.error('[VirtualNumbersManager] Erro ao eliminar número:', err);
-    }
-  };
+  const renderBadge = (val: boolean) => (
+    val ? (
+      <span className="px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold">
+        SIM
+      </span>
+    ) : (
+      <span className="px-1 py-0.2 rounded bg-slate-800 text-slate-500 border border-slate-700 text-[9px] font-bold">
+        NÃO
+      </span>
+    )
+  );
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 text-slate-100 font-sans shadow-xl">
-      <div className="flex items-center justify-between mb-4 border-b border-slate-800/80 pb-3">
-        <div className="flex items-center space-x-2.5">
-          <div className="p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
-            <Phone className="w-4 h-4" />
-          </div>
+    <div className="bg-slate-900/95 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-4 font-mono">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <div className="flex items-center space-x-2">
+          <span className="p-1.5 rounded bg-emerald-500/10 text-emerald-400 font-bold text-xs border border-emerald-500/30">
+            NUMERATION
+          </span>
           <div>
-            <h3 className="text-sm font-bold text-white tracking-tight">Números Virtuais & Trunking SMS/Voz</h3>
-            <p className="text-[11px] text-slate-400">Atribuição de números virtuais E.164 aos nós do ecossistema</p>
+            <h3 className="text-xs font-black text-slate-100 uppercase tracking-wide">
+              Gestão de Números Virtuais (DID / Trunking)
+            </h3>
+            <p className="text-[11px] text-slate-400 font-sans">
+              Mapeamento de rotas de voz, SMS, troncos SIP e núcleos IMS para números locais e internacionais.
+            </p>
           </div>
         </div>
+
         <button
-          onClick={loadNumbers}
-          disabled={loading}
-          className="p-2 text-slate-400 hover:text-white bg-slate-800/60 rounded-xl border border-slate-700/60 hover:bg-slate-700 transition-all cursor-pointer"
-          title="Recarregar"
+          onClick={() => setIsModalOpen(true)}
+          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center space-x-1.5 shadow-lg shadow-emerald-600/20"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <Plus className="w-3.5 h-3.5" />
+          <span>Atribuir Número</span>
         </button>
       </div>
 
-      {/* Formulário de Aprovisionamento */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-5">
-        <div className="flex items-center space-x-2 bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 flex-1">
-          <Globe className="w-4 h-4 text-slate-500 shrink-0" />
-          <span className="text-xs text-slate-400 font-mono">+</span>
-          <input
-            type="text"
-            value={areaCode}
-            onChange={(e) => setAreaCode(e.target.value)}
-            placeholder="Indicativo (ex: 244 para Angola, 351 para Portugal)"
-            className="bg-transparent text-xs text-white font-mono w-full outline-none placeholder:text-slate-600"
-          />
-        </div>
-        <button
-          onClick={handleBuy}
-          className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center space-x-1.5 cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Adquirir Novo Número Virtual</span>
-        </button>
-      </div>
-
-      {/* Lista de Números */}
-      {numbers.length === 0 ? (
-        <div className="text-center py-8 bg-slate-950/40 rounded-xl border border-dashed border-slate-800/80">
-          <Phone className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
-          <p className="text-xs text-slate-400">Nenhum número virtual atribuído neste workspace.</p>
-        </div>
-      ) : (
-        <div className="space-y-2.5">
-          {numbers.map((num) => (
-            <div
-              key={num.id}
-              className="p-3 bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 rounded-xl transition-all"
-            >
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-mono text-sm font-extrabold text-white tracking-tight">{num.number}</span>
-                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold font-mono border ${
-                      num.status === 'assigned'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                        : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+      {/* Dense Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px]">
+              <th className="py-2 px-2.5">Número</th>
+              <th className="py-2 px-2">Operadora</th>
+              <th className="py-2 px-2">Tipo</th>
+              <th className="py-2 px-1.5 text-center">SMS</th>
+              <th className="py-2 px-1.5 text-center">Voz</th>
+              <th className="py-2 px-1.5 text-center">SIP</th>
+              <th className="py-2 px-1.5 text-center">IMS</th>
+              <th className="py-2 px-1.5 text-center">eSIM</th>
+              <th className="py-2 px-2">Estado</th>
+              <th className="py-2 px-2 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800/60 font-mono">
+            {numbers.length === 0 ? (
+              <tr>
+                <td colSpan={10} className="py-6 text-center text-slate-500 text-xs">
+                  Nenhum número virtual atribuído ainda. Clique em "Atribuir Número" para provisionar um DID ou tronco real.
+                </td>
+              </tr>
+            ) : (
+              numbers.map((n) => (
+                <tr key={n.id} className="hover:bg-slate-800/30 transition-colors">
+                  <td className="py-2 px-2.5 font-bold text-cyan-300 whitespace-nowrap">
+                    {n.number}
+                    <span className="block text-[9px] text-slate-500 font-normal">Exp: {n.expirationDate}</span>
+                  </td>
+                  <td className="py-2 px-2 font-bold text-slate-200">{n.carrier}</td>
+                  <td className="py-2 px-2">
+                    <span className="px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold">
+                      {n.type}
+                    </span>
+                  </td>
+                  <td className="py-2 px-1.5 text-center">{renderBadge(n.sms)}</td>
+                  <td className="py-2 px-1.5 text-center">{renderBadge(n.voice)}</td>
+                  <td className="py-2 px-1.5 text-center">{renderBadge(n.sip)}</td>
+                  <td className="py-2 px-1.5 text-center">{renderBadge(n.ims)}</td>
+                  <td className="py-2 px-1.5 text-center">{renderBadge(n.esim)}</td>
+                  <td className="py-2 px-2">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                      n.status === 'ACTIVE'
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
                     }`}>
-                      {num.status.toUpperCase()}
+                      {n.status}
                     </span>
-                    <span className="text-[9px] px-2 py-0.5 rounded-full font-mono bg-slate-800 text-slate-300 border border-slate-700">
-                      PROVEDOR: {num.provider.toUpperCase()}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 mt-2 text-[10px] text-slate-400 font-mono">
-                    <span className="flex items-center space-x-1 text-slate-300">
-                      <Smartphone className="w-3 h-3 text-amber-400" />
-                      <span>Atribuído a: {num.assignedTo || 'Nenhum nó associado'}</span>
-                    </span>
-                    <span>•</span>
-                    <span>Custo: ${(num.monthlyCost / 100).toFixed(2)}/mês</span>
-                    <span>•</span>
-                    <span className="flex items-center space-x-1 text-emerald-400">
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>Capacidade: {Object.keys(num.capabilities).filter(c => (num.capabilities as any)[c]).join(', ')}</span>
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
-                  {assigningId === num.id ? (
-                    <div className="flex items-center space-x-1.5 bg-slate-900 p-1 rounded-lg border border-slate-700">
-                      <input
-                        type="text"
-                        value={targetNodeId}
-                        onChange={(e) => setTargetNodeId(e.target.value)}
-                        placeholder="ID do Nó"
-                        className="bg-slate-950 text-[11px] text-white p-1 rounded font-mono w-32 border border-slate-800 outline-none"
-                      />
-                      <button
-                        onClick={() => handleAssign(num.id)}
-                        className="px-2 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-bold rounded"
-                      >
-                        OK
-                      </button>
-                      <button
-                        onClick={() => setAssigningId(null)}
-                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded"
-                      >
-                        X
-                      </button>
-                    </div>
-                  ) : (
+                  </td>
+                  <td className="py-2 px-2 text-right">
                     <button
-                      onClick={() => setAssigningId(num.id)}
-                      className="px-2.5 py-1.5 text-[11px] font-bold text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-lg transition-all cursor-pointer"
+                      onClick={() => handleDelete(n.id)}
+                      className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 rounded border border-rose-500/30 cursor-pointer"
+                      title="Remover"
                     >
-                      Associar a Nó
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
-                  {num.assignedTo && (
-                    <button
-                      onClick={() => handleRelease(num.id)}
-                      className="px-2.5 py-1.5 text-[11px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-all cursor-pointer"
-                    >
-                      Libertar
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => handleDelete(num.id)}
-                    className="p-1.5 text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg transition-all cursor-pointer"
-                    title="Eliminar Número"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <VirtualNumberAssignmentModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleAddNumber}
+      />
     </div>
   );
-}
+};

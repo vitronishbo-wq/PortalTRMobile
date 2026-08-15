@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Server,
   Users,
@@ -30,6 +30,9 @@ import {
   Shield,
   Clock
 } from 'lucide-react';
+import { systemReadinessEngine, SystemReadinessModule } from '../../engine/systemReadinessEngine';
+import { OperationalRealityValidatorConsole } from '../OperationalRealityValidatorConsole';
+import { FieldEvidenceConsole } from '../FieldEvidenceConsole';
 
 export interface PillarData {
   id: number;
@@ -57,6 +60,17 @@ export const OperationalOverviewConsole: React.FC = () => {
   const [isStreamPaused, setIsStreamPaused] = useState<boolean>(false);
   const [repairFeedback, setRepairFeedback] = useState<string | null>(null);
   const [executedSuggestions, setExecutedSuggestions] = useState<Record<string, boolean>>({});
+
+  // System Readiness State
+  const [readinessModules, setReadinessModules] = useState<SystemReadinessModule[]>([]);
+  const [readinessFilter, setReadinessFilter] = useState<'ALL' | 'READY' | 'PARTIAL' | 'BLOCKED'>('ALL');
+
+  useEffect(() => {
+    const unsub = systemReadinessEngine.subscribe((modules) => {
+      setReadinessModules(modules);
+    });
+    return () => unsub();
+  }, []);
 
   const pillars: PillarData[] = [
     {
@@ -334,6 +348,121 @@ export const OperationalOverviewConsole: React.FC = () => {
           >
             {isStreamPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
           </button>
+        </div>
+      </div>
+
+      {/* 📊 SYSTEM READINESS — MATRIZ COMPACTA DE PRONTIDÃO OPERACIONAL */}
+      <OperationalRealityValidatorConsole />
+
+      {/* 🛡️ MODO PROVA DE CAMPO — 4 TABELAS DENSAS DE EVIDÊNCIA REAL */}
+      <FieldEvidenceConsole />
+
+      <div className="bg-slate-900/95 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3 font-mono">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+          <div className="flex items-center space-x-2">
+            <span className="p-1 rounded bg-indigo-500/20 text-indigo-400 font-bold text-xs border border-indigo-500/30">
+              PRONTIDÃO
+            </span>
+            <h3 className="text-xs font-black text-slate-100 uppercase tracking-wide">
+              SYSTEM READINESS
+            </h3>
+            <div className="flex items-center space-x-1.5 ml-2 text-[10px]">
+              <span className="px-2 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                🟢 {readinessModules.filter((m) => m.status === 'READY').length} Ready
+              </span>
+              <span className="px-2 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                🟡 {readinessModules.filter((m) => m.status === 'PARTIAL' || m.status === 'NOT_CONFIGURED' || m.status === 'NOT_VERIFIED').length} Partial
+              </span>
+              <span className="px-2 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
+                🔴 {readinessModules.filter((m) => m.status === 'BLOCKED').length} Blocked
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Filter Buttons */}
+          <div className="flex items-center space-x-1 text-[10px]">
+            {(['ALL', 'READY', 'PARTIAL', 'BLOCKED'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setReadinessFilter(filter)}
+                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                  readinessFilter === filter
+                    ? 'bg-slate-700 text-white font-bold border border-slate-600'
+                    : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Compact Dense Table */}
+        <div className="overflow-x-auto max-h-72 overflow-y-auto scrollbar-thin">
+          <table className="w-full text-left text-[11px] border-collapse">
+            <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+              <tr>
+                <th className="py-1.5 px-2.5">Módulo</th>
+                <th className="py-1.5 px-2.5">Estado</th>
+                <th className="py-1.5 px-2.5">Última Verificação</th>
+                <th className="py-1.5 px-2.5">Motivo</th>
+                <th className="py-1.5 px-2.5">Ação Necessária</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 font-mono">
+              {readinessModules
+                .filter((m) => {
+                  if (readinessFilter === 'ALL') return true;
+                  if (readinessFilter === 'READY') return m.status === 'READY';
+                  if (readinessFilter === 'BLOCKED') return m.status === 'BLOCKED';
+                  return m.status === 'PARTIAL' || m.status === 'NOT_CONFIGURED' || m.status === 'NOT_VERIFIED';
+                })
+                .map((m) => {
+                  let statusBadge = (
+                    <span className="inline-flex items-center space-x-1 px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                      <span>🟢</span>
+                      <span>Ready</span>
+                    </span>
+                  );
+                  if (m.status === 'BLOCKED') {
+                    statusBadge = (
+                      <span className="inline-flex items-center space-x-1 px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold">
+                        <span>🔴</span>
+                        <span>Blocked</span>
+                      </span>
+                    );
+                  } else if (m.status !== 'READY') {
+                    statusBadge = (
+                      <span className="inline-flex items-center space-x-1 px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold">
+                        <span>🟡</span>
+                        <span>{m.status === 'NOT_CONFIGURED' ? 'Unconfigured' : m.status === 'NOT_VERIFIED' ? 'Unverified' : 'Partial'}</span>
+                      </span>
+                    );
+                  }
+
+                  return (
+                    <tr key={m.moduleId} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-1.5 px-2.5 font-bold text-slate-200">
+                        {m.name}
+                        <span className="text-[9px] text-slate-500 block font-normal">[{m.category}]</span>
+                      </td>
+                      <td className="py-1.5 px-2.5 whitespace-nowrap">
+                        {statusBadge}
+                      </td>
+                      <td className="py-1.5 px-2.5 text-slate-400 text-[10px] whitespace-nowrap">
+                        {new Date(m.lastVerifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </td>
+                      <td className="py-1.5 px-2.5 text-slate-300 font-sans text-[11px]">
+                        {m.reason}
+                      </td>
+                      <td className="py-1.5 px-2.5 text-amber-300/90 font-sans text-[11px]">
+                        {m.actionRequired}
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
         </div>
       </div>
 

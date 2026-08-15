@@ -20,13 +20,19 @@ import {
   Save,
   RotateCcw,
   Check,
-  Key
+  Key,
+  Activity,
+  History,
+  CheckCircle,
+  AlertTriangle,
+  Radio
 } from 'lucide-react';
 import { UserSettings } from '../types/Settings';
 import { FirestoreService } from '../services/firestore';
 import { useIdentity } from '../engine/identityEngine';
 import { SecurityConsole } from './SecurityConsole';
 import { updateEngine, UpdateState } from '../engine/updateEngine';
+import { UpdateLifecycleLog } from '../types/UpdateLog';
 
 const DEFAULT_SETTINGS: UserSettings = {
   userId: 'usr-default',
@@ -72,13 +78,23 @@ const DEFAULT_SETTINGS: UserSettings = {
 export const SettingsView: React.FC = () => {
   const { user } = useIdentity();
   const [updateState, setUpdateState] = useState<UpdateState>(() => updateEngine.getState());
+  const [updateLogs, setUpdateLogs] = useState<UpdateLifecycleLog[]>([]);
+  const [showUpdateLogs, setShowUpdateLogs] = useState(false);
 
   useEffect(() => {
     updateEngine.init();
-    const unsubscribe = updateEngine.subscribe((state) => {
+    const unsubscribeEngine = updateEngine.subscribe((state) => {
       setUpdateState(state);
     });
-    return unsubscribe;
+
+    const unsubscribeLogs = FirestoreService.listenToUpdateLogs((logs) => {
+      setUpdateLogs(logs);
+    });
+
+    return () => {
+      unsubscribeEngine();
+      unsubscribeLogs();
+    };
   }, []);
 
   const [settings, setSettings] = useState<UserSettings>(() => {
@@ -407,14 +423,28 @@ export const SettingsView: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
-                <button
-                  onClick={() => updateEngine.checkForUpdates()}
-                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex items-center space-x-1.5"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Verificar Atualizações</span>
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => updateEngine.checkForUpdates()}
+                    className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex items-center space-x-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Verificar Atualizações</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowUpdateLogs(!showUpdateLogs)}
+                    className={`px-3.5 py-2 rounded-xl font-bold text-xs border transition-all cursor-pointer flex items-center space-x-1.5 ${
+                      showUpdateLogs
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border-slate-800'
+                    }`}
+                  >
+                    <Activity className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Telemetria em Campo ({updateLogs.length})</span>
+                  </button>
+                </div>
 
                 <button
                   onClick={() => updateEngine.forceSystemUpdate()}
@@ -429,6 +459,87 @@ export const SettingsView: React.FC = () => {
                   <span>{updateState.status === 'updating' ? 'A Atualizar...' : 'Atualizar Agora'}</span>
                 </button>
               </div>
+
+              {/* CENTRALIZED FIRESTORE UPDATE LOGS FEED */}
+              {showUpdateLogs && (
+                <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2.5 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                      <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                      <span>Eventos de Ciclo de Vida em Campo (Firestore: update_logs)</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {updateLogs.length} registos sincronizados
+                    </span>
+                  </div>
+
+                  {updateLogs.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 text-center text-xs text-slate-500 font-mono">
+                      Nenhum evento de ciclo de vida registrado no Firestore até ao momento.
+                    </div>
+                  ) : (
+                    <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                      {updateLogs.map((log) => {
+                        const isSuccess = log.eventType === 'update-applied';
+                        const isDetected = log.eventType === 'update-detected';
+                        const isInitiated = log.eventType === 'update-initiated';
+                        const isFailed = log.eventType === 'update-failed';
+
+                        return (
+                          <div
+                            key={log.id}
+                            className={`p-3 rounded-xl border text-xs font-mono transition-all ${
+                              isFailed
+                                ? 'bg-rose-950/20 border-rose-500/30 text-rose-300'
+                                : isSuccess
+                                ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+                                : isDetected
+                                ? 'bg-amber-950/20 border-amber-500/30 text-amber-300'
+                                : 'bg-indigo-950/20 border-indigo-500/30 text-indigo-300'
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center space-x-2">
+                                <span
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                                    isFailed
+                                      ? 'bg-rose-500/20 text-rose-400'
+                                      : isSuccess
+                                      ? 'bg-emerald-500/20 text-emerald-400'
+                                      : isDetected
+                                      ? 'bg-amber-500/20 text-amber-400'
+                                      : 'bg-indigo-500/20 text-indigo-400'
+                                  }`}
+                                >
+                                  {log.eventType}
+                                </span>
+                                <span className="text-slate-200 font-bold">
+                                  {log.detectedVersion || log.currentVersion}
+                                </span>
+                              </div>
+
+                              <span className="text-[10px] text-slate-500">
+                                {new Date(log.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+
+                            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                              <span>Dispositivo: <strong className="text-slate-300">{log.deviceId}</strong></span>
+                              <span>Plataforma: <strong className="text-slate-300">{log.platform || 'web'}</strong></span>
+                              {log.durationMs !== undefined && (
+                                <span>Duração: <strong className="text-emerald-400">{log.durationMs}ms</strong></span>
+                              )}
+                              {log.error && (
+                                <span className="text-rose-400 w-full mt-0.5">Erro: {log.error}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

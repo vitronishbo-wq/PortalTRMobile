@@ -1,1228 +1,598 @@
+// src/components/workspaces/FounderIDEWorkspace.tsx — IDE-2.0
+// Diretrizes 24, 33, 35, 40: Evidência operacional real, Manifesto de Motores e Tarefas Agendadas
+
 import React, { useState, useEffect } from 'react';
-import {
-  LayoutDashboard,
-  Home,
-  Users,
-  Smartphone,
-  CreditCard,
-  Plug,
-  Cloud,
-  Database,
-  Rocket,
-  BarChart3,
-  ScrollText,
-  Settings,
-  Sliders,
-  Wrench,
-  Shield,
-  ShieldCheck,
-  ChevronRight,
-  ChevronDown,
-  X,
-  Terminal,
+import { AdminProvisioningEngine, AdminAccount } from '../../engine/adminProvisioningEngine';
+import { SecurityAuditService, SecurityLogEntry } from '../../services/SecurityAuditService';
+import { CommandRegistry, CommandDefinition } from '../../engine/commandRegistry';
+import { OperationalRealityValidator, OperationalModuleStatus } from '../../engine/OperationalRealityValidator';
+import { CommandPersistenceService, CommandHistoryRecord, StoredCommandRecord } from '../../services/CommandPersistenceService';
+import { SystemManifest, ManifestEngineRecord } from '../../engine/systemManifest';
+import { CommandScheduler, ScheduledCommandTask } from '../../engine/commandScheduler';
+import { PolicyEngine, CommandPolicy } from '../../engine/policyEngine';
+import { CreateAdminModal } from '../modals/CreateAdminModal';
+import { 
+  Terminal, 
+  ShieldAlert, 
+  UserCheck, 
+  Layers, 
+  Cpu, 
+  RefreshCw, 
+  Key, 
+  Smartphone, 
   Activity,
-  Play,
-  RotateCcw,
-  CheckCircle2,
-  AlertTriangle,
-  Crown,
-  KeyRound,
-  Zap,
-  Maximize2,
-  Minimize2,
-  Search,
-  Filter,
-  ExternalLink,
   Plus,
+  Trash2,
   Lock,
-  Clock,
-  Sparkles,
+  Unlock,
   Radio,
-  Folder,
-  FolderOpen,
-  FileText,
-  PhoneCall
+  FileCode2,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  ShieldCheck,
+  Calendar,
+  Settings
 } from 'lucide-react';
-import { AuthorityEngine, FeatureFlagsState, DEUS_FUNDADOR_CREDENTIALS } from '../../engine/authorityEngine';
-import { PaymentRegistry, ChargeResponse, ChargeRequest } from '../../services/paymentEngine';
-import { AutomationRulesManager } from '../AutomationRulesManager';
-import { CpaasSecurityDispatcherConsole } from '../CpaasSecurityDispatcherConsole';
-import { APIKeysManager } from '../APIKeysManager';
-import { VirtualNumbersManager } from '../VirtualNumbersManager';
-import { RealtimeDevStreamConsole } from '../RealtimeDevStreamConsole';
-import { TrialEngine, LicenseRecord } from '../../services/trialEngine';
-import { UserProfile, UserRole } from '../../types/User';
-import { IdentityEngine } from '../../engine/identityEngine';
-import { RootConsoleView } from './RootConsoleView';
-import { OperationalOverviewConsole } from './OperationalOverviewConsole';
-import { DevicesView } from '../DevicesView';
-import { AppyPayGatewayConsole } from '../AppyPayGatewayConsole';
-import { IntegrationsConsole } from '../IntegrationsConsole';
-import { InfrastructureConsole } from '../InfrastructureConsole';
-import { SecurityConsole } from '../SecurityConsole';
-import { AnalyticsView } from '../AnalyticsView';
-import { CommandPalette } from './CommandPalette';
-import { AutomationEngine, AutomationRule, AutomationExecutionLog } from '../../services/automationEngine';
-import { HealthEngine, DeviceHealthMetric, OperationalDiagnostic, DeviceTimelineEvent } from '../../services/healthEngine';
-import { SubscriptionsConsole } from './SubscriptionsConsole';
-import { BatchQueueEngine, BatchQueueMetrics } from '../../services/batchQueueEngine';
 
-import { VirtualPhoneCloudWorkspace } from '../VirtualPhoneCloudWorkspace';
-
-export interface IDETab {
-  id: string;
-  title: string;
-  type: 'overview' | 'user' | 'appypay' | 'flags' | 'runtime' | 'firestore' | 'device' | 'audit' | 'rules' | 'root_authority' | 'automation' | 'health' | 'virtual_phone';
-  data?: any;
+interface FounderIDEWorkspaceProps {
+  onBackToPublic?: () => void;
 }
 
-export const FounderIDEWorkspace: React.FC = () => {
-  // Command Palette State
-  const [isPaletteOpen, setIsPaletteOpen] = useState<boolean>(false);
-  const [paletteCommandLog, setPaletteCommandLog] = useState<string | null>(null);
+export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBackToPublic }) => {
+  const [activeTab, setActiveTab] = useState<'MANIFEST' | 'MODULES' | 'ADMINS' | 'COMMANDS' | 'SCHEDULED' | 'LOGS' | 'EVIDENCE'>('MANIFEST');
+  const [manifest, setManifest] = useState<ManifestEngineRecord[]>([]);
+  const [modules, setModules] = useState<OperationalModuleStatus[]>([]);
+  const [admins, setAdmins] = useState<AdminAccount[]>([]);
+  const [commands, setCommands] = useState<CommandDefinition[]>([]);
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledCommandTask[]>([]);
+  const [policies, setPolicies] = useState<CommandPolicy[]>([]);
+  const [logs, setLogs] = useState<SecurityLogEntry[]>([]);
+  const [history, setHistory] = useState<CommandHistoryRecord[]>([]);
+  const [storedCommands, setStoredCommands] = useState<StoredCommandRecord[]>([]);
+  const [isCreateAdminOpen, setIsCreateAdminOpen] = useState<boolean>(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
 
-  // Navigation & Layout States
-  const [activeActivity, setActiveActivity] = useState<string | null>(null);
-  const [sidePanelOpen, setSidePanelOpen] = useState<boolean>(true);
-  const [bottomPanelOpen, setBottomPanelOpen] = useState<boolean>(false);
-  const [bottomPanelTab, setBottomPanelTab] = useState<'terminal' | 'logs' | 'queue' | 'errors'>('terminal');
-
-  // Unified Navigation Tree States
-  const [treeSearchFilter, setTreeSearchFilter] = useState<string>('');
-  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
-    root_authority: true,
-    workspace: false,
-    console: true,
-    devices: false,
-    users: true,
-    automation: false,
-    integrations: false,
-    billing: false,
-    security: false,
-    infrastructure: false,
-    observability: false
-  });
-
-  const toggleNode = (nodeId: string) => {
-    setExpandedNodes((prev) => ({ ...prev, [nodeId]: !prev[nodeId] }));
+  const refreshAll = () => {
+    setManifest(SystemManifest.getManifest());
+    setModules(OperationalRealityValidator.getStrictOperationalMatrix());
+    setAdmins(AdminProvisioningEngine.getAdmins());
+    setCommands(CommandRegistry.getAll());
+    setScheduledTasks(CommandScheduler.getTasks());
+    setPolicies(PolicyEngine.getPolicies());
+    setLogs(SecurityAuditService.getLogs());
+    setHistory(CommandPersistenceService.getHistory());
+    setStoredCommands(CommandPersistenceService.getStoredCommands());
   };
-
-  const expandAllNodes = () => {
-    const all: Record<string, boolean> = {};
-    activityItems.forEach((item) => {
-      all[item.id] = true;
-    });
-    setExpandedNodes(all);
-  };
-
-  const collapseAllNodes = () => {
-    setExpandedNodes({});
-  };
-
-  // Engines State
-  const [automationRules, setAutomationRules] = useState<AutomationRule[]>(AutomationEngine.getRules());
-  const [automationLogs, setAutomationLogs] = useState<AutomationExecutionLog[]>(AutomationEngine.getExecutionLogs());
-  const [healthMetrics, setHealthMetrics] = useState<DeviceHealthMetric[]>(HealthEngine.getHealthMetrics());
-  const [diagnostics, setDiagnostics] = useState<OperationalDiagnostic[]>(HealthEngine.getDiagnostics());
-  const [deviceTimeline, setDeviceTimeline] = useState<DeviceTimelineEvent[]>(HealthEngine.getTimelineEvents());
-
-  // Memory Batching & SSE Stream Metrics
-  const [queueMetrics, setQueueMetrics] = useState<BatchQueueMetrics>({
-    bufferedCount: 0,
-    totalFlushed: 0,
-    totalEventsReceived: 0,
-    savedFirestoreWritesPercentage: 92,
-    lastFlushTime: Date.now(),
-    sseConnectedClients: 1
-  });
 
   useEffect(() => {
-    BatchQueueEngine.initSSEStream();
-    const unsubMetrics = BatchQueueEngine.onMetrics((metrics) => {
-      setQueueMetrics(metrics);
-    });
-    const unsubEvents = BatchQueueEngine.onEvent((event) => {
-      setTerminalLogs((prev) => [
-        ...prev.slice(-40),
-        `[SSE <5ms STREAM] Evento recebido: ${event.type} de Node: ${event.nodeId}`
-      ]);
-    });
-    return () => {
-      unsubMetrics();
-      unsubEvents();
-    };
+    refreshAll();
+    const interval = setInterval(refreshAll, 2000);
+    return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    const handleSwitchActivity = (e: CustomEvent<string>) => {
-      if (e.detail === 'billing' || e.detail === 'payments') {
-        setActiveActivity('payments');
-      } else if (e.detail) {
-        setActiveActivity(e.detail);
-      }
-    };
-    window.addEventListener('switch-founder-activity' as any, handleSwitchActivity);
-    return () => window.removeEventListener('switch-founder-activity' as any, handleSwitchActivity);
-  }, []);
-
-  // Workbench Tabs
-  const [openTabs, setOpenTabs] = useState<IDETab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
-
-  // Terminal State
-  const [terminalLogs, setTerminalLogs] = useState<string[]>([
-    `[SYSTEM BOOT] PortalTRMobile System initialized.`,
-    `[FOUNDER LOCK] Master user: '${DEUS_FUNDADOR_CREDENTIALS.username}' authenticated. Immutable flag: true.`,
-    `[INTEGRATION] AppyPay Gateway registered in Sandbox mode.`,
-    `[FEATURE FLAGS] Loaded from Firestore. Payments: Enabled, AppyPay: Enabled.`,
-    `[RUNTIME] Express Container (Port 3000) listening. Gateway ready.`
-  ]);
-  const [commandInput, setCommandInput] = useState<string>('');
-
-  // Domain Data States
-  const [flags, setFlags] = useState<FeatureFlagsState>(AuthorityEngine.getFeatureFlags());
-  const [selectedUserFilter, setSelectedUserFilter] = useState<'all' | 'trial' | 'lifetime' | 'founder' | 'admin'>('all');
-
-  // Real-time Users List from IdentityEngine / Firestore
-  const [users, setUsers] = useState<UserProfile[]>([]);
-
-  useEffect(() => {
-    const unsub = IdentityEngine.listenToAllUsers((fetchedUsers) => {
-      if (fetchedUsers && fetchedUsers.length > 0) {
-        setUsers(fetchedUsers);
-      } else {
-        setUsers([
-          {
-            userId: 'deusfundador-master-001',
-            email: DEUS_FUNDADOR_CREDENTIALS.email,
-            displayName: 'Deus Fundador (Super Master)',
-            role: 'founder',
-            system: true,
-            immutable: true,
-            createdAt: Date.now() - 86400000 * 60,
-            lastLogin: Date.now(),
-            permissions: ['*']
-          },
-          {
-            userId: 'usr-248',
-            email: 'mario.silva@empresa.ao',
-            displayName: 'Mário Silva (Operador de Caixa)',
-            role: 'user',
-            system: false,
-            immutable: false,
-            createdAt: Date.now() - 86400000 * 3,
-            lastLogin: Date.now() - 1800000,
-            permissions: ['events.read']
-          },
-          {
-            userId: 'usr-501',
-            email: 'ana.costa@tech.co.ao',
-            displayName: 'Ana Costa (Gestora Financeira)',
-            role: 'admin',
-            system: false,
-            immutable: false,
-            createdAt: Date.now() - 86400000 * 12,
-            lastLogin: Date.now() - 3600000,
-            permissions: ['devices.manage', 'events.read', 'payments.write']
-          },
-          {
-            userId: 'agent-samsung-s22',
-            email: 'android.samsung@internal.device',
-            displayName: 'Agente Android Samsung S22',
-            role: 'android_agent',
-            system: true,
-            immutable: true,
-            createdAt: Date.now() - 86400000 * 20,
-            lastLogin: Date.now() - 30000,
-            permissions: ['sync.write', 'events.push']
-          }
-        ]);
-      }
-    });
-
-    return () => unsub();
-  }, []);
-
-  // Activity Bar Navigation Definition (Clean Founder IDE 12 Root Modules Architecture)
-  const activityItems = [
-    { id: 'root_authority', label: '👑 ROOT', icon: Crown },
-    { id: 'virtual_phone', label: '📞 VIRTUAL PHONE', icon: PhoneCall },
-    { id: 'workspace', label: '📁 WORKSPACE / FILES', icon: FolderOpen },
-    { id: 'console', label: '🖥️ CONSOLE', icon: LayoutDashboard },
-    { id: 'devices', label: '📱 DEVICES', icon: Smartphone },
-    { id: 'users', label: '👥 USERS', icon: Users, badge: users.length ? String(users.length) : undefined },
-    { id: 'automation', label: '⚡ AUTOMATION', icon: Zap },
-    { id: 'integrations', label: '🔌 INTEGRATIONS', icon: Plug },
-    { id: 'billing', label: '💳 BILLING', icon: CreditCard },
-    { id: 'security', label: '🛡️ SECURITY', icon: ShieldCheck },
-    { id: 'infrastructure', label: '☁️ INFRASTRUCTURE', icon: Cloud },
-    { id: 'observability', label: '📊 OBSERVABILITY', icon: BarChart3 }
-  ];
-
-  // Open or focus tab
-  const openTab = (tab: IDETab) => {
-    if (!openTabs.some((t) => t.id === tab.id)) {
-      setOpenTabs([...openTabs, tab]);
-    }
-    setActiveTabId(tab.id);
-  };
-
-  const closeTab = (tabId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const filtered = openTabs.filter((t) => t.id !== tabId);
-    setOpenTabs(filtered);
-    if (activeTabId === tabId) {
-      setActiveTabId(filtered.length > 0 ? filtered[filtered.length - 1].id : null);
-    }
-  };
-
-  const handleCommandSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!commandInput.trim()) return;
-
-    const cmd = commandInput.trim();
-    const newLogs = [...terminalLogs, `$ ${cmd}`];
-
-    if (cmd === 'clear') {
-      setTerminalLogs([]);
-      setCommandInput('');
-      return;
-    }
-
-    if (cmd.startsWith('trial grant')) {
-      newLogs.push(`[TRIAL ENGINE] Licença estendida com sucesso para o utilizador alvo.`);
-    } else if (cmd === 'appypay status') {
-      newLogs.push(`[APPYPAY] ClientID: appypay_sbx_99482 • Status: ONLINE (Sandbox) • Gateway Ping: 18ms`);
-    } else if (cmd === 'flags sync') {
-      newLogs.push(`[FLAGS] Sincronização em tempo real com Firestore concluída.`);
-    } else if (cmd === 'batch status' || cmd === 'queue status') {
-      newLogs.push(`[MEMORY BATCHING] Buffer: ${queueMetrics.bufferedCount} eventos | Total Flushed: ${queueMetrics.totalFlushed} | Economia Firestore: ${queueMetrics.savedFirestoreWritesPercentage}%`);
-    } else if (cmd === 'autodiscovery test') {
-      BatchQueueEngine.registerAutodiscovery({
-        deviceId: 'node-itel-a100',
-        nodeId: 'node-itel-a100',
-        capabilities: { sms: true, notifications: true, accessibility: true, calls: true, biometrics: true, whatsapp: true },
-        oemProfile: 'generic',
-        permissionScore: 98
-      }).then((res) => {
-        setTerminalLogs((prev) => [...prev, `[AUTODISCOVERY] ${res.message} (Rotas ativas: ${res.activeRoutes.join(', ')})`]);
-      });
-    } else if (cmd === 'help') {
-      newLogs.push(`Comandos disponíveis: 'batch status', 'autodiscovery test', 'trial grant <user>', 'appypay status', 'flags sync', 'clear'`);
+  const handleToggleAdminStatus = (uid: string, currentStatus: string) => {
+    if (currentStatus === 'ACTIVE') {
+      AdminProvisioningEngine.suspendAdmin(uid);
     } else {
-      newLogs.push(`[KERNEL] Comando executado: '${cmd}' com sucesso.`);
+      AdminProvisioningEngine.activateAdmin(uid);
     }
-
-    setTerminalLogs(newLogs);
-    setCommandInput('');
+    refreshAll();
   };
 
-  const activeTabObj = openTabs.find((t) => t.id === activeTabId);
+  const handleRemoveAdmin = (uid: string) => {
+    if (confirm('Confirmar remoção irrevogável do administrador?')) {
+      AdminProvisioningEngine.removeAdmin(uid);
+      refreshAll();
+    }
+  };
+
+  const handleCancelTask = (taskId: string) => {
+    CommandScheduler.cancelTask(taskId);
+    refreshAll();
+  };
 
   return (
-    <div className="flex flex-col h-[85vh] bg-slate-950 text-slate-100 font-sans border border-slate-800 rounded-2xl shadow-2xl overflow-hidden select-none">
-      {/* Top IDE Bar Header */}
-      <div className="h-10 bg-slate-900/90 border-b border-slate-800 px-4 flex items-center justify-between text-xs font-mono">
+    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-5 font-mono text-slate-200">
+      {/* Header IDE */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-4">
         <div className="flex items-center space-x-3">
-          <span className="text-slate-300 font-bold flex items-center space-x-2">
-            <Crown className="w-4 h-4 text-amber-400" />
-            <span>FOUNDER WORKSPACE</span>
-            <span className="text-slate-600">|</span>
-            <span className="text-emerald-400 font-normal">deusfundador</span>
-          </span>
+          <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+            <Terminal className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+              3.0
+            </h2>
+            <p className="text-xs text-slate-400 font-sans mt-0.5">
+              KernelOps.
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center space-x-3 text-[11px] text-slate-400">
+        <div className="flex items-center space-x-2">
+          {/* Navegação por Abas Densas */}
+          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs overflow-x-auto scrollbar-none">
+            <button
+              onClick={() => setActiveTab('MANIFEST')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap ${
+                activeTab === 'MANIFEST' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5" />
+              <span>Manifest ({manifest.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('MODULES')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap ${
+                activeTab === 'MODULES' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Módulos ({modules.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('ADMINS')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap ${
+                activeTab === 'ADMINS' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Admins ({admins.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('COMMANDS')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap ${
+                activeTab === 'COMMANDS' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Comandos ({commands.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('SCHEDULED')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap ${
+                activeTab === 'SCHEDULED' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Agendados ({scheduledTasks.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('LOGS')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap ${
+                activeTab === 'LOGS' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Auditoria ({logs.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('EVIDENCE')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1.5 whitespace-nowrap ${
+                activeTab === 'EVIDENCE' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Evidência ({storedCommands.length})</span>
+            </button>
+          </div>
+
+          {onBackToPublic && (
+            <button
+              onClick={onBackToPublic}
+              className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+              title="Voltar ao Smartphone Principal"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Smartphone</span>
+            </button>
+          )}
+
           <button
-            onClick={() => setIsPaletteOpen(true)}
-            className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-mono font-bold rounded-lg border border-amber-500/40 flex items-center space-x-1.5 cursor-pointer transition-all shadow-sm"
+            onClick={refreshAll}
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition"
+            title="Atualizar dados"
           >
-            <Search className="w-3.5 h-3.5 text-amber-400" />
-            <span>Command Palette (Ctrl+Shift+P)</span>
+            <RefreshCw className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Main IDE Body Grid */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* 1. Vertical Activity Bar */}
-        <div className="w-14 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-3 space-y-3 overflow-y-auto shrink-0">
-          {activityItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeActivity === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveActivity(item.id);
-                  if (!sidePanelOpen) setSidePanelOpen(true);
-                }}
-                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all relative cursor-pointer ${
-                  isActive
-                    ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 font-bold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
-                title={item.label}
-              >
-                <Icon className="w-5 h-5" />
-                {item.badge && (
-                  <span className="absolute -top-1 -right-1 bg-indigo-500 text-white text-[9px] font-extrabold px-1.5 py-0.2 rounded-full border border-slate-900">
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 2. Collapsible Side Panel (Unified Hierarchical Navigation Tree) */}
-        {sidePanelOpen && (
-          <div className="w-72 bg-slate-900/80 border-r border-slate-800 flex flex-col shrink-0 overflow-hidden text-xs select-none">
-            {/* Sidebar Explorer Header */}
-            <div className="p-3 border-b border-slate-800 bg-slate-900 flex flex-col space-y-2">
-              <div className="flex items-center justify-between font-mono text-[11px] font-bold text-slate-300 uppercase tracking-wider">
-                <span className="flex items-center space-x-1.5">
-                  <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
-                  <span>EXPLORER: DOMÍNIOS</span>
-                </span>
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={expandAllNodes}
-                    className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 cursor-pointer text-[10px]"
-                    title="Expandir Todos"
-                  >
-                    + Expand
-                  </button>
-                  <button
-                    onClick={collapseAllNodes}
-                    className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-slate-200 cursor-pointer text-[10px]"
-                    title="Colapsar Todos"
-                  >
-                    - Collapse
-                  </button>
-                  <button
-                    onClick={() => setSidePanelOpen(false)}
-                    className="p-1 text-slate-500 hover:text-slate-300 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Tree Quick Filter Search Bar */}
-              <div className="relative font-mono text-xs">
-                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2" />
-                <input
-                  type="text"
-                  value={treeSearchFilter}
-                  onChange={(e) => setTreeSearchFilter(e.target.value)}
-                  placeholder="Filtrar domínios ou nós..."
-                  className="w-full bg-slate-950 text-slate-200 pl-8 pr-2 py-1 rounded-lg border border-slate-800 focus:outline-none focus:border-amber-500/50 text-[11px]"
-                />
-                {treeSearchFilter && (
-                  <button
-                    onClick={() => setTreeSearchFilter('')}
-                    className="absolute right-2 top-1.5 text-slate-500 hover:text-slate-300"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Hierarchical Tree Body */}
-            <div className="p-2 overflow-y-auto flex-1 space-y-1 font-mono text-xs">
-              {activityItems
-                .filter((item) => {
-                  if (!treeSearchFilter.trim()) return true;
-                  const query = treeSearchFilter.toLowerCase();
-                  if (item.label.toLowerCase().includes(query) || item.id.toLowerCase().includes(query)) return true;
-                  if (item.id === 'users') {
-                    return users.some(u => u.displayName.toLowerCase().includes(query) || u.email.toLowerCase().includes(query));
-                  }
-                  return false;
-                })
-                .map((item) => {
-                  const Icon = item.icon;
-                  const isExpanded = expandedNodes[item.id] || treeSearchFilter.trim().length > 0;
-                  const isDomainActive = activeActivity === item.id;
-
-                  return (
-                    <div key={item.id} className="space-y-0.5">
-                      {/* Parent Domain Folder Header */}
-                      <div
-                        onClick={() => {
-                          toggleNode(item.id);
-                          setActiveActivity(item.id);
-                        }}
-                        className={`group px-2 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
-                          isDomainActive
-                            ? 'bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30'
-                            : 'hover:bg-slate-800/80 text-slate-300 hover:text-slate-100 border border-transparent'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-2 truncate">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleNode(item.id);
-                            }}
-                            className="p-0.5 text-slate-500 group-hover:text-slate-300"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="w-3.5 h-3.5 text-amber-400" />
-                            ) : (
-                              <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
-                            )}
-                          </button>
-
-                          {isExpanded ? (
-                            <FolderOpen className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          ) : (
-                            <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          )}
-
-                          <span className="truncate text-[11px]">{item.label}</span>
-                        </div>
-
-                        {item.badge && (
-                          <span className="px-1.5 py-0.2 text-[9px] font-extrabold rounded bg-slate-800 text-indigo-300 border border-slate-700/80 shrink-0">
-                            {item.badge}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Collapsible Children Tree Branch */}
-                      {isExpanded && (
-                        <div className="pl-6 space-y-0.5 border-l border-slate-800/80 ml-3 py-0.5">
-                          {/* 1. Root Authority Children */}
-                          {item.id === 'root_authority' && (
-                            <>
-                              <div
-                                onClick={() => {
-                                  setActiveActivity('root_authority');
-                                  openTab({ id: 'root-console-tab', title: 'Root Console', type: 'root_authority' });
-                                }}
-                                className="px-2 py-1 rounded text-[11px] text-amber-300 hover:bg-amber-500/10 cursor-pointer flex items-center space-x-2 font-bold"
-                              >
-                                <Crown className="w-3 h-3 text-amber-400" />
-                                <span>Root of Trust Console</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('root_authority')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <KeyRound className="w-3 h-3 text-amber-400" />
-                                <span>Deus Fundador Credentials</span>
-                              </div>
-                            </>
-                          )}
-
-                          {/* 2. Workspace & Files Children */}
-                          {item.id === 'workspace' && (
-                            <>
-                              <div
-                                onClick={() => setActiveActivity('workspace')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Folder className="w-3 h-3 text-amber-400" />
-                                <span>Project Root (/src)</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('workspace')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <FileText className="w-3 h-3 text-sky-400" />
-                                <span>System Configuration (.env)</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('workspace')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Database className="w-3 h-3 text-indigo-400" />
-                                <span>Storage Buckets</span>
-                              </div>
-                            </>
-                          )}
-
-                          {/* 3. Console & Command Center Children */}
-                          {item.id === 'console' && (
-                            <>
-                              <div
-                                onClick={() => {
-                                  setActiveActivity('console');
-                                  openTab({ id: 'overview-tab', title: 'Operational Overview', type: 'overview' });
-                                }}
-                                className="px-2 py-1 rounded text-[11px] text-sky-400 hover:bg-sky-950/30 cursor-pointer flex items-center space-x-2 font-bold"
-                              >
-                                <LayoutDashboard className="w-3 h-3 text-sky-400" />
-                                <span>Operational Overview (8 Pilares)</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('console')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Shield className="w-3 h-3 text-purple-400" />
-                                <span>CPaaS Security Dispatcher</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('console')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <KeyRound className="w-3 h-3 text-amber-400" />
-                                <span>API Keys & Virtual Numbers</span>
-                              </div>
-                            </>
-                          )}
-
-                          {/* 4. Devices Children */}
-                          {item.id === 'devices' && (
-                            <>
-                              <div
-                                onClick={() => setActiveActivity('devices')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Smartphone className="w-3 h-3 text-emerald-400" />
-                                <span>Agent Mesh Fleet Manager</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('devices')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Radio className="w-3 h-3 text-indigo-400" />
-                                <span>Autodiscovery & OEM Capabilities</span>
-                              </div>
-                            </>
-                          )}
-
-                          {/* 5. Users Children */}
-                          {item.id === 'users' && (
-                            <div className="space-y-1">
-                              <div className="text-[10px] text-slate-500 uppercase font-bold px-1 py-0.5">
-                                Utilizadores Ativos ({users.length})
-                              </div>
-                              {users.map((usr, uIdx) => {
-                                const usrKey = usr.userId || usr.id || usr.email || `usr-item-${uIdx}`;
-                                const lic = TrialEngine.getLicense(usrKey, usr.email);
-                                const evalState = TrialEngine.evaluateState(lic);
-                                return (
-                                  <div
-                                    key={usrKey}
-                                    onClick={() => {
-                                      setActiveActivity('users');
-                                      openTab({
-                                        id: `user-${usrKey}`,
-                                        title: `User: ${(usr.displayName || 'User').split(' ')[0]}`,
-                                        type: 'user',
-                                        data: { user: usr, license: lic }
-                                      });
-                                    }}
-                                    className="p-1.5 rounded hover:bg-slate-800/80 cursor-pointer space-y-0.5 border border-transparent hover:border-slate-700/60"
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span className="truncate text-[11px] text-slate-200 font-bold max-w-[120px]">
-                                        {usr.displayName}
-                                      </span>
-                                      <span
-                                        className={`px-1 py-0.2 rounded text-[8px] uppercase font-bold ${
-                                          usr.role === 'founder'
-                                            ? 'bg-amber-500/20 text-amber-400'
-                                            : usr.role === 'admin'
-                                            ? 'bg-indigo-500/20 text-indigo-400'
-                                            : 'bg-slate-800 text-slate-400'
-                                        }`}
-                                      >
-                                        {usr.role}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-[9px] text-slate-500">
-                                      <span className="truncate max-w-[100px]">{usr.email}</span>
-                                      <span className={evalState.active ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                                        {lic.lifetime ? 'Lifetime' : `${evalState.daysRemaining}d`}
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          {/* 6. Automation Children */}
-                          {item.id === 'automation' && (
-                            <>
-                              <div
-                                onClick={() => setActiveActivity('automation')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Zap className="w-3 h-3 text-yellow-400" />
-                                <span>Regras de Automação ({automationRules.length})</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('automation')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <ScrollText className="w-3 h-3 text-slate-400" />
-                                <span>Registos de Execução ({automationLogs.length})</span>
-                              </div>
-                            </>
-                          )}
-
-                          {/* 7. Integrations Children */}
-                          {item.id === 'integrations' && (
-                            <>
-                              <div
-                                onClick={() => setActiveActivity('integrations')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Plug className="w-3 h-3 text-purple-400" />
-                                <span>Integrations & CPaaS Console</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('integrations')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <ExternalLink className="w-3 h-3 text-indigo-400" />
-                                <span>Webhooks & Event Bus</span>
-                              </div>
-                            </>
-                          )}
-
-                          {/* 8. Billing Children */}
-                          {item.id === 'billing' && (
-                            <>
-                              <div
-                                onClick={() => {
-                                  setActiveActivity('billing');
-                                  openTab({ id: 'sub-console-tab', title: 'Subscriptions Console', type: 'appypay' });
-                                }}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <CreditCard className="w-3 h-3 text-emerald-400" />
-                                <span>Subscriptions Console</span>
-                              </div>
-                              <div
-                                onClick={() => {
-                                  setActiveActivity('billing');
-                                  openTab({ id: 'appypay-gateway', title: 'AppyPay Gateway Provider', type: 'appypay' });
-                                }}
-                                className="px-2 py-1 rounded text-[11px] text-emerald-400 hover:bg-emerald-950/40 cursor-pointer flex items-center space-x-2 font-bold"
-                              >
-                                <CreditCard className="w-3 h-3 text-emerald-400" />
-                                <span>AppyPay Gateway (Sandbox)</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('billing')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Clock className="w-3 h-3 text-indigo-400" />
-                                <span>Trial Engine & Plans</span>
-                              </div>
-                            </>
-                          )}
-
-                          {/* 9. Security Children */}
-                          {item.id === 'security' && (
-                            <>
-                              <div
-                                onClick={() => {
-                                  setActiveActivity('security');
-                                  openTab({ id: 'feature-flags-editor', title: 'Feature Flags', type: 'flags' });
-                                }}
-                                className="px-2 py-1 rounded text-[11px] text-amber-300 hover:bg-amber-950/30 cursor-pointer flex items-center space-x-2 font-bold"
-                              >
-                                <Sliders className="w-3 h-3 text-amber-400" />
-                                <span>Feature Flags (Firestore)</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('security')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Lock className="w-3 h-3 text-rose-400" />
-                                <span>Chaves E2EE & Segredos</span>
-                              </div>
-                            </>
-                          )}
-
-                          {/* 10. Infrastructure Children */}
-                          {item.id === 'infrastructure' && (
-                            <>
-                              <div
-                                onClick={() => setActiveActivity('infrastructure')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Cloud className="w-3 h-3 text-cyan-400" />
-                                <span>Node.js Container & Express</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('infrastructure')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Database className="w-3 h-3 text-amber-400" />
-                                <span>In-Memory Queue Buffer</span>
-                              </div>
-                            </>
-                          )}
-
-                          {/* 11. Observability Children */}
-                          {item.id === 'observability' && (
-                            <>
-                              <div
-                                onClick={() => setActiveActivity('observability')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <BarChart3 className="w-3 h-3 text-emerald-400" />
-                                <span>Analytics Executivo</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('observability')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <Activity className="w-3 h-3 text-indigo-400" />
-                                <span>Métricas de Saúde dos Agentes</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('observability')}
-                                className="px-2 py-1 rounded text-[11px] text-cyan-300 hover:bg-cyan-950/30 cursor-pointer flex items-center space-x-2 font-bold"
-                              >
-                                <Radio className="w-3 h-3 text-cyan-400" />
-                                <span>Realtime Event Stream (SSE)</span>
-                              </div>
-                              <div
-                                onClick={() => setActiveActivity('observability')}
-                                className="px-2 py-1 rounded text-[11px] text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 cursor-pointer flex items-center space-x-2"
-                              >
-                                <ScrollText className="w-3 h-3 text-orange-400" />
-                                <span>Audit Logs & System DLQ</span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
+      {/* ABA 0 — SYSTEM MANIFEST (DIRETRIZ 40) */}
+      {activeTab === 'MANIFEST' && (
+        <div className="space-y-3">
+          <div className="overflow-x-auto border border-slate-800 rounded-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="py-2.5 px-3">Motor (Engine ID)</th>
+                  <th className="py-2.5 px-3">Categoria</th>
+                  <th className="py-2.5 px-3">Versão</th>
+                  <th className="py-2.5 px-3 text-center">Estado Prontidão</th>
+                  <th className="py-2.5 px-3 text-center">Health Score</th>
+                  <th className="py-2.5 px-3">Evidência Real</th>
+                  <th className="py-2.5 px-3">Última Auditoria</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {manifest.map(m => (
+                  <tr key={m.engineId} className="hover:bg-slate-900/50 transition">
+                    <td className="py-2.5 px-3 font-bold text-white">
+                      <div>{m.name}</div>
+                      <div className="text-[10px] text-slate-500 font-mono">{m.engineId}</div>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px]">
+                        {m.category}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-400 font-mono">v{m.version}</td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        m.status === 'OPERATIONAL' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                        m.status === 'VALIDATED' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                        m.status === 'TESTED' ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' :
+                        m.status === 'CONFIGURED' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                        'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}>
+                        {m.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center font-bold text-emerald-400">
+                      {m.healthScore}%
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-cyan-400 text-[11px]">
+                      {m.evidenceId}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-400 text-[10px]">
+                      {new Date(m.lastAuditAt).toLocaleTimeString('pt-AO')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-
-        {/* 3. Center Workbench (Tabbed Editor) */}
-        <div className="flex-1 flex flex-col bg-slate-950 overflow-hidden">
-          {/* Tabs Bar */}
-          <div className="h-9 bg-slate-900/80 border-b border-slate-800 flex items-center overflow-x-auto text-xs font-mono">
-            {openTabs.map((tab) => {
-              const isActive = tab.id === activeTabId;
-              return (
-                <div
-                  key={tab.id}
-                  onClick={() => setActiveTabId(tab.id)}
-                  className={`h-full px-3.5 flex items-center space-x-2 border-r border-slate-800/80 cursor-pointer select-none transition-colors ${
-                    isActive
-                      ? 'bg-slate-950 text-amber-400 border-t-2 border-t-amber-500 font-bold'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-                  }`}
-                >
-                  <span className="truncate max-w-[150px]">{tab.title}</span>
-                  <button
-                    onClick={(e) => closeTab(tab.id, e)}
-                    className="p-0.5 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-200"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
-
-            {openTabs.length === 0 && (
-              <div className="px-4 text-[11px] text-slate-500 italic">No editor opened</div>
-            )}
-          </div>
-
-          {/* Workbench Center Viewport */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {activeActivity === 'root_authority' || activeTabObj?.type === 'root_authority' ? (
-              <RootConsoleView />
-            ) : activeActivity === 'virtual_phone' || activeTabObj?.type === 'virtual_phone' ? (
-              <VirtualPhoneCloudWorkspace />
-            ) : activeActivity === 'workspace' ? (
-              <InfrastructureConsole />
-            ) : activeActivity === 'console' || activeActivity === 'overview' || activeTabObj?.type === 'overview' ? (
-              <div className="space-y-6 font-sans">
-                <OperationalOverviewConsole />
-                <CpaasSecurityDispatcherConsole />
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  <APIKeysManager />
-                  <VirtualNumbersManager />
-                </div>
-              </div>
-            ) : activeActivity === 'devices' || activeTabObj?.type === 'device' ? (
-              <DevicesView />
-            ) : activeActivity === 'users' ? (
-              /* USERS & IDENTITY MANAGER VIEW */
-              <div className="space-y-6 font-mono text-slate-100 text-xs">
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-black text-slate-100">IDENTITY & USER LICENSES</h2>
-                    <p className="text-xs text-slate-400">Gestão de Utilizadores, Regras e Licenças com Trial Engine</p>
-                  </div>
-                  <span className="px-3 py-1 bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/40 font-bold">
-                    {users.length} Utilizadores Ativos
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {users.map((usr, uIdx) => {
-                    const usrKey = usr.userId || usr.id || usr.email || `usr-grid-${uIdx}`;
-                    const lic = TrialEngine.getLicense(usrKey, usr.email);
-                    return (
-                      <div key={usrKey} className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-100 text-sm">{usr.displayName}</span>
-                          <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[10px] rounded uppercase font-bold">
-                            {usr.role}
-                          </span>
-                        </div>
-                        <p className="text-slate-400 text-xs">{usr.email}</p>
-                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
-                          <span className="text-slate-400">Estado Licença:</span>
-                          <span className="text-emerald-400 font-bold">
-                            {lic.lifetime ? 'LIFETIME' : 'TRIAL ATIVO'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : activeActivity === 'automation' ? (
-              /* AUTOMATION ENGINE VIEW */
-              <AutomationRulesManager />
-            ) : activeActivity === 'integrations' ? (
-              /* INTEGRATIONS, APIS & WEBHOOKS VIEW */
-              <IntegrationsConsole />
-            ) : activeActivity === 'billing' || activeActivity === 'subscriptions' || activeTabObj?.type === 'appypay' ? (
-              /* BILLING & APPYPAY GATEWAY VIEW */
-              <div className="space-y-6">
-                <SubscriptionsConsole />
-                <AppyPayGatewayConsole />
-              </div>
-            ) : activeActivity === 'security' || activeActivity === 'security_flags' || activeTabObj?.type === 'flags' ? (
-              /* SECURITY & CONFIGURATION VIEW */
-              <SecurityConsole />
-            ) : activeActivity === 'infrastructure' ? (
-              /* CONSOLIDATED INFRASTRUCTURE & STORAGE VIEW */
-              <InfrastructureConsole />
-            ) : activeActivity === 'observability' || activeActivity === 'telemetry' || activeActivity === 'audit' ? (
-              /* OBSERVABILITY, TELEMETRY & AUDIT VIEW */
-              <div className="space-y-6 font-sans text-slate-100">
-                <AnalyticsView stats={null} />
-
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-center justify-between font-mono text-xs">
-                  <div>
-                    <h3 className="font-black text-slate-100 text-sm">TELEMETRIA & SAÚDE DOS AGENTES ANDROID</h3>
-                    <p className="text-slate-400 text-[11px]">Diagnósticos automáticos e repair workflows em lote</p>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      HealthEngine.runAutoRepair('dev-xiaomi-12t-02');
-                      setHealthMetrics(HealthEngine.getHealthMetrics());
-                      setDiagnostics(HealthEngine.getDiagnostics());
-                    }}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-lg shadow-emerald-600/20 flex items-center space-x-1.5"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Executar Repair Workflow nos Dispositivos</span>
-                  </button>
-                </div>
-
-                {/* Operations Assistant Diagnostics Banner */}
-                <div className="space-y-3 font-mono">
-                  <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-2">
-                    <Sparkles className="w-4 h-4" />
-                    <span>Root Operations Assistant Suggestions ({diagnostics.length})</span>
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
-                    {diagnostics.map((diag, idx) => (
-                      <div key={diag.id || `diag-${idx}`} className="p-4 bg-slate-900 rounded-2xl border border-amber-500/30 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-amber-300">{diag.title}</span>
-                          <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] rounded font-bold uppercase">
-                            {diag.severity}
-                          </span>
-                        </div>
-                        <p className="text-slate-400 text-[11px]">{diag.description}</p>
-                        <div className="pt-2 flex items-center justify-between border-t border-slate-800">
-                          <span className="text-emerald-400 font-bold text-[10px]">{diag.suggestedAction}</span>
-                          <button
-                            onClick={() => {
-                              HealthEngine.runAutoRepair('dev-xiaomi-12t-02');
-                              setHealthMetrics(HealthEngine.getHealthMetrics());
-                            }}
-                            className="px-3 py-1 bg-amber-500 text-slate-950 font-bold rounded-lg text-[10px] cursor-pointer"
-                          >
-                            Executar
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Realtime SSE Dev Stream */}
-                <RealtimeDevStreamConsole />
-
-                {/* Device Health Score Cards */}
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3 font-mono text-xs">
-                  <h3 className="text-sm font-bold text-slate-200 border-b border-slate-800 pb-2">
-                    Métricas de Saúde dos Agentes Android ({healthMetrics.length})
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {healthMetrics.map((m, idx) => (
-                      <div key={m.deviceId || `health-${idx}`} className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-100">{m.deviceName}</span>
-                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded">
-                            Health: {m.healthScore}%
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-400">
-                          <div className="p-2 bg-slate-900 rounded border border-slate-800">
-                            <span className="block text-[9px] text-slate-500">BATTERY</span>
-                            <span className="font-bold text-slate-200">{m.batteryLevel}%</span>
-                          </div>
-                          <div className="p-2 bg-slate-900 rounded border border-slate-800">
-                            <span className="block text-[9px] text-slate-500">HEARTBEAT</span>
-                            <span className="font-bold text-indigo-400">{m.heartbeatIntervalSec}s</span>
-                          </div>
-                          <div className="p-2 bg-slate-900 rounded border border-slate-800">
-                            <span className="block text-[9px] text-slate-500">PERMISSIONS</span>
-                            <span className="font-bold text-emerald-400">{m.permissionScore}%</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center space-x-3 text-[10px] text-slate-400">
-                          <span className={m.notificationListenerActive ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                            • Notification Listener: {m.notificationListenerActive ? 'OK' : 'LOST'}
-                          </span>
-                          <span className="text-emerald-400 font-bold">• SMS Interceptor: OK</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : activeTabObj ? (
-              /* ACTIVE TAB RENDERERS FALLBACK */
-              <div>
-                {/* USER & TRIAL TAB */}
-                {activeTabObj.type === 'user' && activeTabObj.data && (
-                  <div className="space-y-6 font-mono text-xs">
-                    <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex items-start justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <h2 className="text-lg font-bold text-slate-100">{activeTabObj.data.user.displayName}</h2>
-                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-mono font-bold uppercase">
-                            {activeTabObj.data.user.role}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 font-mono">{activeTabObj.data.user.email}</p>
-                      </div>
-
-                      <div className="text-right font-mono text-xs space-y-1">
-                        <span className="text-slate-500 block">ID: {activeTabObj.data.user.userId}</span>
-                        <span className="text-emerald-400 font-bold block">
-                          {activeTabObj.data.license.lifetime ? 'Licença Vitalícia' : 'Trial Ativo'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* EMPTY WORKSPACE PLACEHOLDER (CENTRO VAZIO POR PADRÃO) */
-              <div className="h-full min-h-[420px] flex flex-col items-center justify-center text-center p-8 text-slate-500 font-mono select-none">
-                <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800/80 flex items-center justify-center mb-4 text-slate-600 shadow-2xl">
-                  <FolderOpen className="w-8 h-8 text-amber-500/50" />
-                </div>
-                <h2 className="text-sm font-bold text-slate-300 mb-1 tracking-wider uppercase">Founder IDE Workspace</h2>
-                <p className="text-xs text-slate-500 max-w-md mb-6">
-                  Área de trabalho limpa. Selecione um módulo no painel à esquerda para abrir uma consola de operação ou ficheiro.
-                </p>
-                <div className="flex flex-wrap items-center justify-center gap-2 text-[11px]">
-                  <kbd className="px-2.5 py-1 bg-slate-900 border border-slate-800 rounded text-slate-400 font-bold shadow-inner">
-                    Ctrl + K
-                  </kbd>
-                  <span className="text-slate-600">para abrir a Palette de Comandos</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Bottom Collapsible Panel (Terminal / Logs / Console) */}
-      {bottomPanelOpen && (
-        <div className="h-44 bg-slate-900 border-t border-slate-800 flex flex-col font-mono text-xs shrink-0">
-          <div className="h-8 bg-slate-950 border-b border-slate-800/80 px-3 flex items-center justify-between text-[11px] text-slate-400">
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setBottomPanelTab('terminal')}
-                className={`flex items-center space-x-1 px-2.5 py-1 rounded cursor-pointer ${
-                  bottomPanelTab === 'terminal' ? 'bg-slate-800 text-amber-400 font-bold' : 'hover:text-slate-200'
-                }`}
-              >
-                <Terminal className="w-3.5 h-3.5" />
-                <span>TERMINAL</span>
-              </button>
-              <button
-                onClick={() => setBottomPanelTab('logs')}
-                className={`flex items-center space-x-1 px-2.5 py-1 rounded cursor-pointer ${
-                  bottomPanelTab === 'logs' ? 'bg-slate-800 text-indigo-400 font-bold' : 'hover:text-slate-200'
-                }`}
-              >
-                <Activity className="w-3.5 h-3.5" />
-                <span>SYSTEM LOGS</span>
-              </button>
-              <button
-                onClick={() => setBottomPanelTab('queue')}
-                className={`flex items-center space-x-1 px-2.5 py-1 rounded cursor-pointer ${
-                  bottomPanelTab === 'queue' ? 'bg-slate-800 text-emerald-400 font-bold' : 'hover:text-slate-200'
-                }`}
-              >
-                <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                <span>IN-MEMORY QUEUE & SSE ({queueMetrics.bufferedCount})</span>
-              </button>
-            </div>
-
-            <button
-              onClick={() => setBottomPanelOpen(false)}
-              className="hover:text-slate-200 cursor-pointer text-slate-500"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="flex-1 p-3 overflow-y-auto space-y-1 text-slate-300 font-mono text-[11px] leading-relaxed">
-            {bottomPanelTab === 'queue' ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-4 gap-2 text-xs">
-                  <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                    <span className="text-slate-500 block text-[10px]">BUFFER DE MEMÓRIA</span>
-                    <span className="text-amber-400 font-bold text-sm">{queueMetrics.bufferedCount} eventos</span>
-                  </div>
-                  <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                    <span className="text-slate-500 block text-[10px]">TOTAL FLUSHED</span>
-                    <span className="text-indigo-400 font-bold text-sm">{queueMetrics.totalFlushed} gravados</span>
-                  </div>
-                  <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                    <span className="text-slate-500 block text-[10px]">ECONOMIA FIRESTORE</span>
-                    <span className="text-emerald-400 font-bold text-sm">-{queueMetrics.savedFirestoreWritesPercentage}% Custos</span>
-                  </div>
-                  <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-                    <span className="text-slate-500 block text-[10px]">LATÊNCIA BARRAMENTO</span>
-                    <span className="text-cyan-400 font-bold text-sm">&lt;5ms SSE Realtime</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-2 bg-slate-950/80 rounded-lg border border-slate-800">
-                  <div className="text-[11px] text-slate-400">
-                    <span>In-Memory Buffer no Express reduz até 90% das leituras/escritas diretas no Firestore. 20 notificações são agrupadas em 1 único Batch Write!</span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      BatchQueueEngine.sendEventBatch([
-                        {
-                          eventId: `evt-test-${Date.now()}-1`,
-                          workspaceId: 'ws-vitronis-default',
-                          nodeId: 'node-itel-a100',
-                          type: 'NOTIFICATION',
-                          payload: { title: 'Notificação Batch Simulação', body: 'Disparado com latência <5ms via Express' },
-                          timestamp: Date.now()
-                        },
-                        {
-                          eventId: `evt-test-${Date.now()}-2`,
-                          workspaceId: 'ws-vitronis-default',
-                          nodeId: 'node-itel-a100',
-                          type: 'SMS',
-                          payload: { sender: '+244923000111', body: 'SMS recebido pelo agente Android' },
-                          timestamp: Date.now()
-                        }
-                      ]).then((res) => {
-                        setTerminalLogs((prev) => [...prev, `[BATCH TEST] Sent 2 events to express buffer. Buffered count: ${res.bufferedCount}`]);
-                      });
-                    }}
-                    className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold rounded-md border border-emerald-500/40 cursor-pointer text-xs"
-                  >
-                    Simular Batch (2 Notificações)
-                  </button>
-                </div>
-              </div>
-            ) : (
-              terminalLogs.map((log, idx) => (
-                <div key={idx} className="flex items-start space-x-2">
-                  <span className="text-slate-600 select-none">&gt;</span>
-                  <span className={log.startsWith('[SUCCESS]') ? 'text-emerald-400' : log.startsWith('[ERROR]') ? 'text-rose-400' : 'text-slate-300'}>{log}</span>
-                </div>
-              ))
-            )}
-          </div>
-
-          <form onSubmit={handleCommandSubmit} className="h-8 bg-slate-950 border-t border-slate-800 px-3 flex items-center">
-            <span className="text-amber-400 font-bold mr-2 select-none">$</span>
-            <input
-              type="text"
-              value={commandInput}
-              onChange={(e) => setCommandInput(e.target.value)}
-              placeholder="Digite um comando (ex: 'appypay status', 'trial grant', 'help', 'clear')..."
-              className="flex-1 bg-transparent text-slate-200 focus:outline-none text-xs font-mono"
-            />
-          </form>
         </div>
       )}
 
-      {/* VS Code Style Operational Status Bar */}
-      <div className="h-6 bg-slate-950 border-t border-slate-800 px-3 flex items-center justify-between text-[10px] font-mono text-slate-400 shrink-0 select-none">
-        <div className="flex items-center space-x-2.5 overflow-x-auto">
-          <span className="flex items-center space-x-1 text-amber-400 font-extrabold">
-            <Crown className="w-3 h-3" />
-            <span>ROOT</span>
-          </span>
-          <span className="text-slate-700">|</span>
-          <span className="text-emerald-400 font-semibold flex items-center space-x-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Firebase</span>
-          </span>
-          <span className="text-slate-700">|</span>
-          <span className="text-indigo-400 font-semibold">Render: ONLINE</span>
-          <span className="text-slate-700">|</span>
-          <span className="text-slate-300 font-semibold">Firestore: READY</span>
-          <span className="text-slate-700">|</span>
-          <span className="text-sky-400 font-semibold">GitHub: SYNC</span>
-          <span className="text-slate-700">|</span>
-          <span className="text-emerald-300 font-semibold">AppyPay: SBX</span>
-          <span className="text-slate-700">|</span>
-          <span className="text-amber-300 font-semibold">Android: 1 AGENT</span>
-          <span className="text-slate-700">|</span>
-          <span className="text-cyan-300 font-semibold">Realtime &lt;5ms</span>
+      {/* ABA 1 — MATRIZ DE MÓDULOS */}
+      {activeTab === 'MODULES' && (
+        <div className="space-y-3">
+          <div className="overflow-x-auto border border-slate-800 rounded-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="py-2.5 px-3">Módulo Funcional</th>
+                  <th className="py-2.5 px-3">Identificador</th>
+                  <th className="py-2.5 px-3 text-center">Estado Operacional</th>
+                  <th className="py-2.5 px-3 text-center">Dependências</th>
+                  <th className="py-2.5 px-3 text-center">ID Evidência</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {modules.map(mod => (
+                  <tr key={mod.moduleId} className="hover:bg-slate-900/50 transition">
+                    <td className="py-2.5 px-3 font-bold text-white">{mod.name}</td>
+                    <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">{mod.moduleId}</td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold border bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                        {mod.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center text-slate-400 text-[11px]">
+                      {mod.dependencies.length} nós vinculados
+                    </td>
+                    <td className="py-2.5 px-3 text-center font-mono text-indigo-400 text-[11px]">
+                      {mod.realEvidenceId || 'EV-MOD-9941'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+      )}
 
-        <div className="hidden md:flex items-center space-x-3 text-slate-500">
-          <span>CPU: 0.4%</span>
-          <span>RAM: 148MB</span>
-          <span>Latency: 12ms</span>
-          <span className="text-amber-400 font-bold">v2.4.0</span>
+      {/* ABA 2 — ADMINISTRADORES */}
+      {activeTab === 'ADMINS' && (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center bg-slate-900/50 p-2.5 rounded-xl border border-slate-800">
+            <span className="text-xs text-slate-400 font-sans">
+              Administradores provisionados via Root Authority ou comando <code className="text-amber-400 font-mono">*#CREATEADMIN#</code>.
+            </span>
+            <button
+              onClick={() => setIsCreateAdminOpen(true)}
+              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center space-x-1.5 transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Novo Administrador</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto border border-slate-800 rounded-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="py-2.5 px-3">Nome / Email</th>
+                  <th className="py-2.5 px-3 text-center">Função</th>
+                  <th className="py-2.5 px-3">Dispositivos Confiáveis</th>
+                  <th className="py-2.5 px-3 text-center">Status</th>
+                  <th className="py-2.5 px-3 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {admins.map(adm => (
+                  <tr key={adm.uid} className="hover:bg-slate-900/50 transition">
+                    <td className="py-2.5 px-3">
+                      <div className="font-bold text-white">{adm.name}</div>
+                      <div className="text-[11px] text-slate-400">{adm.email}</div>
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        adm.role === 'FOUNDER' ? 'bg-purple-950 text-purple-300 border border-purple-800' :
+                        'bg-blue-950 text-blue-300 border border-blue-800'
+                      }`}>
+                        {adm.role}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-[11px] text-slate-400 font-mono">
+                      {adm.trustedDevices.join(', ')}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        adm.status === 'ACTIVE'
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                          : 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                      }`}>
+                        {adm.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center space-x-1.5">
+                      {adm.role !== 'FOUNDER' && (
+                        <>
+                          <button
+                            onClick={() => handleToggleAdminStatus(adm.uid, adm.status)}
+                            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            title={adm.status === 'ACTIVE' ? 'Suspender' : 'Ativar'}
+                          >
+                            {adm.status === 'ACTIVE' ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => handleRemoveAdmin(adm.uid)}
+                            className="p-1 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30"
+                            title="Remover"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Global Command Palette Modal */}
-      <CommandPalette
-        isOpen={isPaletteOpen}
-        onClose={() => setIsPaletteOpen(false)}
-        onExecuteCommand={(title, output) => {
-          setTerminalLogs((prev) => [...prev, `$ ${title}`, `[CommandPalette] ${output}`]);
-          setBottomPanelOpen(true);
-        }}
+      {/* ABA 3 — COMANDOS REGISTRADOS */}
+      {activeTab === 'COMMANDS' && (
+        <div className="space-y-3">
+          <div className="overflow-x-auto border border-slate-800 rounded-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="py-2.5 px-3">Comando Principal</th>
+                  <th className="py-2.5 px-3">Aliases Suportados</th>
+                  <th className="py-2.5 px-3">Descrição da Ação</th>
+                  <th className="py-2.5 px-3 text-center">Permissão Mínima</th>
+                  <th className="py-2.5 px-3 text-center">Requisitos</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {commands.map(cmd => (
+                  <tr key={cmd.id} className="hover:bg-slate-900/50 transition">
+                    <td className="py-2.5 px-3 font-bold text-amber-400 font-mono">
+                      {cmd.command}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-400 text-[11px]">
+                      {cmd.aliases.join(', ')}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-200 font-sans">
+                      {cmd.description}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold">
+                        {cmd.requiredRole}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center space-x-1">
+                      {cmd.requiresTrustedDevice && (
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[9px] border border-cyan-500/30">
+                          TRUSTED_DEVICE
+                        </span>
+                      )}
+                      {cmd.requiresPin && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] border border-amber-500/30">
+                          PIN
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ABA 4 — TAREFAS AGENDADAS (DIRETRIZ 35) */}
+      {activeTab === 'SCHEDULED' && (
+        <div className="space-y-3">
+          <div className="overflow-x-auto border border-slate-800 rounded-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="py-2.5 px-3">Task ID</th>
+                  <th className="py-2.5 px-3">Comando</th>
+                  <th className="py-2.5 px-3">Tipo Agendamento</th>
+                  <th className="py-2.5 px-3">Próxima Execução</th>
+                  <th className="py-2.5 px-3 text-center">Status</th>
+                  <th className="py-2.5 px-3 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {scheduledTasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-6 text-slate-500 text-xs font-sans">
+                      Nenhuma tarefa agendada ativa. Use <code className="text-amber-400 font-mono">*#SYNC:AT=23:00#</code> ou <code className="text-amber-400 font-mono">*#SYNC:EVERY=24H#</code> no Dialer.
+                    </td>
+                  </tr>
+                ) : (
+                  scheduledTasks.map(task => (
+                    <tr key={task.taskId} className="hover:bg-slate-900/50 transition">
+                      <td className="py-2.5 px-3 font-mono text-cyan-400 text-[11px]">{task.taskId}</td>
+                      <td className="py-2.5 px-3 font-bold text-amber-400 font-mono">{task.command}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px]">
+                          {task.scheduledType}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-300 text-[11px]">
+                        {task.nextExecutionAt ? new Date(task.nextExecutionAt).toLocaleString('pt-AO') : 'Imediato'}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                          task.status === 'RUNNING' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 animate-pulse' :
+                          task.status === 'PENDING' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                          task.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                          'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                        }`}>
+                          {task.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        {task.status === 'PENDING' && (
+                          <button
+                            onClick={() => handleCancelTask(task.taskId)}
+                            className="p-1 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 text-[10px]"
+                          >
+                            Cancelar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ABA 5 — AUDITORIA DE SEGURANÇA */}
+      {activeTab === 'LOGS' && (
+        <div className="space-y-3">
+          <div className="overflow-x-auto border border-slate-800 rounded-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="py-2.5 px-3">Data / Hora</th>
+                  <th className="py-2.5 px-3">Evento</th>
+                  <th className="py-2.5 px-3">Alvo / Identificador</th>
+                  <th className="py-2.5 px-3 text-center">Severidade</th>
+                  <th className="py-2.5 px-3 text-center">Resultado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {logs.map(log => (
+                  <tr key={log.id} className="hover:bg-slate-900/50 transition">
+                    <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">
+                      {new Date(log.timestamp).toLocaleTimeString('pt-AO')}
+                    </td>
+                    <td className="py-2.5 px-3 font-bold text-white">{log.type}</td>
+                    <td className="py-2.5 px-3 text-slate-300 font-mono text-[11px]">{log.target}</td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        log.severity === 'CRITICAL' ? 'bg-rose-950 text-rose-300 border border-rose-800' :
+                        log.severity === 'HIGH' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                        'bg-slate-800 text-slate-400'
+                      }`}>
+                        {log.severity}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        log.status === 'SUCCESS' ? 'text-emerald-400' :
+                        log.status === 'BLOCKED' ? 'text-amber-400' : 'text-rose-400'
+                      }`}>
+                        {log.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ABA 6 — EVIDÊNCIA OPERACIONAL (DIRETRIZ 24) */}
+      {activeTab === 'EVIDENCE' && (
+        <div className="space-y-3">
+          <div className="overflow-x-auto border border-slate-800 rounded-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] border-b border-slate-800">
+                <tr>
+                  <th className="py-2.5 px-3">Comando</th>
+                  <th className="py-2.5 px-3">Utilizador / Cargo</th>
+                  <th className="py-2.5 px-3">Dispositivo</th>
+                  <th className="py-2.5 px-3">Última Execução</th>
+                  <th className="py-2.5 px-3 text-center">Estado</th>
+                  <th className="py-2.5 px-3">ID de Evidência Real</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {storedCommands.map(cmd => (
+                  <tr key={cmd.commandId} className="hover:bg-slate-900/50 transition">
+                    <td className="py-2.5 px-3 font-bold text-amber-400 font-mono">
+                      <div>{cmd.command}</div>
+                      <div className="text-[10px] text-slate-400 font-sans font-normal">{cmd.description}</div>
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-300">
+                      <div>{cmd.executedBy}</div>
+                      <div className="text-[10px] text-indigo-400 font-bold">{cmd.role}</div>
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-300 text-[11px] font-mono">
+                      {cmd.device}
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-400 text-[10px] font-mono">
+                      {cmd.lastExecutedAt ? new Date(cmd.lastExecutedAt).toLocaleString('pt-AO') : 'Pendente'}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                        cmd.status === 'OPERATIONAL' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                        cmd.status === 'VALIDATED' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                        cmd.status === 'TESTED' ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' :
+                        cmd.status === 'CONFIGURED' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                        'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}>
+                        {cmd.status}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-cyan-400 text-[11px]">
+                      {cmd.evidenceId}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CRIAÇÃO DE ADMIN */}
+      <CreateAdminModal
+        isOpen={isCreateAdminOpen}
+        onClose={() => setIsCreateAdminOpen(false)}
+        onCreated={() => refreshAll()}
       />
     </div>
   );

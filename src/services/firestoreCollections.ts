@@ -26,7 +26,28 @@ export const FIRESTORE_COLLECTIONS = {
   WALLETS: 'wallets',
   PAYMENT_METHODS: 'payment_methods',
   APP_CENTER: 'app_center',
-  CLOUD_RUNTIMES: 'cloud_runtimes'
+  CLOUD_RUNTIMES: 'cloud_runtimes',
+  UPDATE_LOGS: 'update_logs',
+  SYSTEM_LOGS: 'system_logs',
+  // CAMADA 22 — FIRESTORE 5.0
+  CALL_SESSIONS: 'call_sessions',
+  VOICEMAIL: 'voicemail',
+  PAIRING_TOKENS: 'pairing_tokens',
+  TRUSTED_DEVICES: 'trusted_devices',
+  BLOCKED_DEVICES: 'blocked_devices',
+  APP_REGISTRY: 'app_registry',
+  USER_PREFERENCES: 'user_preferences',
+  WALLPAPERS: 'wallpapers',
+  THEMES: 'themes',
+  // CAMADA 23 — OPERATIONAL REALITY COLLECTIONS
+  CALL_TESTS: 'call_tests',
+  TELECOM_TESTS: 'telecom_tests',
+  BANKING_TESTS: 'banking_tests',
+  INSTALLED_APPS: 'installed_apps',
+  APP_SESSIONS: 'app_sessions',
+  DEVICE_PRESENCE: 'device_presence',
+  DEVICE_CAPABILITIES: 'device_capabilities',
+  PROVIDER_CREDENTIALS: 'provider_credentials'
 } as const;
 
 export type FirestoreCollectionKey = keyof typeof FIRESTORE_COLLECTIONS;
