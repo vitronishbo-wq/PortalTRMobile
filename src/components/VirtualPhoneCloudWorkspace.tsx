@@ -36,7 +36,10 @@ import {
   Smartphone,
   Layers,
   ArrowRightLeft,
-  Star
+  Star,
+  Copy,
+  ClipboardPaste,
+  Check
 } from 'lucide-react';
 import { TelecomRegistry, CallRecord, SmsMessage, VirtualNumber, MeshSession } from '../telecom/TelecomProvider';
 import { FirestoreService } from '../services/firestore';
@@ -64,6 +67,9 @@ import { USSDDialogModal } from './modals/USSDDialogModal';
 import { FounderIDEWorkspace } from './workspaces/FounderIDEWorkspace';
 import { COSCommandBar } from './modals/COSCommandBar';
 import { DTMFT9Engine } from '../engine/dtmfT9Engine';
+import { SecretVaultService, DrawerSecurityState, SecretDialCommand } from '../services/SecretVaultService';
+import { SmartInputInterpreter, InterpretedInput } from '../engine/smartInputInterpreter';
+import { UnifiedInputController, KeypadEventDetail } from '../engine/unifiedInputController';
 
 export const VirtualPhoneCloudWorkspace: React.FC = () => {
   const [showZeroTouchPipeline, setShowZeroTouchPipeline] = useState<boolean>(false);
@@ -140,6 +146,79 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
 
   // Calls Log State (calls/{callId})
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
+
+  // Input History (Seta Cima / Seta Baixo navigation)
+  const [inputHistory, setInputHistory] = useState<string[]>(['*#6368#', '*100#', '*#7668#', '*111#', '+244923888111']);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+
+  // Copy/Paste State
+  const [copiedState, setCopiedState] = useState<boolean>(false);
+
+  // Tecla física ativa para feedback visual no Dialpad (Diretriz de Entrada Unificada)
+  const [activePressedKey, setActivePressedKey] = useState<string | null>(null);
+  const [numLockDetected, setNumLockDetected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const unsub = UnifiedInputController.subscribeVisualFeedback((k) => {
+      setActivePressedKey(k);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleCopyPhoneNumber = async () => {
+    if (!phoneNumber) return;
+    try {
+      await navigator.clipboard.writeText(phoneNumber);
+      setCopiedState(true);
+      setTimeout(() => setCopiedState(false), 1500);
+    } catch (e) {
+      console.error('Falha ao copiar:', e);
+    }
+  };
+
+  const handlePastePhoneNumber = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        // Camada 3 & 4: Input Sanitizer & Interpretador
+        const sanitized = SmartInputInterpreter.sanitize(text);
+        setPhoneNumber(sanitized);
+        CommandEngine.setBuffer(sanitized);
+      }
+    } catch (e) {
+      console.error('Falha ao colar:', e);
+    }
+  };
+
+  const navigateHistory = (direction: 'UP' | 'DOWN') => {
+    if (inputHistory.length === 0) return;
+    let nextIndex: number;
+    if (direction === 'UP') {
+      nextIndex = historyIndex < inputHistory.length - 1 ? historyIndex + 1 : historyIndex;
+    } else {
+      nextIndex = historyIndex > 0 ? historyIndex - 1 : -1;
+    }
+
+    setHistoryIndex(nextIndex);
+    if (nextIndex >= 0 && nextIndex < inputHistory.length) {
+      const histVal = inputHistory[nextIndex];
+      setPhoneNumber(histVal);
+      CommandEngine.setBuffer(histVal);
+    } else if (nextIndex === -1) {
+      setPhoneNumber('');
+      CommandEngine.clearBuffer();
+    }
+  };
+
+  // COS Vault State (Nível 1, 2, 3, 4 - Drawer Security & Comandos)
+  const [vaultConfig, setVaultConfig] = useState(SecretVaultService.getConfig());
+
+  useEffect(() => {
+    const unsub = SecretVaultService.subscribe((cfg) => {
+      setVaultConfig({ ...cfg });
+    });
+    return () => unsub();
+  }, []);
 
   // Call duration counter
   useEffect(() => {
@@ -229,6 +308,7 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
 
   // Keypad Handlers — Interceção pelo CommandEngine (Diretriz 01)
   const handleKeyPress = (digit: string) => {
+    UnifiedInputController.triggerVisualFeedback(digit);
     if (inCall) {
       setDtmfBuffer((prev) => prev + digit);
     } else {
@@ -238,9 +318,59 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
     }
   };
 
+  // Captura Global do Teclado do Computador e Numpad (Sistema Unificado de Entrada — Camadas 1 a 6)
+  useEffect(() => {
+    const handleGlobalKeyboard = (e: KeyboardEvent) => {
+      // 1. Detectar estado do NumLock no evento
+      if (typeof e.getModifierState === 'function') {
+        const numLockState = e.getModifierState('NumLock');
+        setNumLockDetected(numLockState);
+      }
+
+      // 2. Validação inteligente de foco (não captura se estiver em modais ou outros campos)
+      const isAnyModal = showCreateAdminModal || showCommandPalette || showZeroTouchPipeline;
+      const isDialerTab = activeTab === 'teclado';
+
+      if (!UnifiedInputController.shouldCaptureKeyboardEvent(e, isDialerTab, isAnyModal)) {
+        return;
+      }
+
+      // 3. Mapear teclas do Numpad, Teclado Superior e Ações
+      const mapped = UnifiedInputController.mapKeyboardEvent(e);
+      if (!mapped) return;
+
+      if (mapped.action === 'INPUT') {
+        e.preventDefault();
+        handleKeyPress(mapped.key);
+      } else if (mapped.action === 'BACKSPACE') {
+        e.preventDefault();
+        handleBackspace();
+      } else if (mapped.action === 'CLEAR') {
+        e.preventDefault();
+        handleClearPhoneNumber();
+      } else if (mapped.action === 'CANCEL') {
+        e.preventDefault();
+        handleClearPhoneNumber();
+      } else if (mapped.action === 'SUBMIT') {
+        e.preventDefault();
+        if (phoneNumber.trim()) {
+          handleInitiateCall(phoneNumber.trim());
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyboard);
+    return () => window.removeEventListener('keydown', handleGlobalKeyboard);
+  }, [activeTab, showCreateAdminModal, showCommandPalette, showZeroTouchPipeline, phoneNumber, inCall]);
+
   const handleBackspace = () => {
     setPhoneNumber((prev) => prev.slice(0, -1));
     CommandEngine.backspace();
+  };
+
+  const handleClearPhoneNumber = () => {
+    setPhoneNumber('');
+    CommandEngine.clearBuffer();
   };
 
   const handleInitiateCall = async (numToCall?: string) => {
@@ -542,64 +672,146 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
               </div>
             </div>
 
-            {/* Display Screen */}
+            {/* Display Screen com Terminal de Entrada Universal (Arquitetura 6 Camadas: Paste -> Sanitizer -> Pipeline -> COS -> Call) */}
             <div className="bg-slate-900/90 border border-slate-800 p-3 rounded-xl text-center space-y-1 relative">
-              <span className="text-[10px] text-slate-500 uppercase font-mono block">
-                NÚMERO, USSD (*100#), DTMF T9 (*#7668#) OU COMANDO
-              </span>
-              <div className="text-xl font-mono font-black tracking-widest text-emerald-400 min-h-[32px] flex items-center justify-center break-all">
-                {phoneNumber || (inCall ? phoneNumber : '--- --- ---')}
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] text-slate-500 uppercase font-mono block">
+                  TERMINAL UNIVERSAL DE ENTRADA (COPY/PASTE • USSD • COS • T9)
+                </span>
+                {!inCall && (
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={handlePastePhoneNumber}
+                      className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-emerald-300 text-[10px] font-mono transition flex items-center space-x-1"
+                      title="Colar da área de transferência com auto-sanitização (Ctrl+V)"
+                    >
+                      <ClipboardPaste className="w-3 h-3" />
+                      <span>Colar (📋)</span>
+                    </button>
+                    {phoneNumber && (
+                      <button
+                        onClick={handleCopyPhoneNumber}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 text-[10px] font-mono transition flex items-center space-x-1"
+                        title="Copiar texto atual (Ctrl+C)"
+                      >
+                        {copiedState ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedState ? 'Copiado' : 'Copiar'}</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* T9 & USSD Instant Translation Badge */}
+              {/* Caixa Controlada com 3 Ações Inline: [📋 Colar, ✕ Limpar, 📞 Discar] */}
+              <div className="relative flex items-center justify-between bg-slate-950/70 border border-slate-800/80 rounded-lg p-1 min-h-[44px]">
+                {/* Botão Colar Rápido (📋) */}
+                {!inCall && (
+                  <button
+                    onClick={handlePastePhoneNumber}
+                    className="p-2 rounded-md text-slate-400 hover:text-emerald-400 hover:bg-slate-800/50 transition cursor-pointer"
+                    title="Colar (Ctrl+V)"
+                  >
+                    <ClipboardPaste className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* Input Controlado Híbrido */}
+                <input
+                  type="text"
+                  data-dialer-input="true"
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    const rawVal = e.target.value;
+                    const sanitized = SmartInputInterpreter.sanitize(rawVal);
+                    setPhoneNumber(sanitized);
+                    CommandEngine.setBuffer(sanitized);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && phoneNumber.trim()) {
+                      handleInitiateCall(phoneNumber.trim());
+                    } else if (e.key === 'Escape') {
+                      handleClearPhoneNumber();
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      navigateHistory('UP');
+                    } else if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      navigateHistory('DOWN');
+                    }
+                  }}
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    const pasted = e.clipboardData.getData('text');
+                    if (pasted) {
+                      const sanitized = SmartInputInterpreter.sanitize(pasted);
+                      setPhoneNumber(sanitized);
+                      CommandEngine.setBuffer(sanitized);
+                    }
+                  }}
+                  placeholder={inCall ? phoneNumber : '--- --- ---'}
+                  disabled={inCall}
+                  className="w-full bg-transparent text-center text-xl font-mono font-black tracking-widest text-emerald-400 placeholder:text-slate-600 focus:outline-none rounded px-2 py-0.5"
+                />
+
+                {/* Botões Limpar (✕) e Discar (📞) Inline no próprio Display */}
+                {!inCall && (
+                  <div className="flex items-center space-x-1">
+                    {phoneNumber && (
+                      <button
+                        onClick={handleClearPhoneNumber}
+                        className="p-2 rounded-md text-slate-400 hover:text-rose-400 hover:bg-slate-800/50 transition cursor-pointer"
+                        title="Limpar visor (Escape / ✕)"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleInitiateCall(phoneNumber)}
+                      disabled={!phoneNumber.trim()}
+                      className={`p-2 rounded-md transition cursor-pointer ${
+                        phoneNumber.trim() 
+                          ? 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20' 
+                          : 'text-slate-600 opacity-40 cursor-not-allowed'
+                      }`}
+                      title="Discar / Executar (Enter / 📞)"
+                    >
+                      <Phone className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Classificador Semântico Inteligente de Entrada (Smart Input Interpreter) */}
               {phoneNumber && !inCall && (() => {
-                const clean = phoneNumber.trim().toUpperCase();
+                const interpretation: InterpretedInput = SmartInputInterpreter.interpret(phoneNumber);
+                const clean = interpretation.sanitized.toUpperCase();
                 const t9Resolved = DTMFT9Engine.resolveDTMFToCommand(clean);
                 const directCmd = CommandRegistry.findByCommandOrAlias(clean);
-                
-                if (t9Resolved) {
-                  const cmdDef = CommandRegistry.findByCommandOrAlias(t9Resolved);
-                  return (
-                    <div className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-[10px] text-emerald-300 font-mono">
-                      <span className="font-bold">DTMF T9 ➔ {t9Resolved}</span>
-                      <span className="text-slate-400">({cmdDef?.description || 'Comando'})</span>
-                    </div>
-                  );
-                } else if (clean.startsWith('*') && clean.endsWith('#')) {
-                  if (directCmd) {
-                    return (
-                      <div className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/40 text-[10px] text-indigo-300 font-mono">
-                        <span className="font-bold">USSD MMI ➔ {directCmd.command}</span>
-                        <span className="text-slate-400">({directCmd.description})</span>
-                      </div>
-                    );
-                  } else if (clean.startsWith('*100*')) {
-                    return (
-                      <div className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-[10px] text-amber-300 font-mono">
-                        <span className="font-bold">USSD Paramétrico ➔ {clean}</span>
-                        <span className="text-slate-400">(Founder Core Direct)</span>
-                      </div>
-                    );
-                  }
-                } else if (directCmd) {
-                  return (
-                    <div className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded bg-cyan-500/20 border border-cyan-500/40 text-[10px] text-cyan-300 font-mono">
-                      <span className="font-bold">COS CMD ➔ {directCmd.command}</span>
-                      <span className="text-slate-400">({directCmd.description})</span>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
 
-              {phoneNumber && !inCall && (
-                <button
-                  onClick={handleBackspace}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-1 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+                return (
+                  <div className="flex items-center justify-center gap-2 pt-1">
+                    {/* Badge Principal de Categoria */}
+                    <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${interpretation.badgeColor}`}>
+                      <span>{interpretation.categoryLabel}</span>
+                    </span>
+
+                    {/* Resolução Específica de Comando / DTMF */}
+                    {t9Resolved ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-[10px] text-emerald-300 font-mono">
+                        DTMF ➔ {t9Resolved}
+                      </span>
+                    ) : directCmd ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-[10px] text-amber-300 font-mono">
+                        {directCmd.description}
+                      </span>
+                    ) : interpretation.category === 'TELEPHONE' ? (
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {clean.startsWith('+') ? 'Internacional E.164' : 'Nacional / Local'}
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Autocomplete Inline Suggestions (Diretriz 20) */}
@@ -622,22 +834,49 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
             )}
 
             {/* Dialpad Matrix */}
-            <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
-              {[
-                ['1', ''], ['2', 'ABC'], ['3', 'DEF'],
-                ['4', 'GHI'], ['5', 'JKL'], ['6', 'MNO'],
-                ['7', 'PQRS'], ['8', 'TUV'], ['9', 'WXYZ'],
-                ['*', ''], ['0', '+'], ['#', '']
-              ].map(([num, sub]) => (
-                <button
-                  key={num}
-                  onClick={() => handleKeyPress(num)}
-                  className="p-3 bg-slate-900 hover:bg-slate-800 active:bg-indigo-900/50 border border-slate-800 rounded-xl text-center transition-all cursor-pointer active:scale-95 shadow-sm"
-                >
-                  <span className="block font-black text-white text-base leading-none">{num}</span>
-                  {sub && <span className="block text-[8px] text-slate-500 mt-0.5 tracking-widest">{sub}</span>}
-                </button>
-              ))}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between px-1 text-[9px] font-mono text-slate-500">
+                <span>TECLADO FÍSICO / NUMPAD HABILITADO</span>
+                {numLockDetected !== null && (
+                  <span className={`px-1.5 py-0.2 rounded border ${
+                    numLockDetected 
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                      : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                  }`}>
+                    {numLockDetected ? 'NUMLOCK: ON' : 'NUMLOCK: OFF (ATIVAR)'}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
+                {[
+                  ['1', ''], ['2', 'ABC'], ['3', 'DEF'],
+                  ['4', 'GHI'], ['5', 'JKL'], ['6', 'MNO'],
+                  ['7', 'PQRS'], ['8', 'TUV'], ['9', 'WXYZ'],
+                  ['*', ''], ['0', '+'], ['#', '']
+                ].map(([num, sub]) => {
+                  const isPhysicallyPressed = activePressedKey === num;
+                  return (
+                    <button
+                      key={num}
+                      onClick={() => handleKeyPress(num)}
+                      className={`p-3 border rounded-xl text-center transition-all cursor-pointer shadow-sm ${
+                        isPhysicallyPressed
+                          ? 'bg-indigo-600 border-indigo-400 scale-95 ring-2 ring-indigo-400 shadow-indigo-600/50'
+                          : 'bg-slate-900 hover:bg-slate-800 active:bg-indigo-900/50 border-slate-800 active:scale-95'
+                      }`}
+                    >
+                      <span className={`block font-black text-base leading-none ${isPhysicallyPressed ? 'text-white' : 'text-white'}`}>
+                        {num}
+                      </span>
+                      {sub && (
+                        <span className={`block text-[8px] mt-0.5 tracking-widest ${isPhysicallyPressed ? 'text-indigo-200 font-bold' : 'text-slate-500'}`}>
+                          {sub}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Favoritos Dinâmicos & Remarcação (Dialer) */}
@@ -704,74 +943,68 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
               )}
             </div>
 
-            {/* ENGENHARIA DTMF / USSD OPERADORA (Modo Engenharia MMI) */}
-            <div className="space-y-2 pt-2 border-t border-slate-800/80">
-              <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
-                <span className="flex items-center space-x-1">
-                  <Terminal className="w-3 h-3 text-emerald-400" />
-                  <span className="uppercase tracking-wider">CÓDIGOS MMI / USSD & DTMF T9</span>
-                </span>
-                <span className="text-[9px] text-slate-500 font-mono">ITU-T E.161 & GSM 02.90</span>
-              </div>
+            {/* ENGENHARIA DTMF / USSD OPERADORA (Modo Engenharia MMI — 3 Estados: HIDDEN, UNLOCKED, AUTO_LOCKED) */}
+            {vaultConfig.drawerState === 'UNLOCKED' ? (
+              <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
+                  <span className="flex items-center space-x-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span className="uppercase tracking-wider text-emerald-400">GAVETA DE 20 COMANDOS DESBLOQUEADA</span>
+                  </span>
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      onClick={() => SecretVaultService.lockDrawer('MANUAL')}
+                      className="px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-[9px] font-bold uppercase transition"
+                      title="Ocultar gaveta de comandos imediatamente"
+                    >
+                      OCULTAR
+                    </button>
+                    <span className="text-[9px] text-slate-500 font-mono">5 MIN EXP</span>
+                  </div>
+                </div>
 
-              {/* Grid Compacto de Acesso Rápido USSD */}
-              <div className="grid grid-cols-3 gap-1">
-                {[
-                  { code: '*100#', label: 'Founder Core', color: 'text-amber-400 border-amber-500/30' },
-                  { code: '*101#', label: 'Admin Center', color: 'text-indigo-400 border-indigo-500/30' },
-                  { code: '*102#', label: 'Devices Matrix', color: 'text-cyan-400 border-cyan-500/30' },
-                  { code: '*103#', label: 'Telecom Engine', color: 'text-emerald-400 border-emerald-500/30' },
-                  { code: '*104#', label: 'Security & Lock', color: 'text-rose-400 border-rose-500/30' },
-                  { code: '*105#', label: 'Audit Log Trail', color: 'text-purple-400 border-purple-500/30' },
-                  { code: '*106#', label: 'Banking Multi', color: 'text-emerald-400 border-emerald-500/30' },
-                  { code: '*107#', label: 'Pairing Mesh', color: 'text-indigo-400 border-indigo-500/30' },
-                  { code: '*108#', label: 'Session Hub', color: 'text-sky-400 border-sky-500/30' },
-                  { code: '*109#', label: 'Kernel Update', color: 'text-yellow-400 border-yellow-500/30' },
-                  { code: '*110#', label: 'System Health', color: 'text-teal-400 border-teal-500/30' },
-                  { code: '*111#', label: 'Lockdown SOS', color: 'text-red-400 border-red-500/40' },
-                ].map((item) => (
-                  <button
-                    key={item.code}
-                    onClick={() => {
-                      setPhoneNumber(item.code);
-                      CommandEngine.setBuffer(item.code);
-                      handleInitiateCall(item.code);
-                    }}
-                    className={`p-1 bg-slate-900/90 hover:bg-slate-800 border ${item.color} rounded text-left transition-colors cursor-pointer flex flex-col justify-between`}
-                    title={`Discar ${item.code} (${item.label})`}
-                  >
-                    <span className="font-mono font-bold text-[10px] text-white leading-tight">{item.code}</span>
-                    <span className="text-[8px] text-slate-400 truncate leading-tight">{item.label}</span>
-                  </button>
-                ))}
-              </div>
+                {/* Grid Compacto de Nível 4 (USSD Operacional) */}
+                <div className="grid grid-cols-3 gap-1">
+                  {vaultConfig.commands
+                    .filter(c => c.level === 'NIVEL_4_OPERACIONAL' && c.enabled)
+                    .map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setPhoneNumber(item.code);
+                          CommandEngine.setBuffer(item.code);
+                          handleInitiateCall(item.code);
+                        }}
+                        className={`p-1 bg-slate-900/90 hover:bg-slate-800 border ${item.badgeColor || 'border-slate-800'} rounded text-left transition-colors cursor-pointer flex flex-col justify-between`}
+                        title={`Discar ${item.code} (${item.name})`}
+                      >
+                        <span className="font-mono font-bold text-[10px] text-white leading-tight">{item.code}</span>
+                        <span className="text-[8px] text-slate-400 truncate leading-tight">{item.name}</span>
+                      </button>
+                    ))}
+                </div>
 
-              {/* Linha DTMF T9 e Diagnóstico */}
-              <div className="flex flex-wrap gap-1 pt-1">
-                {[
-                  { code: '*#7668#', text: '*#7668# (ROOT)' },
-                  { code: '*#3686337#', text: '*#3686337# (FOUNDER)' },
-                  { code: '*#23646#', text: '*#23646# (ADMIN)' },
-                  { code: '*#7962#', text: '*#7962# (SYNC)' },
-                  { code: '*#7247#', text: '*#7247# (PAIR)' },
-                  { code: '*#5625#', text: '*#5625# (LOCK)' },
-                  { code: '*900#', text: '*900# (COS Kernel)' },
-                  { code: '*700#', text: '*700# (Telecom Ping)' },
-                ].map((t9) => (
-                  <button
-                    key={t9.code}
-                    onClick={() => {
-                      setPhoneNumber(t9.code);
-                      CommandEngine.setBuffer(t9.code);
-                      handleInitiateCall(t9.code);
-                    }}
-                    className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-[9px] font-mono text-slate-300 transition-colors"
-                  >
-                    {t9.text}
-                  </button>
-                ))}
+                {/* Linha DTMF T9 e Privilégios (Nível 3) */}
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {vaultConfig.commands
+                    .filter(c => c.level === 'NIVEL_3_PRIVILEGIOS' && c.enabled)
+                    .map((t9) => (
+                      <button
+                        key={t9.id}
+                        onClick={() => {
+                          setPhoneNumber(t9.code);
+                          CommandEngine.setBuffer(t9.code);
+                          handleInitiateCall(t9.code);
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-[9px] font-mono text-slate-300 transition-colors"
+                        title={t9.description}
+                      >
+                        {t9.code} ({t9.name})
+                      </button>
+                    ))}
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
 
           {/* RIGHT: IN-CALL ACTIVE MONITOR & REALTIME CONTROLS */}

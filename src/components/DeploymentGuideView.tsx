@@ -4,7 +4,7 @@ import { Rocket, Github, Server, Database, Radio, Check, Copy, Terminal, Externa
 export const DeploymentGuideView: React.FC = () => {
   const [repoUrl, setRepoUrl] = useState<string>(() => {
     const saved = localStorage.getItem('portal_github_repo');
-    if (!saved || saved.includes('Portal_Mobile')) {
+    if (!saved || !saved.includes('vitronishbo-wq/PortalTRMobile')) {
       return 'https://github.com/vitronishbo-wq/PortalTRMobile';
     }
     return saved;

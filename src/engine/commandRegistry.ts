@@ -3,6 +3,7 @@
 // Suporte nativo a DTMF T9 (*#7668# -> ROOT), Códigos USSD (*100# - *111#) e Engenharia (*9xx#, *8xx#, *7xx#, *6xx#)
 
 import { UserRole } from './permissionEngine';
+import { SecretVaultService } from '../services/SecretVaultService';
 
 export interface CommandDefinition {
   id: string;
@@ -525,6 +526,21 @@ export class CommandRegistry {
 
   public static findByCommandOrAlias(rawInput: string): CommandDefinition | undefined {
     const clean = rawInput.trim().toUpperCase();
+
+    // 1. Busca dinâmica no SecretVaultService (Permite alteração de códigos em tempo de execução sem recompilar)
+    try {
+      const vaultConfig = SecretVaultService.getConfig();
+      const vaultCmd = vaultConfig.commands.find(c => c.enabled && c.code.toUpperCase() === clean);
+      if (vaultCmd) {
+        // Mapeia para o comando correspondente no registro
+        const matched = this.COMMANDS.find(c => c.id === vaultCmd.id || c.actionId.includes(vaultCmd.name.toUpperCase()));
+        if (matched) return matched;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    // 2. Busca padrão no registro
     return this.COMMANDS.find(c => 
       c.enabled && (
         c.command === clean || 

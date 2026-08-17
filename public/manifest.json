@@ -1,7 +1,8 @@
 {
-  "short_name": "Calculadora",
-  "name": "Portal TR Mobile - Calculadora",
-  "description": "Calculadora Padrão do Sistema",
+  "id": "portaltrmobile-app",
+  "short_name": "PortalTRMobile",
+  "name": "PortalTRMobile",
+  "description": "PortalTRMobile Communication Operating System",
   "icons": [
     {
       "src": "/app_icon.jpg",
@@ -26,7 +27,7 @@
   "background_color": "#090d16",
   "theme_color": "#090d16",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "scope": "/",
-  "categories": ["utilities", "productivity"]
+  "categories": ["utilities", "productivity", "communication"]
 }

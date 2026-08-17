@@ -12,6 +12,7 @@ import { SecurityAuditService } from '../services/SecurityAuditService';
 import { CommandPersistenceService } from '../services/CommandPersistenceService';
 import { SecretCommandsService, AdminProfileRecord } from '../services/SecretCommandsService';
 import { USSDMenuEngine } from './ussdMenuEngine';
+import { SecretVaultService } from '../services/SecretVaultService';
 
 export type PipelineStage = 
   | 'RECEIVED' 
@@ -60,6 +61,43 @@ export class CommandPipeline {
         context,
         stagesCompleted,
         executionTimeMs: 0
+      };
+    }
+
+    // Interceptação de Nível 2 — Código Mestre de Revelação (*#6368# / Reveal Code)
+    const vaultUnlockAttempt = SecretVaultService.attemptUnlock(input);
+    if (vaultUnlockAttempt.success) {
+      stagesCompleted.push('PARSED', 'AUTHORIZED', 'VALIDATED', 'EXECUTED', 'AUDITED');
+      const execTime = Math.round(performance.now() - startTime);
+
+      SecurityAuditService.log('SYSTEM_COMMAND', 'MASTER_REVEAL_CODE', 'SUCCESS', 'LOW', {
+        code: input,
+        action: 'DRAWER_UNLOCKED',
+        user: context.user.email
+      });
+
+      SecretVaultService.logExecution({
+        command: input,
+        userId: context.user.email || 'anonymous',
+        deviceId: context.device.deviceId || 'local_device',
+        sessionId: context.contextId || 'sess_default',
+        execution_time: execTime,
+        result: 'SUCCESS',
+        ip: context.device.ipAddress || '127.0.0.1',
+        privilege_level: 'ROOT',
+        details: 'Código Mestre de Revelação (*#6368#)'
+      });
+
+      return {
+        rawInput,
+        isCommand: true,
+        success: true,
+        currentStage: 'AUDITED',
+        message: vaultUnlockAttempt.message,
+        actionId: 'COMMAND_DRAWER_UNLOCKED',
+        context,
+        stagesCompleted,
+        executionTimeMs: execTime
       };
     }
 
@@ -114,6 +152,18 @@ export class CommandPipeline {
       });
       CommandPersistenceService.recordExecution(commandDef.command, parsed.args, 'DENIED', execTime, permResult.reason);
 
+      SecretVaultService.logExecution({
+        command: commandDef.command,
+        userId: context.user.email || 'anonymous',
+        deviceId: context.device.deviceId || 'local_device',
+        sessionId: context.contextId || 'sess_default',
+        execution_time: execTime,
+        result: 'DENIED',
+        ip: context.device.ipAddress || '127.0.0.1',
+        privilege_level: commandDef.requiredRole === 'FOUNDER' ? 'FOUNDER' : commandDef.requiredRole === 'ROOT_ADMIN' ? 'ROOT' : commandDef.requiredRole === 'ADMIN' ? 'ADMIN' : 'USER',
+        details: `Autorização Negada: ${permResult.reason}`
+      });
+
       return {
         rawInput,
         isCommand: true,
@@ -144,6 +194,18 @@ export class CommandPipeline {
         policyId: policyResult.policyId
       });
       CommandPersistenceService.recordExecution(commandDef.command, parsed.args, 'DENIED', execTime, policyResult.reason);
+
+      SecretVaultService.logExecution({
+        command: commandDef.command,
+        userId: context.user.email || 'anonymous',
+        deviceId: context.device.deviceId || 'local_device',
+        sessionId: context.contextId || 'sess_default',
+        execution_time: execTime,
+        result: 'BLOCKED',
+        ip: context.device.ipAddress || '127.0.0.1',
+        privilege_level: commandDef.requiredRole === 'FOUNDER' ? 'FOUNDER' : commandDef.requiredRole === 'ROOT_ADMIN' ? 'ROOT' : commandDef.requiredRole === 'ADMIN' ? 'ADMIN' : 'USER',
+        details: `Violação de Política: ${policyResult.reason}`
+      });
 
       return {
         rawInput,
@@ -224,6 +286,29 @@ export class CommandPipeline {
       execResult.message,
       execResult.success ? undefined : execResult.message
     );
+
+    // Registro na tabela Firestore secret_command_executions/ e auto-lock se for SOS (*111#)
+    const privLevel: 'ROOT' | 'FOUNDER' | 'ADMIN' | 'ENGINEERING' | 'USER' = 
+      commandDef.requiredRole === 'ROOT_ADMIN' ? 'ROOT' :
+      commandDef.requiredRole === 'FOUNDER' ? 'FOUNDER' :
+      commandDef.requiredRole === 'ADMIN' ? 'ADMIN' :
+      commandDef.requiredRole === 'OPERATOR' ? 'ENGINEERING' : 'USER';
+
+    SecretVaultService.logExecution({
+      command: commandDef.command,
+      userId: context.user.email || 'anonymous',
+      deviceId: context.device.deviceId || 'local_device',
+      sessionId: context.contextId || 'sess_default',
+      execution_time: totalExecTime,
+      result: execResult.success ? 'SUCCESS' : 'FAILED',
+      ip: context.device.ipAddress || '127.0.0.1',
+      privilege_level: privLevel,
+      details: execResult.message
+    });
+
+    if (commandDef.command === '*111#' || commandDef.id === 'cmd_lockdown_sos') {
+      SecretVaultService.lockDrawer('SOS_LOCKDOWN');
+    }
 
     return {
       rawInput,

@@ -36,6 +36,10 @@ import { ExpiredSubscriptionBanner } from './components/ExpiredSubscriptionBanne
 import { ClipboardProvider } from './engine/ClipboardEngine';
 import { CommandProvider } from './engine/CommandEngine';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
+import { InstallEngine } from './engine/installEngine';
+
+// Inicialização imediata do InstallEngine no boot da aplicação
+InstallEngine.init();
 
 interface ToastItem {
   id: string;

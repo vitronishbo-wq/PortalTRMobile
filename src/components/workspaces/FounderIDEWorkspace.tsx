@@ -10,6 +10,7 @@ import { CommandPersistenceService, CommandHistoryRecord, StoredCommandRecord } 
 import { SystemManifest, ManifestEngineRecord } from '../../engine/systemManifest';
 import { CommandScheduler, ScheduledCommandTask } from '../../engine/commandScheduler';
 import { PolicyEngine, CommandPolicy } from '../../engine/policyEngine';
+import { SecretVaultService, SecretVaultConfig, SecretDialCommand, SecretCommandExecutionRecord } from '../../services/SecretVaultService';
 import { CreateAdminModal } from '../modals/CreateAdminModal';
 import { 
   Terminal, 
@@ -32,7 +33,9 @@ import {
   Clock,
   ShieldCheck,
   Calendar,
-  Settings
+  Settings,
+  Vault,
+  Edit3
 } from 'lucide-react';
 
 interface FounderIDEWorkspaceProps {
@@ -40,7 +43,7 @@ interface FounderIDEWorkspaceProps {
 }
 
 export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBackToPublic }) => {
-  const [activeTab, setActiveTab] = useState<'MANIFEST' | 'MODULES' | 'ADMINS' | 'COMMANDS' | 'SCHEDULED' | 'LOGS' | 'EVIDENCE'>('MANIFEST');
+  const [activeTab, setActiveTab] = useState<'MANIFEST' | 'MODULES' | 'ADMINS' | 'COMMANDS' | 'VAULT' | 'SECRET_EXECUTIONS' | 'SCHEDULED' | 'LOGS' | 'EVIDENCE'>('MANIFEST');
   const [manifest, setManifest] = useState<ManifestEngineRecord[]>([]);
   const [modules, setModules] = useState<OperationalModuleStatus[]>([]);
   const [admins, setAdmins] = useState<AdminAccount[]>([]);
@@ -50,8 +53,19 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
   const [logs, setLogs] = useState<SecurityLogEntry[]>([]);
   const [history, setHistory] = useState<CommandHistoryRecord[]>([]);
   const [storedCommands, setStoredCommands] = useState<StoredCommandRecord[]>([]);
+  const [vaultConfig, setVaultConfig] = useState<SecretVaultConfig>(SecretVaultService.getConfig());
+  const [secretExecutions, setSecretExecutions] = useState<SecretCommandExecutionRecord[]>([]);
   const [isCreateAdminOpen, setIsCreateAdminOpen] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+
+  // Filtro de auditoria secret_command_executions
+  const [filterResult, setFilterResult] = useState<string>('ALL');
+  const [filterPrivilege, setFilterPrivilege] = useState<string>('ALL');
+
+  // Edição de código no Vault
+  const [editingCmdId, setEditingCmdId] = useState<string | null>(null);
+  const [editingCodeVal, setEditingCodeVal] = useState<string>('');
+  const [newRevealCodeVal, setNewRevealCodeVal] = useState<string>('');
 
   const refreshAll = () => {
     setManifest(SystemManifest.getManifest());
@@ -63,6 +77,8 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
     setLogs(SecurityAuditService.getLogs());
     setHistory(CommandPersistenceService.getHistory());
     setStoredCommands(CommandPersistenceService.getStoredCommands());
+    setVaultConfig(SecretVaultService.getConfig());
+    setSecretExecutions(SecretVaultService.getExecutions(100));
   };
 
   useEffect(() => {
@@ -145,6 +161,24 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
               }`}
             >
               Comandos ({commands.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('VAULT')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap ${
+                activeTab === 'VAULT' ? 'bg-amber-600 text-white' : 'text-amber-400 hover:text-amber-300'
+              }`}
+            >
+              <Vault className="w-3.5 h-3.5" />
+              <span>Vault (20)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('SECRET_EXECUTIONS')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap ${
+                activeTab === 'SECRET_EXECUTIONS' ? 'bg-emerald-600 text-white' : 'text-emerald-400 hover:text-emerald-300'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>Execuções COS ({secretExecutions.length})</span>
             </button>
             <button
               onClick={() => setActiveTab('SCHEDULED')}
@@ -417,6 +451,344 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ABA 3.5 — SECRET VAULT & COMANDOS (NÍVEIS 1, 2, 3, 4) */}
+      {activeTab === 'VAULT' && (
+        <div className="space-y-4 font-sans">
+          {/* Header Vault com Estado da Gaveta e Código Mestre */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Estado da Gaveta</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                  vaultConfig.drawerState === 'UNLOCKED' 
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                    : vaultConfig.drawerState === 'AUTO_LOCKED'
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                }`}>
+                  {vaultConfig.drawerState}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2 pt-1">
+                {vaultConfig.drawerState === 'UNLOCKED' ? (
+                  <button
+                    onClick={() => {
+                      SecretVaultService.lockDrawer('MANUAL');
+                      refreshAll();
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition flex items-center space-x-1"
+                  >
+                    <Lock className="w-3 h-3" />
+                    <span>Bloquear Manual</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      SecretVaultService.attemptUnlock(vaultConfig.revealCode);
+                      refreshAll();
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center space-x-1"
+                  >
+                    <Unlock className="w-3 h-3" />
+                    <span>Desbloquear Gaveta</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    SecretVaultService.resetToDefaults();
+                    refreshAll();
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                  title="Restaurar códigos padrão de fábrica"
+                >
+                  Restaurar Padrão
+                </button>
+              </div>
+            </div>
+
+            {/* Código Mestre de Revelação (Nível 2) */}
+            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1.5">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Código Mestre de Revelação</span>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  placeholder={vaultConfig.revealCode}
+                  value={newRevealCodeVal}
+                  onChange={(e) => setNewRevealCodeVal(e.target.value)}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-amber-400 w-36 focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  onClick={() => {
+                    if (newRevealCodeVal.trim()) {
+                      SecretVaultService.setRevealCode(newRevealCodeVal.trim());
+                      setNewRevealCodeVal('');
+                      refreshAll();
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition"
+                >
+                  Atualizar
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 font-mono">Padrão: *#6368# | Discado no teclado para revelar a gaveta</p>
+            </div>
+
+            {/* Configuração de Auto-Lock */}
+            <div className="p-3.5 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1.5">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Política de Expiração</span>
+              <div className="text-xs text-slate-300 font-mono flex items-center justify-between">
+                <span>Tempo Limite Inatividade:</span>
+                <span className="text-emerald-400 font-bold">{vaultConfig.expirationMinutes || 5} min</span>
+              </div>
+              <p className="text-[10px] text-slate-500">Expira automaticamente ao trancar ecrã, trocar sessão ou acionar SOS *111#.</p>
+            </div>
+          </div>
+
+          {/* Tabela dos 20 Comandos com Rotação em Tempo Real */}
+          <div className="overflow-x-auto border border-slate-800 rounded-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] border-b border-slate-800 font-mono">
+                <tr>
+                  <th className="py-2.5 px-3">Código MMI / USSD</th>
+                  <th className="py-2.5 px-3">Nome do Comando</th>
+                  <th className="py-2.5 px-3">Nível de Segurança</th>
+                  <th className="py-2.5 px-3">Descrição da Ação</th>
+                  <th className="py-2.5 px-3 text-center">Permissão</th>
+                  <th className="py-2.5 px-3 text-center">Execuções</th>
+                  <th className="py-2.5 px-3 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50 font-mono">
+                {vaultConfig.commands.map(cmd => (
+                  <tr key={cmd.id} className="hover:bg-slate-900/50 transition">
+                    <td className="py-2 px-3 font-bold text-amber-400">
+                      {editingCmdId === cmd.id ? (
+                        <div className="flex items-center space-x-1">
+                          <input
+                            type="text"
+                            value={editingCodeVal}
+                            onChange={(e) => setEditingCodeVal(e.target.value)}
+                            className="bg-slate-950 border border-amber-500 rounded px-1.5 py-0.5 text-xs text-amber-300 w-28 focus:outline-none"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => {
+                              if (editingCodeVal.trim()) {
+                                SecretVaultService.updateCommandCode(cmd.id, editingCodeVal.trim());
+                                setEditingCmdId(null);
+                                refreshAll();
+                              }
+                            }}
+                            className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold"
+                          >
+                            OK
+                          </button>
+                          <button
+                            onClick={() => setEditingCmdId(null)}
+                            className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]"
+                          >
+                            X
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1.5">
+                          <span>{cmd.code}</span>
+                          <button
+                            onClick={() => {
+                              setEditingCmdId(cmd.id);
+                              setEditingCodeVal(cmd.code);
+                            }}
+                            className="text-slate-500 hover:text-slate-300 p-0.5"
+                            title="Rotacionar / Alterar código deste comando"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 font-sans font-bold text-slate-200">
+                      {cmd.name}
+                    </td>
+                    <td className="py-2 px-3">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                        cmd.level === 'NIVEL_1_VAULT' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                        cmd.level === 'NIVEL_2_REVEAL' ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' :
+                        cmd.level === 'NIVEL_3_PRIVILEGIOS' ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' :
+                        'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                      }`}>
+                        {cmd.level}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-slate-400 font-sans text-[11px]">
+                      {cmd.description}
+                    </td>
+                    <td className="py-2 px-3 text-center">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[9px] font-bold">
+                        {cmd.requiredRole}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-center text-slate-400 text-[10px]">
+                      {cmd.executionCount || 0}
+                    </td>
+                    <td className="py-2 px-3 text-center">
+                      <button
+                        onClick={() => {
+                          SecretVaultService.toggleCommand(cmd.id, !cmd.enabled);
+                          refreshAll();
+                        }}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          cmd.enabled 
+                            ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' 
+                            : 'bg-slate-800 text-slate-500 hover:bg-slate-700'
+                        }`}
+                      >
+                        {cmd.enabled ? 'ATIVO' : 'DESATIVADO'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ABA 3.6 — TABELA FIRESTORE: secret_command_executions/ */}
+      {activeTab === 'SECRET_EXECUTIONS' && (
+        <div className="space-y-4 font-sans">
+          {/* Header & Filtros Rápidos */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 bg-slate-900/90 border border-slate-800 rounded-xl">
+            <div className="flex items-center space-x-2">
+              <span className="font-mono text-xs font-bold text-emerald-400">Coleção:</span>
+              <span className="font-mono text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                secret_command_executions/
+              </span>
+              <span className="text-xs text-slate-400">({secretExecutions.length} registros)</span>
+            </div>
+
+            <div className="flex items-center space-x-2 text-xs font-mono">
+              <label className="text-slate-400">Status:</label>
+              <select
+                value={filterResult}
+                onChange={(e) => setFilterResult(e.target.value)}
+                className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+              >
+                <option value="ALL">Todos os Resultados</option>
+                <option value="SUCCESS">SUCCESS</option>
+                <option value="DENIED">DENIED</option>
+                <option value="BLOCKED">BLOCKED</option>
+                <option value="FAILED">FAILED</option>
+              </select>
+
+              <label className="text-slate-400 ml-2">Privilégio:</label>
+              <select
+                value={filterPrivilege}
+                onChange={(e) => setFilterPrivilege(e.target.value)}
+                className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+              >
+                <option value="ALL">Todos os Níveis</option>
+                <option value="ROOT">ROOT</option>
+                <option value="FOUNDER">FOUNDER</option>
+                <option value="ADMIN">ADMIN</option>
+                <option value="USER">USER</option>
+              </select>
+
+              <button
+                onClick={() => {
+                  SecretVaultService.clearExecutions();
+                  refreshAll();
+                }}
+                className="ml-2 px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-bold transition flex items-center space-x-1"
+                title="Limpar logs de execução de comandos"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Limpar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Tabela de Execuções Estruturada — Densidade Máxima Inline */}
+          <div className="overflow-x-auto border border-slate-800 rounded-xl">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] border-b border-slate-800 font-mono">
+                <tr>
+                  <th className="py-2.5 px-3">Timestamp</th>
+                  <th className="py-2.5 px-3">command</th>
+                  <th className="py-2.5 px-3">userId</th>
+                  <th className="py-2.5 px-3">deviceId</th>
+                  <th className="py-2.5 px-3">sessionId</th>
+                  <th className="py-2.5 px-3 text-center">execution_time</th>
+                  <th className="py-2.5 px-3 text-center">result</th>
+                  <th className="py-2.5 px-3">ip</th>
+                  <th className="py-2.5 px-3 text-center">privilege_level</th>
+                  <th className="py-2.5 px-3">details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50 font-mono">
+                {secretExecutions
+                  .filter(rec => filterResult === 'ALL' || rec.result === filterResult)
+                  .filter(rec => filterPrivilege === 'ALL' || rec.privilege_level === filterPrivilege)
+                  .map(rec => (
+                    <tr key={rec.id} className="hover:bg-slate-900/50 transition">
+                      <td className="py-2 px-3 text-slate-400 whitespace-nowrap text-[11px]">
+                        {new Date(rec.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </td>
+                      <td className="py-2 px-3 font-bold text-amber-400 whitespace-nowrap">
+                        {rec.command}
+                      </td>
+                      <td className="py-2 px-3 text-slate-300 truncate max-w-[140px]" title={rec.userId}>
+                        {rec.userId}
+                      </td>
+                      <td className="py-2 px-3 text-slate-400 truncate max-w-[130px]" title={rec.deviceId}>
+                        {rec.deviceId}
+                      </td>
+                      <td className="py-2 px-3 text-slate-500 font-mono text-[10px] truncate max-w-[120px]" title={rec.sessionId}>
+                        {rec.sessionId}
+                      </td>
+                      <td className="py-2 px-3 text-center font-bold text-emerald-400 whitespace-nowrap">
+                        {rec.execution_time}ms
+                      </td>
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                          rec.result === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
+                          rec.result === 'DENIED' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                          rec.result === 'BLOCKED' ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' :
+                          'bg-red-500/20 text-red-400 border-red-500/30'
+                        }`}>
+                          {rec.result}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-slate-400 text-[10px] whitespace-nowrap">
+                        {rec.ip}
+                      </td>
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                          rec.privilege_level === 'ROOT' ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' :
+                          rec.privilege_level === 'FOUNDER' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                          rec.privilege_level === 'ADMIN' ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' :
+                          'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}>
+                          {rec.privilege_level}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-slate-400 font-sans text-[11px] truncate max-w-[200px]" title={rec.details}>
+                        {rec.details || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                {secretExecutions.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="py-6 text-center text-slate-500 text-xs">
+                      Nenhuma execução de comando COS registrada na coleção secret_command_executions/
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
