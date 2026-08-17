@@ -6,3 +6,4 @@ export * from './Session';
 export * from './Engine';
 export * from './License';
 export * from './UpdateLog';
+export * from '../services/support/types';

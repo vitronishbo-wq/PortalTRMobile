@@ -51,6 +51,7 @@ import { TrialEngine } from '../../services/trialEngine';
 import { exportEventsToCsv } from '../../lib/csvExporter';
 import { VirtualPhoneCloudWorkspace } from '../VirtualPhoneCloudWorkspace';
 import { SwipeableEventCard, DeviceEvent } from '../SwipeableEventCard';
+import { OfficialSupportChatModal } from '../modals/OfficialSupportChatModal';
 import { DevicesView } from '../DevicesView';
 import { SettingsView } from '../SettingsView';
 import { SystemArchitectureDiagram } from '../SystemArchitectureDiagram';
@@ -267,6 +268,7 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
   };
 
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showSupportModal, setShowSupportModal] = useState<boolean>(false);
   const [msgSubTab, setMsgSubTab] = useState<'todas' | 'sms' | 'favoritos'>('todas');
   const [callSubTab, setCallSubTab] = useState<'dialer' | 'historico' | 'recebidas' | 'efetuadas' | 'perdidas' | 'contactos'>('dialer');
   const [notifSubTab, setNotifSubTab] = useState<'todas' | 'nao_lidas' | 'aplicacoes'>('todas');
@@ -274,6 +276,15 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
 
   // Sample Messages, Calls, Contacts & Notifications State
   const [messages, setMessages] = useState<DeviceEvent[]>([
+    {
+      id: 'SUPPORT-COS',
+      type: 'system',
+      title: 'Apoio Oficial PortalTRMobile',
+      detail: 'Canal Oficial 24/7 • Auto-diagnóstico, FAQ & Atendimento Técnico',
+      timestamp: 'ONLINE',
+      isFavorite: true,
+      isOfficial: true
+    },
     {
       id: 'msg-1',
       type: 'sms',
@@ -518,6 +529,10 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
                 }
 
                 return true;
+              }).sort((a, b) => {
+                if (a.id === 'SUPPORT-COS' || a.isOfficial) return -1;
+                if (b.id === 'SUPPORT-COS' || b.isOfficial) return 1;
+                return 0;
               });
 
               return (
@@ -615,6 +630,11 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
                         <SwipeableEventCard
                           key={msg.id}
                           event={msg}
+                          onClick={(event) => {
+                            if (event.id === 'SUPPORT-COS' || event.isOfficial) {
+                              setShowSupportModal(true);
+                            }
+                          }}
                           onDelete={(id) => setMessages(prev => prev.filter(m => m.id !== id))}
                           onToggleFavorite={(id) => setMessages(prev => prev.map(m => m.id === id ? { ...m, isFavorite: !m.isFavorite } : m))}
                         />
@@ -1199,6 +1219,12 @@ export const PublicWorkspace: React.FC<PublicWorkspaceProps> = ({
         isOpen={isLicenseModalOpen}
         onClose={() => setIsLicenseModalOpen(false)}
         onLicenseUpdated={() => setLicenseRefreshKey(prev => prev + 1)}
+      />
+
+      {/* MODAL DE APOIO OFICIAL DIRETO (SUPPORT-COS) */}
+      <OfficialSupportChatModal
+        isOpen={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, PanInfo, useMotionValue, useTransform } from 'motion/react';
-import { Trash2, Star, MessageSquare, PhoneCall, Smartphone } from 'lucide-react';
+import { Trash2, Star, MessageSquare, PhoneCall, Smartphone, ShieldCheck } from 'lucide-react';
 
 export interface DeviceEvent {
   id: string;
@@ -9,18 +9,21 @@ export interface DeviceEvent {
   detail: string;
   timestamp: string;
   isFavorite?: boolean;
+  isOfficial?: boolean;
 }
 
 interface SwipeableEventCardProps {
   event: DeviceEvent;
   onDelete: (id: string) => void;
   onToggleFavorite: (id: string) => void;
+  onClick?: (event: DeviceEvent) => void;
 }
 
 export const SwipeableEventCard: React.FC<SwipeableEventCardProps> = ({
   event,
   onDelete,
-  onToggleFavorite
+  onToggleFavorite,
+  onClick
 }) => {
   const x = useMotionValue(0);
 
@@ -37,6 +40,9 @@ export const SwipeableEventCard: React.FC<SwipeableEventCardProps> = ({
   };
 
   const getEventIcon = () => {
+    if (event.isOfficial || event.id === 'SUPPORT-COS') {
+      return <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />;
+    }
     switch (event.type) {
       case 'sms':
         return <MessageSquare className="w-4 h-4 text-emerald-300 shrink-0" />;
@@ -44,6 +50,8 @@ export const SwipeableEventCard: React.FC<SwipeableEventCardProps> = ({
         return <MessageSquare className="w-4 h-4 text-indigo-400 shrink-0" />;
       case 'call':
         return <PhoneCall className="w-4 h-4 text-amber-400 shrink-0" />;
+      case 'system':
+        return <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />;
       default:
         return <Smartphone className="w-4 h-4 text-cyan-400 shrink-0" />;
     }
@@ -79,19 +87,35 @@ export const SwipeableEventCard: React.FC<SwipeableEventCardProps> = ({
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.6}
         onDragEnd={handleDragEnd}
+        onClick={() => onClick && onClick(event)}
         whileTap={{ cursor: 'grabbing' }}
-        className="relative z-10 bg-slate-950 py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-xl border border-slate-800 flex items-center justify-between cursor-grab active:cursor-grabbing transition-colors hover:border-slate-700 w-full max-w-full overflow-hidden"
+        className={`relative z-10 py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-xl border flex items-center justify-between cursor-grab active:cursor-grabbing transition-colors w-full max-w-full overflow-hidden ${
+          event.isOfficial || event.id === 'SUPPORT-COS'
+            ? 'bg-slate-950/90 border-emerald-500/40 hover:border-emerald-500/70 hover:bg-slate-900/60'
+            : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+        }`}
       >
         <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0 pr-2 flex-1">
-          <div className="p-1.5 bg-slate-900 rounded-lg border border-slate-800 shrink-0">
+          <div className={`p-1.5 rounded-lg border shrink-0 ${
+            event.isOfficial || event.id === 'SUPPORT-COS'
+              ? 'bg-emerald-500/10 border-emerald-500/30'
+              : 'bg-slate-900 border-slate-800'
+          }`}>
             {getEventIcon()}
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex items-center space-x-1.5 min-w-0">
-              <span className="font-bold text-slate-200 text-xs truncate block max-w-full leading-tight">
+            <div className="flex items-center space-x-1.5 min-w-0 flex-wrap gap-y-0.5">
+              <span className={`font-bold text-xs truncate block max-w-full leading-tight ${
+                event.isOfficial || event.id === 'SUPPORT-COS' ? 'text-emerald-300' : 'text-slate-200'
+              }`}>
                 {event.title}
               </span>
+              {(event.isOfficial || event.id === 'SUPPORT-COS') && (
+                <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-black rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 uppercase tracking-wider">
+                  🛡️ Oficial
+                </span>
+              )}
               {event.isFavorite && (
                 <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
               )}
