@@ -103,90 +103,23 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
   const [dtmfBuffer, setDtmfBuffer] = useState<string>('');
 
   // Blacklist & Whitelist
-  const [blacklist, setBlacklist] = useState<string[]>(['+244 900 000 000', '+244 999 111 222']);
-  const [whitelist, setWhitelist] = useState<string[]>(['+244 923 888 111', '+244 955 777 222', '+244 222 000 999']);
+  const [blacklist, setBlacklist] = useState<string[]>([]);
+  const [whitelist, setWhitelist] = useState<string[]>([]);
   const [newBlockNum, setNewBlockNum] = useState<string>('');
 
   // Virtual Numbers Collection State (virtual_numbers/{numberId})
-  const [virtualNumbersList, setVirtualNumbersList] = useState<VirtualNumber[]>([
-    {
-      id: 'num-01',
-      number: '+244 923 888 111',
-      isPrimary: true,
-      isSecondary: false,
-      operator: 'Unitel',
-      status: 'active',
-      type: 'mobile',
-      country: 'Angola',
-      esim: true,
-      esimProfileId: 'eSIM-UNITEL-AO-8801',
-      sip: true,
-      sipTrunkUri: 'sip:num01@unitel.portal.co.ao',
-      ims: true,
-      imsGatewayDomain: 'ims.unitel.co.ao'
-    },
-    {
-      id: 'num-02',
-      number: '+244 955 777 222',
-      isPrimary: false,
-      isSecondary: true,
-      operator: 'Africell',
-      status: 'active',
-      type: 'mobile',
-      country: 'Angola',
-      esim: true,
-      esimProfileId: 'eSIM-AFRICELL-AO-5502',
-      sip: false,
-      ims: true,
-      imsGatewayDomain: 'ims.africell.co.ao'
-    },
-    {
-      id: 'num-03',
-      number: '+351 210 999 888',
-      isPrimary: false,
-      isSecondary: true,
-      operator: 'SIP Gateway',
-      status: 'active',
-      type: 'landline',
-      country: 'Portugal',
-      esim: false,
-      sip: true,
-      sipTrunkUri: 'sip:lisbon-trunk@sip.portal.co.ao',
-      ims: false
-    }
-  ]);
+  const [virtualNumbersList, setVirtualNumbersList] = useState<VirtualNumber[]>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('portal_assigned_virtual_numbers');
+        if (stored) return JSON.parse(stored);
+      }
+    } catch {}
+    return [];
+  });
 
   // Mesh Sessions State (sessions/{sessionId})
-  const [meshSessionsList, setMeshSessionsList] = useState<MeshSession[]>([
-    {
-      id: 'session-master-01',
-      uid: 'usr-founder-001',
-      isPrimarySession: true,
-      isSecondarySession: false,
-      currentDeviceId: 'dev-samsung-s22',
-      activeDevicesCount: 5,
-      deviceLimit: 100,
-      sessionTransferStatus: 'synced',
-      autoContinuation: true,
-      instantSync: true,
-      primaryDevicePriority: 1,
-      lastSyncTimestamp: Date.now()
-    },
-    {
-      id: 'session-sec-02',
-      uid: 'usr-founder-001',
-      isPrimarySession: false,
-      isSecondarySession: true,
-      currentDeviceId: 'dev-macbook-pro',
-      activeDevicesCount: 5,
-      deviceLimit: 100,
-      sessionTransferStatus: 'synced',
-      autoContinuation: true,
-      instantSync: true,
-      primaryDevicePriority: 2,
-      lastSyncTimestamp: Date.now() - 5000
-    }
-  ]);
+  const [meshSessionsList, setMeshSessionsList] = useState<MeshSession[]>([]);
 
   // Call History State
   const [callHistoryFilter, setCallHistoryFilter] = useState<'todas' | 'recebidas' | 'efetuadas' | 'perdidas' | 'transferidas' | 'gravadas' | 'conferencia'>('todas');
@@ -194,88 +127,19 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
 
   // Contacts State
   const [searchContact, setSearchContact] = useState<string>('');
-  const [contactsList, setContactsList] = useState([
-    { id: '1', name: 'Comando Central (Founder)', phone: '+244 923 888 111', category: 'Root', isFav: true },
-    { id: '2', name: 'Operador Africell Core', phone: '+244 955 777 222', category: 'Operador', isFav: true },
-    { id: '3', name: 'Suporte Técnico Movicel', phone: '+244 912 666 333', category: 'Suporte', isFav: false },
-    { id: '4', name: 'Gateway SIP Angola Enterprise', phone: 'sip:trunk01@sip.portal.co.ao', category: 'SIP', isFav: false },
-    { id: '5', name: 'IMS Core Gateway Direct', phone: '+244 222 000 999', category: 'IMS', isFav: true }
-  ]);
+  const [contactsList, setContactsList] = useState<any[]>([]);
 
   // SMS Compose State
   const [smsRecipient, setSmsRecipient] = useState<string>('');
   const [smsBody, setSmsBody] = useState<string>('');
-  const [smsHistory, setSmsHistory] = useState<SmsMessage[]>([
-    {
-      id: 'sms-01',
-      sender: '+244 923 888 111',
-      recipient: '+244 955 777 222',
-      content: 'Código de validação de dispositivo PortalTRMobile: 849201. Validade 5 min.',
-      timestamp: Date.now() - 3600000,
-      direction: 'inbound',
-      status: 'delivered'
-    },
-    {
-      id: 'sms-02',
-      sender: '+244 955 777 222',
-      recipient: '+244 923 888 111',
-      content: 'Sessão de emparelhamento Zero-Touch confirmada no nó Android SM-S901B.',
-      timestamp: Date.now() - 1800000,
-      direction: 'outbound',
-      status: 'delivered'
-    }
-  ]);
+  const [smsHistory, setSmsHistory] = useState<SmsMessage[]>([]);
 
   // Voicemail State
-  const [voicemails, setVoicemails] = useState([
-    { id: 'vm-1', caller: '+244 912 666 333', name: 'Suporte Técnico Movicel', duration: '0:42', timestamp: Date.now() - 7200000, isRead: false },
-    { id: 'vm-2', caller: '+244 955 777 222', name: 'Operador Africell Core', duration: '1:15', timestamp: Date.now() - 14400000, isRead: true }
-  ]);
+  const [voicemails, setVoicemails] = useState<any[]>([]);
   const [playingVmId, setPlayingVmId] = useState<string | null>(null);
 
-  // Calls Log Mock State (calls/{callId})
-  const [callRecords, setCallRecords] = useState<CallRecord[]>([
-    {
-      id: 'call-101',
-      caller: '+244 923 888 111',
-      recipient: '+244 955 777 222',
-      startTime: Date.now() - 1200000,
-      endTime: Date.now() - 1140000,
-      durationSeconds: 60,
-      status: 'completed',
-      direction: 'outbound',
-      recordingUrl: 'https://storage.portal.co.ao/calls/call-101.mp3',
-      recordingStatus: 'saved',
-      isInternational: false,
-      countryCode: '+244'
-    },
-    {
-      id: 'call-102',
-      caller: '+244 912 666 333',
-      recipient: '+244 923 888 111',
-      startTime: Date.now() - 3600000,
-      endTime: Date.now() - 3600000,
-      durationSeconds: 0,
-      status: 'missed',
-      direction: 'inbound',
-      isInternational: false,
-      countryCode: '+244'
-    },
-    {
-      id: 'call-103',
-      caller: '+351 910 000 111',
-      recipient: '+244 923 888 111',
-      startTime: Date.now() - 7200000,
-      endTime: Date.now() - 7000000,
-      durationSeconds: 200,
-      status: 'transferred',
-      direction: 'inbound',
-      recordingUrl: 'https://storage.portal.co.ao/calls/call-103.mp3',
-      recordingStatus: 'saved',
-      isInternational: true,
-      countryCode: '+351'
-    }
-  ]);
+  // Calls Log State (calls/{callId})
+  const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
 
   // Call duration counter
   useEffect(() => {
@@ -1090,46 +954,55 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                {virtualNumbersList.map((vn) => (
-                  <tr key={vn.id} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="p-2.5 font-black text-cyan-400">{vn.number}</td>
-                    <td className="p-2.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                        vn.isPrimary ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-slate-900 text-slate-400 border-slate-800'
-                      }`}>
-                        {vn.isPrimary ? 'PRINCIPAL' : 'SECUNDÁRIO'}
-                      </span>
-                    </td>
-                    <td className="p-2.5 text-white font-bold">{vn.operator}</td>
-                    <td className="p-2.5 uppercase text-slate-300">{vn.type}</td>
-                    <td className="p-2.5 text-slate-300">{vn.country}</td>
-                    <td className="p-2.5 text-center">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${vn.esim ? 'bg-indigo-950 text-indigo-300 border border-indigo-800' : 'text-slate-600'}`}>
-                        {vn.esim ? 'ATIVO' : 'N/A'}
-                      </span>
-                    </td>
-                    <td className="p-2.5 text-center">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${vn.sip ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-600'}`}>
-                        {vn.sip ? 'SIP DIRECT' : 'N/A'}
-                      </span>
-                    </td>
-                    <td className="p-2.5 text-center">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${vn.ims ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'text-slate-600'}`}>
-                        {vn.ims ? 'IMS CORE' : 'N/A'}
-                      </span>
-                    </td>
-                    <td className="p-2.5 text-right space-x-1">
-                      {!vn.isPrimary && (
-                        <button
-                          onClick={() => handleSetPrimaryVirtualNumber(vn.id)}
-                          className="px-2 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 hover:bg-emerald-900 rounded text-[10px] font-bold uppercase cursor-pointer"
-                        >
-                          DEFINIR PRINCIPAL
-                        </button>
-                      )}
+                {virtualNumbersList.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-6 text-center text-slate-500 font-sans">
+                      <span className="font-bold block text-slate-400">NENHUM NÚMERO CONFIGURADO (NOT_CONFIGURED)</span>
+                      <span className="text-[10px] text-slate-600 block mt-1">Conecte credenciais válidas ou provisione uma porta SIP/IMS/SIM real para listar números virtuais.</span>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  virtualNumbersList.map((vn) => (
+                    <tr key={vn.id} className="hover:bg-slate-900/50 transition-colors">
+                      <td className="p-2.5 font-black text-cyan-400">{vn.number}</td>
+                      <td className="p-2.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                          vn.isPrimary ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-slate-900 text-slate-400 border-slate-800'
+                        }`}>
+                          {vn.isPrimary ? 'PRINCIPAL' : 'SECUNDÁRIO'}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-white font-bold">{vn.operator}</td>
+                      <td className="p-2.5 uppercase text-slate-300">{vn.type}</td>
+                      <td className="p-2.5 text-slate-300">{vn.country}</td>
+                      <td className="p-2.5 text-center">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${vn.esim ? 'bg-indigo-950 text-indigo-300 border border-indigo-800' : 'text-slate-600'}`}>
+                          {vn.esim ? 'ATIVO' : 'NOT_CONFIGURED'}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-center">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${vn.sip ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'text-slate-600'}`}>
+                          {vn.sip ? 'SIP DIRECT' : 'NOT_CONFIGURED'}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-center">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${vn.ims ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'text-slate-600'}`}>
+                          {vn.ims ? 'IMS CORE' : 'NOT_CONFIGURED'}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-right space-x-1">
+                        {!vn.isPrimary && (
+                          <button
+                            onClick={() => handleSetPrimaryVirtualNumber(vn.id)}
+                            className="px-2 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 hover:bg-emerald-900 rounded text-[10px] font-bold uppercase cursor-pointer"
+                          >
+                            DEFINIR PRINCIPAL
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -1143,8 +1016,8 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
             <div>
               <span className="text-xs font-black text-white uppercase block flex items-center space-x-2">
                 <span>DEVICE MESH 4.0 — MALHA SINCRO REALTIME</span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-mono font-bold">
-                  LATÊNCIA &lt;12MS
+                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[9px] font-mono font-bold">
+                  NOT_CONFIGURED
                 </span>
               </span>
               <p className="text-[10px] text-slate-400">Continuação automática de sessão, prioridade de nós, sincronização de clipboard, chamadas e SMS</p>
@@ -1178,38 +1051,47 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                {meshSessionsList.map((ms) => (
-                  <tr key={ms.id} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="p-2.5 font-bold text-cyan-400">{ms.id}</td>
-                    <td className="p-2.5 text-white font-bold">{ms.currentDeviceId}</td>
-                    <td className="p-2.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                        ms.isPrimarySession ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-slate-900 text-slate-400 border-slate-800'
-                      }`}>
-                        {ms.isPrimarySession ? 'SESSÃO ATIVA' : 'SESSÃO SECUNDÁRIA'}
-                      </span>
-                    </td>
-                    <td className="p-2.5 text-center font-bold text-indigo-300">
-                      PRIORIDADE #{ms.primaryDevicePriority}
-                    </td>
-                    <td className="p-2.5 text-center">
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
-                        {ms.autoContinuation ? 'ATIVO' : 'DESATIVADO'}
-                      </span>
-                    </td>
-                    <td className="p-2.5 text-center text-slate-300">
-                      {ms.activeDevicesCount} / {ms.deviceLimit === 100 ? 'Ilimitado' : ms.deviceLimit}
-                    </td>
-                    <td className="p-2.5 text-right">
-                      <button
-                        onClick={() => handleTransferSessionMesh(ms.id)}
-                        className="px-2.5 py-1 bg-cyan-950 text-cyan-300 border border-cyan-800 hover:bg-cyan-900 rounded text-[10px] font-bold uppercase cursor-pointer"
-                      >
-                        TRANSFERIR SESSÃO
-                      </button>
+                {meshSessionsList.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-6 text-center text-slate-500 font-sans">
+                      <span className="font-bold block text-slate-400">NENHUMA SESSÃO MESH REGISTADA (NOT_CONFIGURED)</span>
+                      <span className="text-[10px] text-slate-600 block mt-1">Conecte outros dispositivos ao mesmo ID de utilizador para sincronizar a malha.</span>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  meshSessionsList.map((ms) => (
+                    <tr key={ms.id} className="hover:bg-slate-900/50 transition-colors">
+                      <td className="p-2.5 font-bold text-cyan-400">{ms.id}</td>
+                      <td className="p-2.5 text-white font-bold">{ms.currentDeviceId}</td>
+                      <td className="p-2.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                          ms.isPrimarySession ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-slate-900 text-slate-400 border-slate-800'
+                        }`}>
+                          {ms.isPrimarySession ? 'SESSÃO ATIVA' : 'SESSÃO SECUNDÁRIA'}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-center font-bold text-indigo-300">
+                        PRIORIDADE #{ms.primaryDevicePriority}
+                      </td>
+                      <td className="p-2.5 text-center">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          {ms.autoContinuation ? 'ATIVO' : 'DESATIVADO'}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-center text-slate-300">
+                        {ms.activeDevicesCount} / {ms.deviceLimit === 100 ? 'Ilimitado' : ms.deviceLimit}
+                      </td>
+                      <td className="p-2.5 text-right">
+                        <button
+                          onClick={() => handleTransferSessionMesh(ms.id)}
+                          className="px-2.5 py-1 bg-cyan-950 text-cyan-300 border border-cyan-800 hover:bg-cyan-900 rounded text-[10px] font-bold uppercase cursor-pointer"
+                        >
+                          TRANSFERIR SESSÃO
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -1414,37 +1296,45 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {filteredContacts.map((ct) => (
-                  <tr key={ct.id} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="p-2.5 font-bold text-white flex items-center space-x-2">
-                      <span>{ct.name}</span>
-                      {ct.isFav && <span className="text-amber-400 text-[10px]">★</span>}
-                    </td>
-                    <td className="p-2.5 text-cyan-400 font-mono font-bold">{ct.phone}</td>
-                    <td className="p-2.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-slate-900 text-slate-300 border border-slate-800 font-bold">
-                        {ct.category}
-                      </span>
-                    </td>
-                    <td className="p-2.5 text-right space-x-2">
-                      <button
-                        onClick={() => handleInitiateCall(ct.phone)}
-                        className="px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 hover:bg-emerald-900 rounded text-[10px] font-bold uppercase cursor-pointer"
-                      >
-                        CHAMAR
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSmsRecipient(ct.phone);
-                          setActiveTab('sms');
-                        }}
-                        className="px-2.5 py-1 bg-indigo-950 text-indigo-300 border border-indigo-800 hover:bg-indigo-900 rounded text-[10px] font-bold uppercase cursor-pointer"
-                      >
-                        SMS
-                      </button>
+                {filteredContacts.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="p-6 text-center text-slate-500 font-sans text-xs">
+                      Nenhum contacto registado. Clique em &quot;NOVO CONTACTO&quot; ou &quot;IMPORTAR VCARD&quot;.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredContacts.map((ct) => (
+                    <tr key={ct.id} className="hover:bg-slate-900/50 transition-colors">
+                      <td className="p-2.5 font-bold text-white flex items-center space-x-2">
+                        <span>{ct.name}</span>
+                        {ct.isFav && <span className="text-amber-400 text-[10px]">★</span>}
+                      </td>
+                      <td className="p-2.5 text-cyan-400 font-mono font-bold">{ct.phone}</td>
+                      <td className="p-2.5">
+                        <span className="px-2 py-0.5 rounded text-[10px] bg-slate-900 text-slate-300 border border-slate-800 font-bold">
+                          {ct.category}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-right space-x-2">
+                        <button
+                          onClick={() => handleInitiateCall(ct.phone)}
+                          className="px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 hover:bg-emerald-900 rounded text-[10px] font-bold uppercase cursor-pointer"
+                        >
+                          CHAMAR
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSmsRecipient(ct.phone);
+                            setActiveTab('sms');
+                          }}
+                          className="px-2.5 py-1 bg-indigo-950 text-indigo-300 border border-indigo-800 hover:bg-indigo-900 rounded text-[10px] font-bold uppercase cursor-pointer"
+                        >
+                          SMS
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -1500,17 +1390,23 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
             </span>
 
             <div className="space-y-2">
-              {smsHistory.map((s) => (
-                <div key={s.id} className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1">
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="font-bold text-indigo-400 font-mono">
-                      {s.direction === 'inbound' ? `DE: ${s.sender}` : `PARA: ${s.recipient}`}
-                    </span>
-                    <span className="text-slate-500">{new Date(s.timestamp).toLocaleTimeString('pt-BR')}</span>
-                  </div>
-                  <p className="text-xs text-slate-200 leading-relaxed font-sans">{s.content}</p>
+              {smsHistory.length === 0 ? (
+                <div className="py-8 text-center text-slate-500 text-xs font-mono">
+                  Nenhuma mensagem SMS no histórico.
                 </div>
-              ))}
+              ) : (
+                smsHistory.map((s) => (
+                  <div key={s.id} className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="font-bold text-indigo-400 font-mono">
+                        {s.direction === 'inbound' ? `DE: ${s.sender}` : `PARA: ${s.recipient}`}
+                      </span>
+                      <span className="text-slate-500">{new Date(s.timestamp).toLocaleTimeString('pt-BR')}</span>
+                    </div>
+                    <p className="text-xs text-slate-200 leading-relaxed font-sans">{s.content}</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -1537,26 +1433,32 @@ export const VirtualPhoneCloudWorkspace: React.FC = () => {
                   <th className="p-2.5 text-right">REPRODUÇÃO</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {voicemails.map((vm) => (
-                  <tr key={vm.id} className="hover:bg-slate-900/50 transition-colors">
-                    <td className="p-2.5 font-bold text-white">{vm.name}</td>
-                    <td className="p-2.5 text-cyan-400 font-mono font-bold">{vm.caller}</td>
-                    <td className="p-2.5 text-slate-300 font-mono">{vm.duration}</td>
-                    <td className="p-2.5 text-slate-400 text-[10px]">
-                      {new Date(vm.timestamp).toLocaleString('pt-BR')}
-                    </td>
-                    <td className="p-2.5 text-right">
-                      <button
-                        onClick={() => setPlayingVmId(playingVmId === vm.id ? null : vm.id)}
-                        className="px-3 py-1 bg-indigo-950 text-indigo-300 border border-indigo-800 hover:bg-indigo-900 rounded text-[10px] font-bold uppercase cursor-pointer flex items-center space-x-1.5 ml-auto"
-                      >
-                        {playingVmId === vm.id ? <Pause className="w-3 h-3 text-amber-400" /> : <Play className="w-3 h-3 text-emerald-400" />}
-                        <span>{playingVmId === vm.id ? 'PAUSAR' : 'REPRODUZIR'}</span>
-                      </button>
+              <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                {voicemails.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-6 text-center text-slate-500 font-sans text-xs">
+                      Caixa de correio de voz vazia.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  voicemails.map((vm) => (
+                    <tr key={vm.id} className="hover:bg-slate-900/50 transition-colors">
+                      <td className="p-2.5 font-bold text-white">{vm.name || 'Desconhecido'}</td>
+                      <td className="p-2.5 text-cyan-400">{vm.caller}</td>
+                      <td className="p-2.5 text-slate-400">{vm.duration}</td>
+                      <td className="p-2.5 text-slate-500">{new Date(vm.timestamp).toLocaleString('pt-BR')}</td>
+                      <td className="p-2.5 text-right">
+                        <button
+                          onClick={() => setPlayingVmId(playingVmId === vm.id ? null : vm.id)}
+                          className="px-3 py-1 bg-indigo-950 text-indigo-300 border border-indigo-800 hover:bg-indigo-900 rounded text-[10px] font-bold uppercase cursor-pointer flex items-center space-x-1.5 ml-auto"
+                        >
+                          {playingVmId === vm.id ? <Pause className="w-3 h-3 text-amber-400" /> : <Play className="w-3 h-3 text-emerald-400" />}
+                          <span>{playingVmId === vm.id ? 'PAUSAR' : 'REPRODUZIR'}</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

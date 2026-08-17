@@ -3,11 +3,23 @@ import { TelecomProvider, TelecomCallRequest, TelecomCallSession } from './Telec
 export class AfricellProvider extends TelecomProvider {
   name = 'Africell Angola (VoNR 5G)';
   code: 'africell' = 'africell';
-  activeMsisdn = '+244 955 777 222';
 
   async initiateCall(req: TelecomCallRequest): Promise<TelecomCallSession> {
+    const callId = `africell-call-${Date.now()}`;
+    if (!this.isConfigured) {
+      return {
+        id: callId,
+        callId,
+        providerName: this.name,
+        targetNumber: req.targetNumber,
+        callerMsisdn: this.activeMsisdn,
+        status: 'failed',
+        startTime: Date.now()
+      };
+    }
     return {
-      callId: `africell-call-${Date.now()}`,
+      id: callId,
+      callId,
       providerName: this.name,
       targetNumber: req.targetNumber,
       callerMsisdn: this.activeMsisdn,
@@ -22,10 +34,17 @@ export class AfricellProvider extends TelecomProvider {
 
   async sendSms(recipient: string, message: string): Promise<boolean> {
     console.log(`[AfricellProvider] SMS para ${recipient}: ${message}`);
-    return true;
+    return this.isConfigured && this.isVerified;
   }
 
   async checkBalance() {
-    return { balanceMznOrAoa: 18200, currency: 'Kz' };
+    if (!this.isConfigured) {
+      return { balanceMznOrAoa: 0, currency: 'Kz', status: 'NOT_CONFIGURED' as const };
+    }
+    if (!this.isVerified) {
+      return { balanceMznOrAoa: 0, currency: 'Kz', status: 'NOT_VERIFIED' as const };
+    }
+    return { balanceMznOrAoa: 0, currency: 'Kz', status: 'READY' as const };
   }
 }
+

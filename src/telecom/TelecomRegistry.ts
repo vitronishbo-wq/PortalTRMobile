@@ -5,7 +5,7 @@ export interface TelecomOperator {
   name: string;
   countryCode: string;
   mccMnc: string;
-  status: 'active' | 'inactive' | 'degraded';
+  status: 'active' | 'inactive' | 'degraded' | 'NOT_CONFIGURED' | 'NOT_VERIFIED';
   supportedProtocols: ('SIP' | 'IMS' | 'VoLTE' | 'WebRTC' | 'eSIM')[];
   sipGateway?: string;
   imsApn?: string;
@@ -66,17 +66,31 @@ class TelecomRegistryEngine {
   }
 
   private seedDefaultTelecomOperators() {
+    const getStoredCreds = (opId: string) => {
+      try {
+        if (typeof window === 'undefined') return null;
+        const item = localStorage.getItem(`telecom_creds_${opId}`);
+        return item ? JSON.parse(item) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const unitelCreds = getStoredCreds('unitel_ao');
+    const movicelCreds = getStoredCreds('movicel_ao');
+    const africellCreds = getStoredCreds('africell_ao');
+
     const defaultOps: TelecomOperator[] = [
       {
         id: 'unitel-ao',
         name: 'Unitel Angola',
         countryCode: '+244',
         mccMnc: '63102',
-        status: 'active',
+        status: unitelCreds?.apiKey ? (unitelCreds.verified ? 'active' : 'NOT_VERIFIED') : 'NOT_CONFIGURED',
         supportedProtocols: ['SIP', 'IMS', 'VoLTE', 'WebRTC', 'eSIM'],
-        sipGateway: 'sip.unitel.ao:5061',
-        imsApn: 'ims.unitel.ao',
-        eSimProfileUrl: 'https://smdp.unitel.ao',
+        sipGateway: unitelCreds?.sipServer || undefined,
+        imsApn: undefined,
+        eSimProfileUrl: undefined,
         ussdPrefix: '*111#',
         createdAt: Date.now()
       },
@@ -85,10 +99,10 @@ class TelecomRegistryEngine {
         name: 'Movicel',
         countryCode: '+244',
         mccMnc: '63104',
-        status: 'active',
+        status: movicelCreds?.apiKey ? (movicelCreds.verified ? 'active' : 'NOT_VERIFIED') : 'NOT_CONFIGURED',
         supportedProtocols: ['SIP', 'IMS', 'WebRTC', 'eSIM'],
-        sipGateway: 'sip.movicel.ao:5060',
-        imsApn: 'ims.movicel.ao',
+        sipGateway: movicelCreds?.sipServer || undefined,
+        imsApn: undefined,
         ussdPrefix: '*196#',
         createdAt: Date.now()
       },
@@ -97,11 +111,11 @@ class TelecomRegistryEngine {
         name: 'Africell Angola',
         countryCode: '+244',
         mccMnc: '63105',
-        status: 'active',
+        status: africellCreds?.apiKey ? (africellCreds.verified ? 'active' : 'NOT_VERIFIED') : 'NOT_CONFIGURED',
         supportedProtocols: ['SIP', 'IMS', 'VoLTE', 'WebRTC', 'eSIM'],
-        sipGateway: 'sip.africell.ao:5061',
-        imsApn: 'ims.africell.ao',
-        eSimProfileUrl: 'https://smdp.africell.ao',
+        sipGateway: africellCreds?.sipServer || undefined,
+        imsApn: undefined,
+        eSimProfileUrl: undefined,
         ussdPrefix: '*123#',
         createdAt: Date.now()
       }

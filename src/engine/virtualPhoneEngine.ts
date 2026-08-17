@@ -101,10 +101,10 @@ const DEFAULT_STATE: VirtualPhoneState = {
   uid: 'usr-root-001',
   identityHash: 'sha256-vtr-9a8f7e6d5c4b3a21',
   role: 'founder',
-  mfaEnabled: true,
-  msisdn: '+244923000111',
+  mfaEnabled: false,
+  msisdn: 'NOT_CONFIGURED',
   provider: 'unitel',
-  providerStatus: 'connected',
+  providerStatus: 'offline',
   voice: {
     state: 'idle',
     durationSeconds: 0,
@@ -114,111 +114,13 @@ const DEFAULT_STATE: VirtualPhoneState = {
     audioInputDevice: 'default-mic',
     audioOutputDevice: 'default-speaker'
   },
-  contacts: [
-    { id: 'c1', name: 'Suporte Unitel', number: '+244923000000', speedDial: 1 },
-    { id: 'c2', name: 'Central Africell', number: '+244930000000', speedDial: 2 },
-    { id: 'c3', name: 'Movicel NOC', number: '+244910000000', speedDial: 3 },
-    { id: 'c4', name: 'Admin PortalTR', number: '+244944556677', speedDial: 4 }
-  ],
-  smsMessages: [
-    {
-      id: 'sms-1',
-      threadId: 'th-+244923000000',
-      sender: '+244923000000',
-      recipient: '+244923000111',
-      text: 'Seu saldo de minutos e dados foi atualizado.',
-      timestamp: Date.now() - 3600000,
-      direction: 'inbound',
-      status: 'delivered'
-    },
-    {
-      id: 'sms-2',
-      threadId: 'th-+244944556677',
-      sender: '+244923000111',
-      recipient: '+244944556677',
-      text: 'Sincronização de nós do Device Mesh concluída.',
-      timestamp: Date.now() - 1800000,
-      direction: 'outbound',
-      status: 'delivered'
-    }
-  ],
-  callHistory: [
-    {
-      id: 'call-1',
-      type: 'incoming',
-      peerNumber: '+244923000000',
-      timestamp: Date.now() - 7200000,
-      durationSeconds: 142,
-      provider: 'unitel'
-    },
-    {
-      id: 'call-2',
-      type: 'outgoing',
-      peerNumber: '+244930000000',
-      timestamp: Date.now() - 3600000,
-      durationSeconds: 45,
-      provider: 'africell'
-    }
-  ],
-  voicemails: [
-    {
-      id: 'vm-1',
-      caller: '+244910000000',
-      timestamp: Date.now() - 14400000,
-      durationSeconds: 18,
-      read: false
-    }
-  ],
-  devicesMesh: [
-    {
-      deviceId: 'dev-android-agent-1',
-      name: 'Samsung Galaxy S24 (Agent)',
-      platform: 'android',
-      trustScore: 98,
-      isOnline: true,
-      lastSeen: Date.now() - 12000
-    },
-    {
-      deviceId: 'dev-iphone-15-pro',
-      name: 'iPhone 15 Pro (Client)',
-      platform: 'iphone',
-      trustScore: 95,
-      isOnline: true,
-      lastSeen: Date.now() - 45000
-    },
-    {
-      deviceId: 'dev-desktop-win',
-      name: 'Workstation Windows (Terminal)',
-      platform: 'windows',
-      trustScore: 100,
-      isOnline: true,
-      lastSeen: Date.now() - 5000
-    }
-  ],
-  virtualApps: [
-    {
-      containerId: 'cnt-whatsapp-bus',
-      packageName: 'com.whatsapp.w4b',
-      appName: 'WhatsApp Business (Cloud)',
-      status: 'running',
-      cpuUsagePct: 2.4,
-      memoryMb: 312,
-      fps: 60
-    },
-    {
-      containerId: 'cnt-banking-app',
-      packageName: 'com.unitel.money',
-      appName: 'Unitel Money (Cloud)',
-      status: 'running',
-      cpuUsagePct: 1.1,
-      memoryMb: 198,
-      fps: 60
-    }
-  ],
-  webhooks: [
-    { id: 'wh-1', url: 'https://portaltrmobile-api.onrender.com/api/webhooks/voice', event: 'call.incoming', active: true },
-    { id: 'wh-2', url: 'https://portaltrmobile-api.onrender.com/api/webhooks/sms', event: 'sms.received', active: true }
-  ],
+  contacts: [],
+  smsMessages: [],
+  callHistory: [],
+  voicemails: [],
+  devicesMesh: [],
+  virtualApps: [],
+  webhooks: [],
   mfaModalOpen: false,
   pairingModalOpen: false,
   providerModalOpen: false,

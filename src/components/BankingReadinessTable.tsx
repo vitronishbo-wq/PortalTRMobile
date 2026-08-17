@@ -37,6 +37,22 @@ export const BankingReadinessTable: React.FC = () => {
         </span>
       );
     }
+    if (status === 'NOT_CONFIGURED') {
+      return (
+        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-bold">
+          <span>⚪</span>
+          <span>NOT_CONFIGURED</span>
+        </span>
+      );
+    }
+    if (status === 'NOT_VERIFIED') {
+      return (
+        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+          <span>⚠️</span>
+          <span>NOT_VERIFIED</span>
+        </span>
+      );
+    }
     return (
       <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold">
         <span>🔴</span>
@@ -63,14 +79,14 @@ export const BankingReadinessTable: React.FC = () => {
               Banking Readiness Table (EMIS / Multicaixa)
             </h3>
             <p className="text-[11px] text-slate-400 font-sans">
-              Status de integração em Sandbox e Produção, autenticação MFA e capacidade transacional.
+              Status real de integração bancária. Ausência de credenciais/contratos reflete estritamente NOT_CONFIGURED.
             </p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex items-center space-x-1 text-[10px]">
-          {(['ALL', 'READY', 'PARTIAL', 'BLOCKED'] as const).map((f) => (
+        <div className="flex items-center space-x-1 text-[10px] flex-wrap gap-1">
+          {(['ALL', 'NOT_CONFIGURED', 'NOT_VERIFIED', 'READY'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}

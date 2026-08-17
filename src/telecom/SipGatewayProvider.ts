@@ -3,11 +3,23 @@ import { TelecomProvider, TelecomCallRequest, TelecomCallSession } from './Telec
 export class SipGatewayProvider extends TelecomProvider {
   name = 'SIP Gateway Direct Core';
   code: 'sip' = 'sip';
-  activeMsisdn = 'sip:agent01@sip.portal.co.ao';
 
   async initiateCall(req: TelecomCallRequest): Promise<TelecomCallSession> {
+    const callId = `sip-call-${Date.now()}`;
+    if (!this.isConfigured) {
+      return {
+        id: callId,
+        callId,
+        providerName: this.name,
+        targetNumber: req.targetNumber,
+        callerMsisdn: this.activeMsisdn,
+        status: 'failed',
+        startTime: Date.now()
+      };
+    }
     return {
-      callId: `sip-call-${Date.now()}`,
+      id: callId,
+      callId,
       providerName: this.name,
       targetNumber: req.targetNumber,
       callerMsisdn: this.activeMsisdn,
@@ -22,10 +34,14 @@ export class SipGatewayProvider extends TelecomProvider {
 
   async sendSms(recipient: string, message: string): Promise<boolean> {
     console.log(`[SipGatewayProvider] MESSAGE para ${recipient}: ${message}`);
-    return true;
+    return this.isConfigured && this.isVerified;
   }
 
   async checkBalance() {
-    return { balanceMznOrAoa: 50000, currency: 'Kz' };
+    if (!this.isConfigured) {
+      return { balanceMznOrAoa: 0, currency: 'Kz', status: 'NOT_CONFIGURED' as const };
+    }
+    return { balanceMznOrAoa: 0, currency: 'Kz', status: 'NOT_VERIFIED' as const };
   }
 }
+

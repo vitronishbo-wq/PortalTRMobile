@@ -3,11 +3,23 @@ import { TelecomProvider, TelecomCallRequest, TelecomCallSession } from './Telec
 export class MovicelProvider extends TelecomProvider {
   name = 'Movicel Angola (LTE/CDMA)';
   code: 'movicel' = 'movicel';
-  activeMsisdn = '+244 912 666 333';
 
   async initiateCall(req: TelecomCallRequest): Promise<TelecomCallSession> {
+    const callId = `movicel-call-${Date.now()}`;
+    if (!this.isConfigured) {
+      return {
+        id: callId,
+        callId,
+        providerName: this.name,
+        targetNumber: req.targetNumber,
+        callerMsisdn: this.activeMsisdn,
+        status: 'failed',
+        startTime: Date.now()
+      };
+    }
     return {
-      callId: `movicel-call-${Date.now()}`,
+      id: callId,
+      callId,
       providerName: this.name,
       targetNumber: req.targetNumber,
       callerMsisdn: this.activeMsisdn,
@@ -22,10 +34,17 @@ export class MovicelProvider extends TelecomProvider {
 
   async sendSms(recipient: string, message: string): Promise<boolean> {
     console.log(`[MovicelProvider] SMS para ${recipient}: ${message}`);
-    return true;
+    return this.isConfigured && this.isVerified;
   }
 
   async checkBalance() {
-    return { balanceMznOrAoa: 9800, currency: 'Kz' };
+    if (!this.isConfigured) {
+      return { balanceMznOrAoa: 0, currency: 'Kz', status: 'NOT_CONFIGURED' as const };
+    }
+    if (!this.isVerified) {
+      return { balanceMznOrAoa: 0, currency: 'Kz', status: 'NOT_VERIFIED' as const };
+    }
+    return { balanceMznOrAoa: 0, currency: 'Kz', status: 'READY' as const };
   }
 }
+

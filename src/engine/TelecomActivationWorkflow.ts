@@ -97,18 +97,25 @@ export class TelecomActivationWorkflow {
 
     // Passo 7: Testar SMS
     steps[6].status = 'RUNNING';
-    steps[6].status = 'PASSED';
-    steps[6].detail = 'Rota SMPP de entrega de SMS simulada com sucesso.';
+    const storedCreds = typeof window !== 'undefined' ? localStorage.getItem(`telecom_creds_${carrierId}`) : null;
+    const credsObj = storedCreds ? JSON.parse(storedCreds) : null;
+    if (credsObj?.apiKey && credsObj?.verified) {
+      steps[6].status = 'PASSED';
+      steps[6].detail = 'Rota SMPP/REST de entrega de SMS verificada com credenciais.';
+    } else {
+      steps[6].status = 'SKIPPED';
+      steps[6].detail = 'Aguardando credenciais reais de Gateway SMS/SMPP (NOT_CONFIGURED).';
+    }
 
     // Passo 8: Testar chamada Real
     steps[7].status = 'RUNNING';
     const callTest: RealCallTestSuiteResult = await RealCallTestService.executeFullCallDiagnostic();
-    if (callTest.overall === 'PASSED') {
+    if (callTest.overall === 'PASSED' && credsObj?.verified) {
       steps[7].status = 'PASSED';
       steps[7].detail = 'Áudio WebRTC bidirecional e mídia homologados.';
     } else {
-      steps[7].status = 'PASSED'; // Não bloqueia se apenas o mic foi negado no browser
-      steps[7].detail = `Teste de mídia concluído (${callTest.overall}). Mapeamento WebRTC ativo.`;
+      steps[7].status = 'SKIPPED';
+      steps[7].detail = `Diagnóstico de mídia local concluído (${callTest.overall}). Requer credenciais de operadora ativas.`;
     }
 
     // Passo 9: Ativar serviço

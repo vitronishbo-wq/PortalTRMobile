@@ -3,11 +3,23 @@ import { TelecomProvider, TelecomCallRequest, TelecomCallSession } from './Telec
 export class ImsGatewayProvider extends TelecomProvider {
   name = 'IMS Core VoLTE Direct Gateway';
   code: 'ims' = 'ims';
-  activeMsisdn = '+244 222 000 999';
 
   async initiateCall(req: TelecomCallRequest): Promise<TelecomCallSession> {
+    const callId = `ims-call-${Date.now()}`;
+    if (!this.isConfigured) {
+      return {
+        id: callId,
+        callId,
+        providerName: this.name,
+        targetNumber: req.targetNumber,
+        callerMsisdn: this.activeMsisdn,
+        status: 'failed',
+        startTime: Date.now()
+      };
+    }
     return {
-      callId: `ims-call-${Date.now()}`,
+      id: callId,
+      callId,
       providerName: this.name,
       targetNumber: req.targetNumber,
       callerMsisdn: this.activeMsisdn,
@@ -22,10 +34,14 @@ export class ImsGatewayProvider extends TelecomProvider {
 
   async sendSms(recipient: string, message: string): Promise<boolean> {
     console.log(`[ImsGatewayProvider] Instant Message para ${recipient}: ${message}`);
-    return true;
+    return this.isConfigured && this.isVerified;
   }
 
   async checkBalance() {
-    return { balanceMznOrAoa: 100000, currency: 'Kz' };
+    if (!this.isConfigured) {
+      return { balanceMznOrAoa: 0, currency: 'Kz', status: 'NOT_CONFIGURED' as const };
+    }
+    return { balanceMznOrAoa: 0, currency: 'Kz', status: 'NOT_VERIFIED' as const };
   }
 }
+

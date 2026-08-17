@@ -268,8 +268,47 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center py-2 px-1 w-full max-w-md mx-auto font-sans select-none">
+    <div className="flex flex-col items-center justify-center py-2 px-1 w-full max-w-md mx-auto font-sans select-none relative">
       
+      {/* BOTÃO FÍSICO POWER NO CHASSIS (LADO DIREITO) */}
+      <div className="absolute -right-3 sm:-right-3.5 top-28 z-30 flex flex-col items-center">
+        <button
+          onMouseDown={handlePowerMouseDown}
+          onMouseUp={handlePowerMouseUp}
+          onTouchStart={handlePowerMouseDown}
+          onTouchEnd={handlePowerMouseUp}
+          className="w-2.5 sm:w-3 h-14 bg-gradient-to-r from-slate-700 to-slate-900 hover:from-emerald-600 hover:to-emerald-800 border-y border-r border-slate-600 rounded-r-md shadow-md active:translate-x-0.5 transition-all cursor-pointer group flex items-center justify-center"
+          title="Botão Power Físico: Clique curto = Tela ON/OFF | Segurar >1.5s = Menu de Energia"
+          aria-label="Power Button"
+        >
+          <span className="sr-only">Power</span>
+        </button>
+        <span className="text-[8px] font-mono text-slate-500 font-bold uppercase tracking-tighter mt-1 mr-1 hidden sm:inline">PWR</span>
+      </div>
+
+      {/* BOTÕES FÍSICOS DE VOLUME NO CHASSIS (LADO ESQUERDO) */}
+      <div className="absolute -left-3 sm:-left-3.5 top-24 z-30 flex flex-col items-center space-y-2">
+        {/* Volume UP */}
+        <button
+          onClick={() => HardwareEngine.adjustVolume('UP')}
+          className="w-2.5 sm:w-3 h-10 bg-gradient-to-l from-slate-700 to-slate-900 hover:from-indigo-600 hover:to-indigo-800 border-y border-l border-slate-600 rounded-l-md shadow-md active:-translate-x-0.5 transition-all cursor-pointer flex items-center justify-center"
+          title="Volume Físico +"
+          aria-label="Volume Up"
+        >
+          <span className="sr-only">Vol+</span>
+        </button>
+        {/* Volume DOWN */}
+        <button
+          onClick={() => HardwareEngine.adjustVolume('DOWN')}
+          className="w-2.5 sm:w-3 h-10 bg-gradient-to-l from-slate-700 to-slate-900 hover:from-indigo-600 hover:to-indigo-800 border-y border-l border-slate-600 rounded-l-md shadow-md active:-translate-x-0.5 transition-all cursor-pointer flex items-center justify-center"
+          title="Volume Físico -"
+          aria-label="Volume Down"
+        >
+          <span className="sr-only">Vol-</span>
+        </button>
+        <span className="text-[8px] font-mono text-slate-500 font-bold uppercase tracking-tighter ml-1 hidden sm:inline">VOL</span>
+      </div>
+
       {/* SMARTPHONE FRAME ENCLOSURE */}
       <div 
         className={`w-full bg-slate-950 border-4 border-slate-800/90 rounded-[2.5rem] shadow-2xl shadow-slate-950 overflow-hidden relative flex flex-col min-h-[580px] sm:min-h-[640px] border-t-slate-700/80 ${
@@ -277,20 +316,81 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
         }`}
       >
         
+        {/* VOLUME HUD DINÂMICO (CAMADA 43) */}
+        <VolumeHud volume={hwState.volume} visible={hwState.isVolumeHudVisible} />
+
+        {/* POWER MENU MODAL (CAMADA 45) */}
+        <PowerMenuModal isOpen={hwState.isPowerMenuOpen} />
+
+        {/* LOCKSCREEN NATIVA (CAMADA 44) */}
+        {hwState.screenState === 'LOCKED' && hwState.powerState === 'POWERED_ON' && (
+          <LockscreenView 
+            batteryLevel={batteryLevel} 
+            isOnline={isOnline} 
+            unreadNotifsCount={unreadNotifsCount} 
+          />
+        )}
+
+        {/* SLEEP / STANDBY / SCREEN OFF (CAMADA 42) */}
+        {hwState.screenState === 'SLEEP' && hwState.powerState === 'POWERED_ON' && (
+          <div 
+            onClick={() => HardwareEngine.handlePowerShortClick()}
+            className="absolute inset-0 z-40 bg-black flex flex-col items-center justify-center cursor-pointer select-none p-6 animate-in fade-in duration-200"
+          >
+            <div className="w-2 h-2 rounded-full bg-emerald-500/40 animate-ping mb-3" />
+            <span className="text-[11px] font-mono text-neutral-600 tracking-wider">
+              Ecrã em Suspensão • Toque para acordar
+            </span>
+          </div>
+        )}
+
+        {/* SEQUÊNCIA DE BOOT COS 2.0 (CAMADA 46) */}
+        {hwState.powerState === 'BOOTING' && (
+          <BootSequenceView 
+            progress={hwState.bootProgress} 
+            stage={hwState.bootStage} 
+          />
+        )}
+
+        {/* DISPOSITIVO TOTALMENTE DESLIGADO */}
+        {hwState.powerState === 'POWERED_OFF' && (
+          <div 
+            onClick={() => HardwareEngine.powerOn()}
+            className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center cursor-pointer select-none p-6 text-center"
+          >
+            <Power className="w-8 h-8 text-neutral-800 hover:text-emerald-500 transition-colors mb-3" />
+            <span className="text-xs font-mono text-neutral-600 tracking-wider">
+              Dispositivo Desligado
+            </span>
+            <span className="text-[10px] font-mono text-neutral-700 mt-1">
+              Clique no botão Power ou no ecrã para iniciar o COS
+            </span>
+          </div>
+        )}
+
         {/* CAMERA NOTCH / PUNCH HOLE */}
         <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-4 bg-slate-900 rounded-full border border-slate-800 z-30 flex items-center justify-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-slate-800 border border-slate-700"></span>
           <span className="w-1.5 h-1.5 rounded-full bg-indigo-500/60"></span>
         </div>
 
-        {/* CUSTOMIZE TRIGGER BUTTON (TOP RIGHT) */}
-        <button
-          onClick={() => setIsCustomizeOpen(!isCustomizeOpen)}
-          className="absolute top-2.5 right-3.5 z-40 p-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-amber-400 transition-all cursor-pointer shadow hover:scale-105 active:scale-95"
-          title="Personalizar Home (Wallpaper, Tema, Relógio, Ícones)"
-        >
-          <Palette className="w-3.5 h-3.5" />
-        </button>
+        {/* ACTION BUTTONS (TOP RIGHT): CUSTOMIZE & HARDWARE DIAGNOSTICS */}
+        <div className="absolute top-2.5 right-3.5 z-30 flex items-center space-x-1.5">
+          <button
+            onClick={() => setIsHardwareTestOpen(true)}
+            className="p-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-emerald-400 transition-all cursor-pointer shadow hover:scale-105 active:scale-95"
+            title="Diagnóstico de Hardware (Camada 48)"
+          >
+            <Cpu className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setIsCustomizeOpen(!isCustomizeOpen)}
+            className="p-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-amber-400 transition-all cursor-pointer shadow hover:scale-105 active:scale-95"
+            title="Personalizar Home (Wallpaper, Tema, Relógio, Ícones)"
+          >
+            <Palette className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
         {/* 1. TOPO DA TELA MOBILE: STATUS BAR */}
         {config.showStatusBar && (
@@ -575,6 +675,12 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
           onUpdateConfig={setConfig}
           onClose={() => setIsCustomizeOpen(false)}
           isOpen={isCustomizeOpen}
+        />
+
+        {/* TABELA DE VALIDAÇÃO DE HARDWARE (CAMADA 48) */}
+        <HardwareTestModal
+          isOpen={isHardwareTestOpen}
+          onClose={() => setIsHardwareTestOpen(false)}
         />
 
       </div>

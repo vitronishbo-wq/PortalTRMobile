@@ -3,11 +3,23 @@ import { TelecomProvider, TelecomCallRequest, TelecomCallSession } from './Telec
 export class UnitelProvider extends TelecomProvider {
   name = 'Unitel Angola (GSM/VoLTE Core)';
   code: 'unitel' = 'unitel';
-  activeMsisdn = '+244 923 888 111';
 
   async initiateCall(req: TelecomCallRequest): Promise<TelecomCallSession> {
+    const callId = `unitel-call-${Date.now()}`;
+    if (!this.isConfigured) {
+      return {
+        id: callId,
+        callId,
+        providerName: this.name,
+        targetNumber: req.targetNumber,
+        callerMsisdn: this.activeMsisdn,
+        status: 'failed',
+        startTime: Date.now()
+      };
+    }
     return {
-      callId: `unitel-call-${Date.now()}`,
+      id: callId,
+      callId,
       providerName: this.name,
       targetNumber: req.targetNumber,
       callerMsisdn: this.activeMsisdn,
@@ -22,10 +34,17 @@ export class UnitelProvider extends TelecomProvider {
 
   async sendSms(recipient: string, message: string): Promise<boolean> {
     console.log(`[UnitelProvider] SMS para ${recipient}: ${message}`);
-    return true;
+    return this.isConfigured && this.isVerified;
   }
 
   async checkBalance() {
-    return { balanceMznOrAoa: 15400, currency: 'Kz' };
+    if (!this.isConfigured) {
+      return { balanceMznOrAoa: 0, currency: 'Kz', status: 'NOT_CONFIGURED' as const };
+    }
+    if (!this.isVerified) {
+      return { balanceMznOrAoa: 0, currency: 'Kz', status: 'NOT_VERIFIED' as const };
+    }
+    return { balanceMznOrAoa: 0, currency: 'Kz', status: 'READY' as const };
   }
 }
+

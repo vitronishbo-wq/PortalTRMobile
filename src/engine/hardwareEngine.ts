@@ -113,12 +113,13 @@ export class HardwareEngine {
     this.state.isPowerMenuOpen = true;
     this.notify();
 
-    SecurityAuditService.log({
-      action: 'HARDWARE_POWER_MENU_OPENED',
-      severity: 'LOW',
-      details: 'Power Menu Dialog aberto via long-press do botão físico',
-      timestamp: Date.now()
-    }).catch(() => {});
+    SecurityAuditService.log(
+      'SYSTEM_COMMAND',
+      'HARDWARE_POWER_MENU_OPENED',
+      'SUCCESS',
+      'INFO',
+      { details: 'Power Menu Dialog aberto via long-press do botão físico' }
+    );
   }
 
   /**
@@ -194,12 +195,13 @@ export class HardwareEngine {
     this.state.isPowerMenuOpen = false;
     this.notify();
 
-    SecurityAuditService.log({
-      action: 'HARDWARE_POWER_OFF',
-      severity: 'MEDIUM',
-      details: 'Dispositivo desligado pelo utilizador',
-      timestamp: Date.now()
-    }).catch(() => {});
+    SecurityAuditService.log(
+      'SYSTEM_COMMAND',
+      'HARDWARE_POWER_OFF',
+      'SUCCESS',
+      'MEDIUM',
+      { details: 'Dispositivo desligado pelo utilizador' }
+    );
   }
 
   /**
@@ -226,12 +228,13 @@ export class HardwareEngine {
     this.state.screenState = 'LOCKED';
     this.notify();
 
-    SecurityAuditService.log({
-      action: 'HARDWARE_EMERGENCY_LOCKDOWN',
-      severity: 'CRITICAL',
-      details: 'Bloqueio de Emergência (*111#) acionado via Hardware Power Menu',
-      timestamp: Date.now()
-    }).catch(() => {});
+    SecurityAuditService.log(
+      'SECURITY_ALERT',
+      'HARDWARE_EMERGENCY_LOCKDOWN',
+      'SUCCESS',
+      'CRITICAL',
+      { details: 'Bloqueio de Emergência (*111#) acionado via Hardware Power Menu' }
+    );
   }
 
   /**
@@ -289,3 +292,34 @@ export class HardwareEngine {
     return updated;
   }
 }
+
+// Global Event listener for decoupled USSD and COS commands
+if (typeof window !== 'undefined') {
+  window.addEventListener('portal:command-executed', ((event: CustomEvent) => {
+    const actionId = event.detail?.actionId;
+    if (!actionId) return;
+
+    switch (actionId) {
+      case 'HARDWARE_TEST_POWER':
+        HardwareEngine.handlePowerLongPress();
+        break;
+      case 'HARDWARE_TEST_VOLUME':
+        HardwareEngine.adjustVolume('UP');
+        break;
+      case 'HARDWARE_TEST_LOCK':
+        HardwareEngine.lockScreen();
+        break;
+      case 'HARDWARE_TEST_AUDIO':
+        HapticEngine.trigger('DTMF');
+        HardwareEngine.setVolumeDirect(90);
+        break;
+      case 'HARDWARE_EMERGENCY_LOCK':
+        HardwareEngine.triggerEmergencyLockdown();
+        break;
+      case 'HARDWARE_POWER_OFF':
+        HardwareEngine.powerOff();
+        break;
+    }
+  }) as EventListener);
+}
+
