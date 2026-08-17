@@ -613,7 +613,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             </div>
             <div className="flex items-center space-x-2">
               <h2 className="text-sm sm:text-base font-black text-slate-100 tracking-tight">
-                Gestão Multiplataforma de Dispositivos (Device Mesh Fleet)
+                Gestão Multiplataforma
               </h2>
               <span className="px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-mono font-black text-[10px] tracking-wider uppercase">
                 {activeFleet.length} {activeFleet.length === 1 ? 'NÓ' : 'NÓS'}
