@@ -1,111 +1,182 @@
-export type OutboundCommandType = 'SEND_SMS' | 'MAKE_CALL' | 'SEND_WHATSAPP' | 'RUN_USSD' | 'SET_PROFILES';
-export type CommandStatus = 'QUEUED' | 'SENT_TO_NODE' | 'EXECUTED' | 'FAILED' | 'EXPIRED';
+import { FirestoreService } from './firestore';
+import { NodeCommandStatus, NodeExecutionStage, NodeOutboundCommand } from '../types/nodeContract';
 
-export interface OutboundCommand {
-  id: string;
-  nodeId: string;
-  type: OutboundCommandType;
-  recipient: string; // Phone number or contact
-  message?: string;  // Message text or USSD code (*111#)
-  payload?: Record<string, any>;
-  status: CommandStatus;
-  createdAt: number;
-  sentAt?: number;
-  executedAt?: number;
-  attempts: number;
-  error?: string;
-  resultPayload?: any;
-}
+export type OutboundCommandType = 'SEND_SMS' | 'MAKE_CALL' | 'RUN_USSD';
+export type CommandStatus = NodeCommandStatus;
+export type PhysicalExecutionStage = NodeExecutionStage;
+export type OutboundCommand = NodeOutboundCommand;
 
 export class OutboundCommandDispatcher {
-  private static commandQueue: OutboundCommand[] = [
-    {
-      id: 'cmd-901',
-      nodeId: 'node-angola-luanda-01',
-      type: 'SEND_SMS',
-      recipient: '+244923000111',
-      message: 'Sua fatura #8819 de 25.000 Kz foi emitida com sucesso. Pague via ProxyPay.',
-      status: 'EXECUTED',
-      createdAt: Date.now() - 3600000 * 2,
-      sentAt: Date.now() - 3600000 * 2 + 150,
-      executedAt: Date.now() - 3600000 * 2 + 1200,
-      attempts: 1,
-      resultPayload: { carrierStatus: 'DELIVERED', gsmSignal: '-78dBm' }
-    },
-    {
-      id: 'cmd-902',
-      nodeId: 'node-angola-luanda-01',
-      type: 'RUN_USSD',
-      recipient: '*111#',
-      message: '*111#',
-      status: 'EXECUTED',
-      createdAt: Date.now() - 1800000,
-      sentAt: Date.now() - 1800000 + 100,
-      executedAt: Date.now() - 1800000 + 3500,
-      attempts: 1,
-      resultPayload: { ussdResponse: 'O seu saldo principal e de 14.500 Kz valido ate 30/08/2026.' }
-    }
-  ];
+
+  private static readonly STORAGE_KEY = 'portal_outbound_commands_cache';
+  private static commandCache: OutboundCommand[] = [];
+  private static unsubscribeFirestore: (() => void) | null = null;
+  private static listeners: Set<(commands: OutboundCommand[]) => void> = new Set();
+  private static isInitialized = false;
 
   /**
-   * Enqueues a new command to be delivered to an Android Node
+   * Inicializa o dispatcher conectando ao listener do Firestore e carregando cache local
    */
-  static enqueueCommand(
+  public static init(): void {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+
+    // Carregar cache local de contingência
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      if (raw) {
+        this.commandCache = JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('[OutboundCommandDispatcher] Falha ao ler cache local:', e);
+    }
+
+    // Subscrever coleção /outbound_commands em tempo real
+    this.unsubscribeFirestore = FirestoreService.listenToOutboundCommands((firestoreList) => {
+      if (firestoreList && firestoreList.length > 0) {
+        this.commandCache = firestoreList as OutboundCommand[];
+        try {
+          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.commandCache.slice(0, 100)));
+        } catch {
+          // Ignora overflow
+        }
+        this.notifyListeners();
+      }
+    });
+  }
+
+  /**
+   * Enfileira e grava o comando real na coleção /outbound_commands do Firestore
+   */
+  public static enqueueCommand(
     nodeId: string,
     type: OutboundCommandType,
     recipient: string,
     message?: string,
     payload?: Record<string, any>
   ): OutboundCommand {
+    this.init();
+
+    const now = Date.now();
+    const commandId = `cmd_${now}_${Math.random().toString(36).substring(2, 7)}`;
+    const evidenceId = `ev_cmd_${now}`;
+
     const command: OutboundCommand = {
-      id: `cmd-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: commandId,
       nodeId,
       type,
       recipient,
       message,
       payload,
       status: 'QUEUED',
-      createdAt: Date.now(),
-      attempts: 0
+      executionStage: 'STORED_FIRESTORE',
+      createdAt: now,
+      storedAt: now,
+      attempts: 0,
+      evidenceId
     };
 
-    OutboundCommandDispatcher.commandQueue.unshift(command);
+    // Atualiza cache em memória e local imediato
+    this.commandCache.unshift(command);
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.commandCache.slice(0, 100)));
+    } catch {
+      // Fallback
+    }
+    this.notifyListeners();
+
+    // Persistência direta e real no Firestore
+    FirestoreService.saveOutboundCommand(command).catch((err) => {
+      console.error('[OutboundCommandDispatcher] Erro ao gravar comando no Firestore:', err);
+    });
+
     return command;
   }
 
   /**
-   * Retrieves pending commands for a specific Node (called by Android Node poll/SSE)
+   * Recupera comandos pendentes para um nó específico
    */
-  static getPendingCommandsForNode(nodeId: string): OutboundCommand[] {
-    return OutboundCommandDispatcher.commandQueue.filter(
+  public static getPendingCommandsForNode(nodeId: string): OutboundCommand[] {
+    this.init();
+    return this.commandCache.filter(
       (cmd) => (cmd.nodeId === nodeId || cmd.nodeId === 'ANY') && cmd.status === 'QUEUED'
     );
   }
 
   /**
-   * Updates status of a command upon response from Android Node
+   * Atualiza o status físico da execução após resposta do Daemon Android
    */
-  static acknowledgeCommand(
+  public static acknowledgeCommand(
     commandId: string,
     status: CommandStatus,
     resultPayload?: any,
     error?: string
   ): OutboundCommand | undefined {
-    const cmd = OutboundCommandDispatcher.commandQueue.find((c) => c.id === commandId);
-    if (cmd) {
-      cmd.status = status;
-      cmd.attempts += 1;
-      if (status === 'SENT_TO_NODE') cmd.sentAt = Date.now();
-      if (status === 'EXECUTED' || status === 'FAILED') {
-        cmd.executedAt = Date.now();
-        cmd.resultPayload = resultPayload;
-        cmd.error = error;
-      }
+    this.init();
+
+    const cmd = this.commandCache.find((c) => c.id === commandId);
+    const now = Date.now();
+    let stage: PhysicalExecutionStage = 'EXECUTING';
+
+    if (status === 'QUEUED') stage = 'STORED_FIRESTORE';
+    if (status === 'EXECUTING') stage = 'EXECUTING';
+    if (status === 'RESULT_CONFIRMED') stage = 'RESULT_CONFIRMED';
+    if (status === 'FAILED') stage = 'FAILED';
+
+    const updates: Partial<OutboundCommand> = {
+      status,
+      executionStage: stage,
+      attempts: (cmd?.attempts || 0) + 1,
+      resultPayload,
+      error
+    };
+
+    if (status === 'EXECUTING') updates.executingAt = now;
+    if (status === 'RESULT_CONFIRMED' || status === 'FAILED') {
+      updates.executedAt = now;
     }
+
+
+    if (cmd) {
+      Object.assign(cmd, updates);
+      try {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.commandCache.slice(0, 100)));
+      } catch {
+        // Fallback
+      }
+      this.notifyListeners();
+    }
+
+    // Persistência no Firestore
+    FirestoreService.updateOutboundCommand(commandId, updates).catch((err) => {
+      console.error('[OutboundCommandDispatcher] Erro ao atualizar comando no Firestore:', err);
+    });
+
     return cmd;
   }
 
-  static getAllCommands(): OutboundCommand[] {
-    return [...OutboundCommandDispatcher.commandQueue];
+  /**
+   * Retorna a lista completa de comandos
+   */
+  public static getAllCommands(): OutboundCommand[] {
+    this.init();
+    return [...this.commandCache];
+  }
+
+  /**
+   * Subscrição reativa para consoles da PWA
+   */
+  public static subscribe(listener: (commands: OutboundCommand[]) => void): () => void {
+    this.init();
+    this.listeners.add(listener);
+    listener([...this.commandCache]);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private static notifyListeners(): void {
+    const list = [...this.commandCache];
+    this.listeners.forEach((fn) => fn(list));
   }
 }

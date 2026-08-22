@@ -706,6 +706,278 @@ export class FirestoreService {
   }
 
   /**
+   * Salva ou atualiza um comando de saída em /outbound_commands
+   */
+  static async saveOutboundCommand(cmd: any): Promise<void> {
+    if (!db) return;
+    try {
+      const cmdRef = doc(db, 'outbound_commands', cmd.id);
+      await setDoc(cmdRef, {
+        ...cmd,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao salvar comando de saída:', error);
+    }
+  }
+
+  /**
+   * Listener em tempo real para comandos de saída (/outbound_commands)
+   */
+  static listenToOutboundCommands(
+    onData: (commands: any[]) => void,
+    onError?: (err: Error) => void
+  ): Unsubscribe {
+    if (!db) {
+      onData([]);
+      return () => {};
+    }
+    try {
+      const cmdRef = collection(db, 'outbound_commands');
+      const q = query(cmdRef, orderBy('createdAt', 'desc'), limit(100));
+      return onSnapshot(
+        q,
+        (snapshot) => {
+          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          onData(list);
+        },
+        (error) => {
+          console.warn('[FirestoreService] Erro ao escutar outbound_commands:', error.message);
+          if (onError) onError(error);
+        }
+      );
+    } catch (e) {
+      console.error('[FirestoreService] Erro na subscrição de outbound_commands:', e);
+      return () => {};
+    }
+  }
+
+  /**
+   * Atualiza o estado de um comando de saída (/outbound_commands/{cmdId})
+   */
+  static async updateOutboundCommand(cmdId: string, updates: Record<string, any>): Promise<void> {
+    if (!db) return;
+    try {
+      const cmdRef = doc(db, 'outbound_commands', cmdId);
+      await setDoc(cmdRef, {
+        ...updates,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao atualizar outbound_command:', error);
+    }
+  }
+
+  /**
+   * Salva definição de comando dinâmico em /commands/{commandId}
+   */
+  static async saveCommandDefinition(command: any): Promise<void> {
+    if (!db) return;
+    try {
+      const cmdRef = doc(db, 'commands', command.id);
+      await setDoc(cmdRef, {
+        ...command,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao salvar definição de comando:', error);
+    }
+  }
+
+  /**
+   * Escuta definições de comandos dinâmicos (/commands)
+   */
+  static listenToCommandDefinitions(
+    onData: (commands: any[]) => void,
+    onError?: (err: Error) => void
+  ): Unsubscribe {
+    if (!db) {
+      onData([]);
+      return () => {};
+    }
+    try {
+      const colRef = collection(db, 'commands');
+      return onSnapshot(
+        colRef,
+        (snapshot) => {
+          const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          onData(list);
+        },
+        (error) => {
+          console.warn('[FirestoreService] Erro ao escutar commands:', error.message);
+          if (onError) onError(error);
+        }
+      );
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao subscrever commands:', e);
+      return () => {};
+    }
+  }
+
+  /**
+   * Salva registro de execução de comando em /command_history/{historyId}
+   */
+  static async saveCommandHistory(historyEntry: any): Promise<void> {
+    if (!db) return;
+    try {
+      const histRef = doc(db, 'command_history', historyEntry.historyId);
+      await setDoc(histRef, {
+        ...historyEntry,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao salvar histórico de comando:', error);
+    }
+  }
+
+  /**
+   * Escuta histórico de execuções de comandos (/command_history)
+   */
+  static listenToCommandHistory(
+    onData: (history: any[]) => void,
+    onError?: (err: Error) => void
+  ): Unsubscribe {
+    if (!db) {
+      onData([]);
+      return () => {};
+    }
+    try {
+      const colRef = collection(db, 'command_history');
+      const q = query(colRef, orderBy('timestamp', 'desc'), limit(150));
+      return onSnapshot(
+        q,
+        (snapshot) => {
+          const list = snapshot.docs.map(d => ({ historyId: d.id, ...d.data() }));
+          onData(list);
+        },
+        (error) => {
+          console.warn('[FirestoreService] Erro ao escutar command_history:', error.message);
+          if (onError) onError(error);
+        }
+      );
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao subscrever command_history:', e);
+      return () => {};
+    }
+  }
+
+  /**
+   * Salva log de auditoria de segurança em /security_audit/{logId}
+   */
+  static async saveSecurityAuditLog(auditEntry: any): Promise<void> {
+    if (!db) return;
+    try {
+      const logId = auditEntry.logId || auditEntry.id;
+      const logRef = doc(db, 'security_audit', logId);
+      await setDoc(logRef, {
+        ...auditEntry,
+        timestamp: auditEntry.timestamp || Date.now()
+      }, { merge: true });
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao salvar log de auditoria:', error);
+    }
+  }
+
+  /**
+   * Escuta logs de auditoria de segurança (/security_audit)
+   */
+  static listenToSecurityAuditLogs(
+    onData: (logs: any[]) => void,
+    onError?: (err: Error) => void
+  ): Unsubscribe {
+    if (!db) {
+      onData([]);
+      return () => {};
+    }
+    try {
+      const colRef = collection(db, 'security_audit');
+      const q = query(colRef, orderBy('timestamp', 'desc'), limit(100));
+      return onSnapshot(
+        q,
+        (snapshot) => {
+          const list = snapshot.docs.map(d => ({ logId: d.id, id: d.id, ...d.data() }));
+          onData(list);
+        },
+        (error) => {
+          console.warn('[FirestoreService] Erro ao escutar security_audit:', error.message);
+          if (onError) onError(error);
+        }
+      );
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao subscrever security_audit:', e);
+      return () => {};
+    }
+  }
+
+  /**
+   * Atualiza presença e heartbeat em /presence/{presenceId}
+   */
+  static async updatePresenceHeartbeat(presence: any): Promise<void> {
+    if (!db) return;
+    try {
+      const docId = `${presence.uid}_${presence.deviceId}`;
+      const presRef = doc(db, 'presence', docId);
+      await setDoc(presRef, {
+        ...presence,
+        lastHeartbeat: Date.now(),
+        lastSeen: Date.now(),
+        ttlMs: 45000
+      }, { merge: true });
+    } catch (error) {
+      console.error('[FirestoreService] Erro ao atualizar heartbeat de presença:', error);
+    }
+  }
+
+  /**
+   * Escuta presença de todos os nós (/presence)
+   */
+  static listenToAllPresence(
+    onData: (presenceList: any[]) => void,
+    onError?: (err: Error) => void
+  ): Unsubscribe {
+    if (!db) {
+      onData([]);
+      return () => {};
+    }
+    try {
+      const colRef = collection(db, 'presence');
+      return onSnapshot(
+        colRef,
+        (snapshot) => {
+          const now = Date.now();
+          const list = snapshot.docs.map(d => {
+            const data = d.data();
+            const timeSinceHeartbeat = now - (data.lastHeartbeat || 0);
+            let dynamicStatus = data.status || 'offline';
+            if (dynamicStatus !== 'offline') {
+              if (timeSinceHeartbeat > 120000) {
+                dynamicStatus = 'offline';
+              } else if (timeSinceHeartbeat > 45000) {
+                dynamicStatus = 'away';
+              } else {
+                dynamicStatus = 'online';
+              }
+            }
+            return {
+              id: d.id,
+              ...data,
+              status: dynamicStatus
+            };
+          });
+          onData(list);
+        },
+        (error) => {
+          console.warn('[FirestoreService] Erro ao escutar presence:', error.message);
+          if (onError) onError(error);
+        }
+      );
+    } catch (e) {
+      console.error('[FirestoreService] Erro ao subscrever presence:', e);
+      return () => {};
+    }
+  }
+
+  /**
    * Escuta em tempo real os logs de ciclo de vida de atualização em campo (update_logs)
    */
   static listenToUpdateLogs(

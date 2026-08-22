@@ -13,6 +13,8 @@ export interface InstallState {
   isInstalled: boolean;
   canInstall: boolean;
   environment: InstallEnvironment;
+  platform: InstallEnvironment;
+  isInAppBrowser: boolean;
   hasNativePrompt: boolean;
 }
 
@@ -59,6 +61,15 @@ export class InstallEngine {
       this.deferredPrompt = e;
       this.notifyListeners();
     }
+  }
+
+  /**
+   * Deteta se o utilizador está dentro de WebViews / In-App Browsers (Instagram, WhatsApp, TikTok, etc.)
+   */
+  public static isInAppBrowser(): boolean {
+    if (typeof window === 'undefined') return false;
+    const ua = navigator.userAgent || navigator.vendor || (window as any).opera || '';
+    return /FBAN|FBAV|Instagram|WhatsApp|TikTok|Snapchat|Line|MicroMessenger|Twitter|FB_IAB/i.test(ua);
   }
 
   /**
@@ -114,10 +125,13 @@ export class InstallEngine {
    * Retorna o estado completo da engine
    */
   public static getState(): InstallState {
+    const env = this.getInstallEnvironment();
     return {
       isInstalled: this.isInstalled(),
       canInstall: this.canInstall(),
-      environment: this.getInstallEnvironment(),
+      environment: env,
+      platform: env,
+      isInAppBrowser: this.isInAppBrowser(),
       hasNativePrompt: Boolean(this.deferredPrompt)
     };
   }
@@ -148,17 +162,36 @@ export class InstallEngine {
   }
 
   /**
-   * DISPARA A INSTALAÇÃO EM 1 CLIQUE
-   * - Laptop/Android com beforeinstallprompt -> Exibe diálogo nativo do SO.
-   * - Iframe / AI Studio -> Abre diretamente https://portaltrmobile.web.app/ para disparar no browser nativo.
-   * - iOS Safari -> Orienta "Partilhar -> Adicionar ao ecrã principal".
+   * DISPARA A INSTALAÇÃO DETERMINÍSTICA
+   * - Android / Desktop com beforeinstallprompt -> Exibe diálogo nativo.
+   * - iOS Safari -> Fornece instrução determinística de 2 passos.
+   * - In-App Browser -> Avisa para abrir no Safari ou Chrome.
+   * - Iframe -> Oferece abertura no navegador nativo.
    */
-  public static async install(): Promise<{ success: boolean; outcome?: string; reason?: string }> {
+  public static async install(): Promise<{ success: boolean; outcome?: string; reason?: string; message?: string }> {
     if (this.isInstalled()) {
       return { success: true, outcome: 'ALREADY_INSTALLED', reason: 'A aplicação já está instalada neste dispositivo.' };
     }
 
-    // 1. Caso tenha o evento nativo em cache (Laptop Chrome/Edge ou Android)
+    if (this.isInAppBrowser()) {
+      return {
+        success: false,
+        reason: 'in_app_browser',
+        message: 'Navegador interno detetado. Abra no Safari (iOS) ou Chrome (Android) para instalar.'
+      };
+    }
+
+    const env = this.getInstallEnvironment();
+
+    if (env === 'MOBILE_IOS') {
+      return {
+        success: false,
+        reason: 'ios_manual_instruction',
+        message: 'No iOS Safari: Toque em Partilhar (ícone do quadrado com seta) e selecione "Adicionar ao Ecrã Principal".'
+      };
+    }
+
+    // 1. Caso tenha o evento nativo em cache (Desktop Chrome/Edge ou Android)
     if (this.deferredPrompt) {
       try {
         const promptEvent = this.deferredPrompt;
@@ -175,19 +208,21 @@ export class InstallEngine {
       }
     }
 
-    // 2. Se estiver dentro de iframe (AI Studio preview) ou sem evento nativo disponível no ambiente local
-    const env = this.getInstallEnvironment();
-    if (env === 'IFRAME_PREVIEW' || !this.deferredPrompt) {
-      // Abre a URL oficial pública numa nova aba onde o beforeinstallprompt nativo é garantido
+    // 2. Se estiver em Iframe Preview
+    if (env === 'IFRAME_PREVIEW') {
       this.openExternalInstall();
       return {
         success: true,
         outcome: 'REDIRECTED_EXTERNAL',
-        reason: 'A abrir o domínio oficial https://portaltrmobile.web.app/ para instalação nativa direta.'
+        reason: 'A abrir o domínio oficial para instalação nativa direta.'
       };
     }
 
-    return { success: false, reason: 'Ambiente não suporta instalação automática.' };
+    return {
+      success: false,
+      reason: 'prompt_not_ready',
+      message: 'Toque no menu (⋮) do navegador e selecione "Adicionar ao ecrã principal" ou "Instalar aplicação".'
+    };
   }
 }
 

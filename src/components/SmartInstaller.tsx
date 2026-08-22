@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { Smartphone, Apple, QrCode, Sparkles, CheckCircle2, ArrowDown, ExternalLink, ShieldCheck, Share, PlusSquare, Copy, Check } from 'lucide-react';
+import { InstallEngine, InstallState } from '../engine/installEngine';
 
 interface SmartInstallerProps {
   onContinueToApp?: () => void;
@@ -11,39 +12,30 @@ export const SmartInstaller: React.FC<SmartInstallerProps> = ({
   onContinueToApp,
   appName = 'Calculadora Padrão'
 }) => {
+  const [installState, setInstallState] = useState<InstallState>(InstallEngine.getState());
   const [deviceType, setDeviceType] = useState<'android' | 'ios' | 'desktop'>('desktop');
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [installed, setInstalled] = useState<boolean>(false);
   const [qrCodeData, setQrCodeData] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
+  const [showAndroidManual, setShowAndroidManual] = useState<boolean>(false);
   const currentUrl = typeof window !== 'undefined' ? window.location.href : 'https://portaltrmobile.web.app';
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Detect device type
-    const ua = navigator.userAgent.toLowerCase();
-    if (/iphone|ipad|ipod/.test(ua)) {
-      setDeviceType('ios');
-    } else if (/android/.test(ua)) {
-      setDeviceType('android');
-    } else {
-      setDeviceType('desktop');
-    }
-
-    // Capture PWA install prompt on Android / Chromium
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    const handleAppInstalled = () => {
-      setInstalled(true);
-      setDeferredPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
+    const unsubscribe = InstallEngine.subscribe((state) => {
+      setInstallState(state);
+      if (state.isInstalled) {
+        setInstalled(true);
+      }
+      if (state.platform === 'MOBILE_IOS') {
+        setDeviceType('ios');
+      } else if (state.platform === 'MOBILE_ANDROID') {
+        setDeviceType('android');
+      } else {
+        setDeviceType('desktop');
+      }
+    });
 
     // Generate QR code for desktop view
     QRCode.toDataURL(currentUrl, {
@@ -57,22 +49,15 @@ export const SmartInstaller: React.FC<SmartInstallerProps> = ({
       console.error('[SmartInstaller] Erro ao gerar QR Code:', err);
     });
 
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
+    return () => unsubscribe();
   }, [currentUrl]);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setInstalled(true);
-      }
-      setDeferredPrompt(null);
-    } else {
-      alert('Para instalar no Android: Toque no menu de 3 pontos do Chrome (⋮) e selecione "Adicionar ao ecrã principal" ou "Instalar aplicação".');
+    const res = await InstallEngine.install();
+    if (res.success) {
+      setInstalled(true);
+    } else if (res.reason === 'prompt_not_ready') {
+      setShowAndroidManual(true);
     }
   };
 
@@ -108,8 +93,28 @@ export const SmartInstaller: React.FC<SmartInstallerProps> = ({
             </div>
           )}
 
+          {/* IN-APP BROWSER DETECTED VIEW */}
+          {installState.isInAppBrowser && (
+            <div className="space-y-4 bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl animate-in fade-in duration-300">
+              <div className="flex items-center space-x-2 text-amber-400 font-bold text-sm">
+                <ExternalLink className="w-5 h-5" />
+                <span>Navegador Interno Detetado</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                As aplicações como Instagram, WhatsApp e Facebook bloqueiam a instalação de PWAs. Abra no navegador predefinido do seu smartphone (<strong>Safari</strong> no iOS ou <strong>Chrome</strong> no Android).
+              </p>
+              <button
+                onClick={handleCopy}
+                className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-2 border border-slate-700"
+              >
+                {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-400" />}
+                <span>{copied ? 'Ligação Copiada!' : 'Copiar Ligação para Navegador'}</span>
+              </button>
+            </div>
+          )}
+
           {/* ANDROID DEVICE VIEW */}
-          {deviceType === 'android' && (
+          {!installState.isInAppBrowser && deviceType === 'android' && (
             <div className="space-y-5 animate-in fade-in duration-300">
               <div className="text-center space-y-2">
                 <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto shadow-inner">

@@ -111,8 +111,8 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
   return (
     <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-5 font-mono text-slate-200">
       {/* Header IDE */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-4">
-        <div className="flex items-center space-x-3">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-800 pb-4 min-w-0 max-w-full">
+        <div className="flex items-center space-x-3 shrink-0">
           <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
             <Terminal className="w-5 h-5" />
           </div>
@@ -126,12 +126,12 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 min-w-0 max-w-full flex-1 lg:justify-end">
           {/* Navegação por Abas Densas */}
-          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs overflow-x-auto scrollbar-none">
+          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 min-w-0 max-w-full">
             <button
               onClick={() => setActiveTab('MANIFEST')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'MANIFEST' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -140,7 +140,7 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
             </button>
             <button
               onClick={() => setActiveTab('MODULES')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'MODULES' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -148,7 +148,7 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
             </button>
             <button
               onClick={() => setActiveTab('ADMINS')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'ADMINS' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -156,7 +156,7 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
             </button>
             <button
               onClick={() => setActiveTab('COMMANDS')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'COMMANDS' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -164,7 +164,7 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
             </button>
             <button
               onClick={() => setActiveTab('VAULT')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'VAULT' ? 'bg-amber-600 text-white' : 'text-amber-400 hover:text-amber-300'
               }`}
             >
@@ -173,7 +173,7 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
             </button>
             <button
               onClick={() => setActiveTab('SECRET_EXECUTIONS')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'SECRET_EXECUTIONS' ? 'bg-emerald-600 text-white' : 'text-emerald-400 hover:text-emerald-300'
               }`}
             >
@@ -182,7 +182,7 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
             </button>
             <button
               onClick={() => setActiveTab('SCHEDULED')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'SCHEDULED' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -191,7 +191,7 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
             </button>
             <button
               onClick={() => setActiveTab('LOGS')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'LOGS' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -199,7 +199,7 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
             </button>
             <button
               onClick={() => setActiveTab('EVIDENCE')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1.5 whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition flex items-center space-x-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
                 activeTab === 'EVIDENCE' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -211,7 +211,7 @@ export const FounderIDEWorkspace: React.FC<FounderIDEWorkspaceProps> = ({ onBack
           {onBackToPublic && (
             <button
               onClick={onBackToPublic}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shrink-0"
               title="Voltar ao Smartphone Principal"
             >
               <Smartphone className="w-3.5 h-3.5" />

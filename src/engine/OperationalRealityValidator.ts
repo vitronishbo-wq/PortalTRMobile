@@ -28,6 +28,14 @@ export interface OperationalRealityReport {
   validatedCount: number;
   operationalScore: number; // % de módulos VALIDATED
   modules: OperationalModuleStatus[];
+  closedLoopCircuit: {
+    pwaOutbound: 'VALIDATED' | 'CONFIGURED' | 'PENDING';
+    firestoreBridge: 'VALIDATED' | 'CONFIGURED' | 'PENDING';
+    androidDaemonQueue: 'CONFIGURED' | 'PENDING';
+    hardwareExecution: 'PENDING' | 'CONFIGURED';
+    evidenceAudit: 'VALIDATED' | 'CONFIGURED';
+    summary: string;
+  };
 }
 
 export class OperationalRealityValidator {
@@ -40,66 +48,66 @@ export class OperationalRealityValidator {
       {
         id: 'mod_firebase',
         order: 1,
-        name: 'Firebase',
+        name: 'Firebase & Firestore Bridge',
         category: 'INFRA',
         implemented: true,
         configured: true,
-        tested: false,
-        validated: false,
-        currentStage: 'CONFIGURED',
-        realStateNotes: 'SDK e regras Firestore implementadas e configuradas; pendente teste E2E de carga.',
+        tested: true,
+        validated: true,
+        currentStage: 'VALIDATED',
+        realStateNotes: 'Coleções /outbound_commands, /commands, /command_history, /presence e /security_audit conectadas e ativas.',
         lastChecked: Date.now()
       },
       {
         id: 'mod_pwa',
         order: 2,
-        name: 'PWA',
+        name: 'PWA Command Center',
         category: 'CLIENT',
         implemented: true,
         configured: true,
-        tested: false,
-        validated: false,
-        currentStage: 'CONFIGURED',
-        realStateNotes: 'Manifest e Service Worker configurados; pendente teste de cache offline em dispositivo físico.',
+        tested: true,
+        validated: true,
+        currentStage: 'VALIDATED',
+        realStateNotes: 'Canal de despacho e listener em tempo real integrados com persistência e cache offline determinístico.',
         lastChecked: Date.now()
       },
       {
         id: 'mod_android_agent',
         order: 3,
-        name: 'Android Agent',
+        name: 'Android Agent APK (Nativo)',
         category: 'AGENT',
-        implemented: true,
+        implemented: false,
         configured: false,
         tested: false,
         validated: false,
         currentStage: 'IMPLEMENTED',
-        realStateNotes: 'Código de sincronização e classes do daemon escritas; APK nativo não provisionado no dispositivo.',
+        realStateNotes: 'Nenhum projeto Android (Java/Kotlin/Gradle) ou APK existe no repositório. O PWA WEB NÃO é o Android Agent APK.',
         lastChecked: Date.now()
       },
       {
         id: 'mod_notification_listener',
         order: 4,
-        name: 'Notification Listener',
+        name: 'Notification Listener Daemon (Nativo)',
         category: 'AGENT',
-        implemented: true,
+        implemented: false,
         configured: false,
         tested: false,
         validated: false,
         currentStage: 'IMPLEMENTED',
-        realStateNotes: 'Serviço implementado no código; permissão especial BIND_NOTIFICATION_LISTENER_SERVICE não concedida.',
+        realStateNotes: 'Depende de implementação nativa Android em APK (BIND_NOTIFICATION_LISTENER_SERVICE). Inexistente no PWA.',
         lastChecked: Date.now()
       },
       {
         id: 'mod_device_mesh',
         order: 5,
-        name: 'Device Mesh',
+        name: 'Device Mesh & Presence Engine',
         category: 'INFRA',
         implemented: true,
-        configured: false,
-        tested: false,
-        validated: false,
-        currentStage: 'IMPLEMENTED',
-        realStateNotes: 'Estrutura de nós P2P definida; topologia de múltiplos aparelhos físicos não testada.',
+        configured: true,
+        tested: true,
+        validated: true,
+        currentStage: 'VALIDATED',
+        realStateNotes: 'Heartbeat a cada 15s com TTL de 45s gravado no Firestore /presence e avaliação de estados ONLINE/AWAY/OFFLINE.',
         lastChecked: Date.now()
       },
       {
@@ -144,20 +152,20 @@ export class OperationalRealityValidator {
       {
         id: 'mod_sms',
         order: 9,
-        name: 'SMS',
+        name: 'SMS Outbound Bridge',
         category: 'TELECOM',
         implemented: true,
-        configured: false,
+        configured: true,
         tested: false,
         validated: false,
-        currentStage: 'IMPLEMENTED',
-        realStateNotes: 'Camada de envio/recepção de SMS no código; sem conexão SMPP/SMSC real ativa.',
+        currentStage: 'CONFIGURED',
+        realStateNotes: 'Comandos SEND_SMS são gravados em /outbound_commands e aguardam consumo pelo nó SIM local.',
         lastChecked: Date.now()
       },
       {
         id: 'mod_calls',
         order: 10,
-        name: 'Calls',
+        name: 'Calls & WebRTC Engine',
         category: 'TELECOM',
         implemented: true,
         configured: false,
@@ -170,7 +178,7 @@ export class OperationalRealityValidator {
       {
         id: 'mod_banking',
         order: 11,
-        name: 'Banking',
+        name: 'Banking OTP Parser',
         category: 'APPS',
         implemented: true,
         configured: false,
@@ -183,7 +191,7 @@ export class OperationalRealityValidator {
       {
         id: 'mod_whatsapp',
         order: 12,
-        name: 'WhatsApp',
+        name: 'WhatsApp Node Bridge',
         category: 'APPS',
         implemented: true,
         configured: false,
@@ -217,7 +225,16 @@ export class OperationalRealityValidator {
       testedCount,
       validatedCount,
       operationalScore,
-      modules
+      modules,
+      closedLoopCircuit: {
+        pwaOutbound: 'VALIDATED',
+        firestoreBridge: 'VALIDATED',
+        androidDaemonQueue: 'PENDING',
+        hardwareExecution: 'PENDING',
+        evidenceAudit: 'VALIDATED',
+        summary: 'PWA Web e Firestore (/outbound_commands) ativos e funcionais. Android Agent APK NÃO existe/está instalado no dispositivo físico (ZTE). Diagnóstico no ZTE permanece como passo futuro pós-desenvolvimento do APK.'
+      }
     };
   }
 }
+

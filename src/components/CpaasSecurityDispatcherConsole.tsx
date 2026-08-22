@@ -60,6 +60,10 @@ export const CpaasSecurityDispatcherConsole: React.FC = () => {
 
   useEffect(() => {
     refreshData();
+    const unsub = OutboundCommandDispatcher.subscribe((updatedCmds) => {
+      setCommands(updatedCmds);
+    });
+    return () => unsub();
   }, []);
 
   // Dispatch Command to Android Node

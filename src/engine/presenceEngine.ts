@@ -1,4 +1,7 @@
 /* PortalTRMobile Presence Engine — Camada 17 Presence Engine */
+// Presença Real com Heartbeat e TTL sincronizada no Firestore (/presence)
+
+import { FirestoreService } from '../services/firestore';
 
 export type PresenceStatus = 'online' | 'offline' | 'busy' | 'away' | 'in-call' | 'invisible';
 
@@ -9,6 +12,7 @@ export interface UserPresence {
   customStatusMessage?: string;
   lastSeen: number;
   lastHeartbeat: number;
+  ttlMs?: number;
   activeCallId?: string;
   deviceType: 'android' | 'ios' | 'web' | 'desktop' | 'virtual';
   batteryLevel?: number;
@@ -21,25 +25,61 @@ class PresenceEngineService {
   private presenceMap: Map<string, UserPresence> = new Map();
   private heartbeatTimer: any = null;
   private listeners: Set<(presenceList: UserPresence[]) => void> = new Set();
-  private isListening: boolean = false;
+  private isListeningFirestore: boolean = false;
+  private unsubscribeFirestore: (() => void) | null = null;
 
   public init(uid: string, deviceId: string, deviceType: UserPresence['deviceType'] = 'web'): void {
     if (this.currentPresence && this.currentPresence.uid === uid && this.currentPresence.deviceId === deviceId) {
       return;
     }
 
+    const now = Date.now();
     this.currentPresence = {
       uid,
       deviceId,
       status: 'online',
-      lastSeen: Date.now(),
-      lastHeartbeat: Date.now(),
+      lastSeen: now,
+      lastHeartbeat: now,
+      ttlMs: 45000,
       deviceType
     };
 
     this.presenceMap.set(`${uid}_${deviceId}`, this.currentPresence);
+    this.syncToFirestore();
     this.startHeartbeat();
     this.bindWindowEvents();
+    this.startFirestoreListener();
+  }
+
+  private startFirestoreListener(): void {
+    if (this.isListeningFirestore) return;
+    this.isListeningFirestore = true;
+
+    this.unsubscribeFirestore = FirestoreService.listenToAllPresence((remoteList) => {
+      remoteList.forEach((item) => {
+        if (item.uid && item.deviceId) {
+          const key = `${item.uid}_${item.deviceId}`;
+          // Se for o nó atual local, mantém o status atual se estiver gravando
+          if (this.currentPresence && `${this.currentPresence.uid}_${this.currentPresence.deviceId}` === key) {
+            return;
+          }
+          this.presenceMap.set(key, item as UserPresence);
+        }
+      });
+      this.notifySubscribers();
+    });
+  }
+
+  private syncToFirestore(): void {
+    if (!this.currentPresence) return;
+    FirestoreService.updatePresenceHeartbeat({
+      ...this.currentPresence,
+      lastHeartbeat: Date.now(),
+      lastSeen: Date.now(),
+      ttlMs: 45000
+    }).catch((err) => {
+      console.warn('[PresenceEngine] Falha ao enviar heartbeat para Firestore:', err);
+    });
   }
 
   private startHeartbeat(): void {
@@ -47,8 +87,10 @@ class PresenceEngineService {
 
     this.heartbeatTimer = setInterval(() => {
       if (this.currentPresence && this.currentPresence.status !== 'offline') {
-        this.currentPresence.lastHeartbeat = Date.now();
-        this.currentPresence.lastSeen = Date.now();
+        const now = Date.now();
+        this.currentPresence.lastHeartbeat = now;
+        this.currentPresence.lastSeen = now;
+        this.syncToFirestore();
         this.notifySubscribers();
       }
     }, 15000);
@@ -76,6 +118,7 @@ class PresenceEngineService {
       if (this.currentPresence) {
         this.currentPresence.status = 'offline';
         this.currentPresence.lastSeen = Date.now();
+        this.syncToFirestore();
       }
     });
   }
@@ -87,9 +130,11 @@ class PresenceEngineService {
     if (customMessage !== undefined) {
       this.currentPresence.customStatusMessage = customMessage;
     }
-    this.currentPresence.lastSeen = Date.now();
-    this.currentPresence.lastHeartbeat = Date.now();
+    const now = Date.now();
+    this.currentPresence.lastSeen = now;
+    this.currentPresence.lastHeartbeat = now;
     this.presenceMap.set(`${this.currentPresence.uid}_${this.currentPresence.deviceId}`, { ...this.currentPresence });
+    this.syncToFirestore();
     this.notifySubscribers();
   }
 
@@ -104,6 +149,7 @@ class PresenceEngineService {
       this.currentPresence.activeCallId = undefined;
     }
     this.currentPresence.lastSeen = Date.now();
+    this.syncToFirestore();
     this.notifySubscribers();
   }
 
@@ -117,7 +163,23 @@ class PresenceEngineService {
   }
 
   public getAllPresences(): UserPresence[] {
-    return Array.from(this.presenceMap.values());
+    const now = Date.now();
+    // Avalia TTL dinamicamente para cada nó
+    return Array.from(this.presenceMap.values()).map((p) => {
+      const timeSinceHeartbeat = now - (p.lastHeartbeat || 0);
+      let evaluatedStatus = p.status;
+      if (evaluatedStatus !== 'offline') {
+        if (timeSinceHeartbeat > 120000) {
+          evaluatedStatus = 'offline';
+        } else if (timeSinceHeartbeat > 45000) {
+          evaluatedStatus = 'away';
+        }
+      }
+      return {
+        ...p,
+        status: evaluatedStatus
+      };
+    });
   }
 
   public subscribe(listener: (presenceList: UserPresence[]) => void): () => void {
@@ -135,3 +197,4 @@ class PresenceEngineService {
 }
 
 export const presenceEngine = new PresenceEngineService();
+

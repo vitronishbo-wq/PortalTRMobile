@@ -16,19 +16,67 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Rules for 'events' collection
+    // Rules for 'events' collection (Node Physical Events)
     match /events/{eventId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.uid == request.auth.uid);
-      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || request.resource.data.uid == request.auth.uid);
-      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.uid == request.auth.uid);
+      allow read: if isSignedIn() && (
+        resource.data.uid == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.pairedUid == request.auth.uid
+      );
+      allow create: if isSignedIn() 
+        && request.resource.data.deviceId != null 
+        && request.resource.data.type in ['SMS_RECEIVED', 'CALL_MISSED', 'NOTIFICATION_RECEIVED', 'USSD_RESPONSE']
+        && request.resource.data.timestamp is number;
+      allow update: if isSignedIn() && (
+        resource.data.deviceId == request.resource.data.deviceId &&
+        (resource.data.uid == request.auth.uid || resource.data.userId == request.auth.uid || resource.data.pairedUid == request.auth.uid)
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.uid == request.auth.uid ||
+        resource.data.pairedUid == request.auth.uid
+      );
     }
 
     // Rules for 'devices' collection
     match /devices/{deviceId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.uid == request.auth.uid);
-      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || request.resource.data.uid == request.auth.uid);
-      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.uid == request.auth.uid);
+      allow read: if isSignedIn() && (
+        resource.data.pairedUid == request.auth.uid ||
+        resource.data.userId == request.auth.uid ||
+        resource.data.deviceId == deviceId
+      );
+      allow create: if isSignedIn() && request.resource.data.deviceId == deviceId;
+      allow update: if isSignedIn() && (
+        request.resource.data.deviceId == deviceId &&
+        (resource.data.pairedUid == request.auth.uid || resource.data.userId == request.auth.uid || request.resource.data.pairedUid == request.auth.uid)
+      );
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.pairedUid == request.auth.uid);
     }
+
+    // Rules for 'outbound_commands' collection (PWA -> Agent command queue)
+    match /outbound_commands/{commandId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.nodeId != null
+        && request.resource.data.type in ['SEND_SMS', 'MAKE_CALL', 'RUN_USSD']
+        && request.resource.data.status in ['QUEUED', 'EXECUTING', 'RESULT_CONFIRMED', 'FAILED', 'EXPIRED'];
+      allow update: if isSignedIn() && (
+        // Agent atualizando status de execução ou PWA cancelando
+        request.resource.data.status in ['QUEUED', 'EXECUTING', 'RESULT_CONFIRMED', 'FAILED', 'EXPIRED']
+      );
+      allow delete: if isSignedIn();
+    }
+
+    // Rules for 'presence' collection (Strict heartbeat / presence pulse)
+    match /presence/{presenceId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && (
+        request.resource.data.lastHeartbeat is number &&
+        request.resource.data.ttlMs is number
+      );
+      allow delete: if isSignedIn();
+    }
+
 
     // Rules for 'users' collection and user subcollections
     match /users/{userId} {
